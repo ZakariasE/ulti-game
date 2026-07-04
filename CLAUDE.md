@@ -42,25 +42,37 @@ Eight ranks per suit: Ász (Ace), Király (King), Felső (Over), Alsó (Under), 
 
 ### Bidding
 
-1. The player to the dealer's right receives the talon (2 face-down cards).
-2. They may take the talon (pick up both cards, discard 2 from their extended hand) and name a contract, or pass the talon to the next player anticlockwise.
-3. Each player who takes the talon must bid a contract **higher** than the current high bid, then discard 2 cards.
-4. Bidding ends when 3 consecutive players pass.
+1. The player to the dealer's right is dealt **12 cards** (their 10 + the 2-card talon).
+2. That player **must discard 2** (forming a new face-down talon) and **declare an opening contract** (at least Simple).
+3. Going anticlockwise, each other player may **pass**, or **"rob"** — pick up the 2-card talon, discard 2, and declare a **higher** contract.
+4. Bidding ends only when **all three players pass in succession** after the last bid. The high bidder gets a final turn to rob their **own** talon and raise; if they pass too, bidding closes.
 5. The highest bidder is the **declarer**; the other two are **defenders**.
-6. If all three players pass without any bid: the player to dealer's right is forced to play Simple (minor) — placeholder rule.
+6. The final talon on the table counts toward the declarer's card points.
 
-### Contracts (Phase 1)
+### Contracts
 
 | Contract | Points (minor / hearts) | Win Condition |
 |---|---|---|
 | Simple (Parti) | 1 / 2 | Declarer scores ≥ 50 of 90 card points |
+| 40-100 | 4 / 8 | Score ≥ 100 incl. a 40-pt marriage (K+O) in the **trump** suit |
+| 20-100 | 8 / 16 | Score ≥ 100 incl. a 20-pt marriage (K+O) in a **non-trump** suit |
 | Ulti | 4 / 8 (lose: −8 / −16) | Score ≥ 50 AND win last trick with the 7 of trumps |
 | Betli | 5 (flat) | Declarer wins zero tricks (no trumps) |
+| Heart Betli | 10 (flat) | As Betli, higher stake |
+| Open Betli | 20 (flat) | Betli with declarer's hand revealed after trick 1 |
 | Durchmars | 6 (flat) | Declarer wins all 10 tricks (no trumps) |
+| Heart Durchmars | 12 (flat) | As Durchmars, higher stake |
+| Open Durchmars | 24 (flat) | Durchmars with declarer's hand revealed after trick 1 |
 
-**Bid rank (lowest → highest):** Simple(minor) < Simple(hearts) < Betli < Ulti(minor) < Durchmars < Ulti(hearts)
+**Bid ladder (low → high):** Simple(minor) < Simple(hearts) < 40-100(minor) < Betli < Ulti(minor) < Durchmars < 40-100(hearts) < 20-100(minor) < Ulti(hearts) < Heart Betli < Heart Durchmars < 20-100(hearts) < Open Betli < Open Durchmars.
 
-**Payout:** On win, each defender pays the declarer `basePoints`. On loss, the declarer pays each defender `basePoints`. Hearts doubles Simple and Ulti only; Betli and Durchmars are flat.
+**Payout:** On win, each defender pays the declarer `basePoints`. On loss, the declarer pays each defender `basePoints`. Hearts doubles the trump contracts (Simple, 40-100, Ulti, 20-100); the Betli/Durchmars variants are flat.
+
+**Marriages** (40-100 / 20-100) are auto-detected from the King + Over the declarer held in the relevant suit (simplified — no explicit in-play declaration yet).
+
+### Kontra (doubling)
+
+Before the first trick finishes, a **defender** may call **Kontra** (×2). The declarer answers with **Rekontra** (×4), then a defender **Szubkontra** (×8), and so on — each doubling the stakes. The multiplier applies to the round's payout.
 
 ### Trick-Taking Rules
 
