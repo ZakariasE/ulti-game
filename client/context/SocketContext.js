@@ -11,9 +11,14 @@ export function SocketProvider({ children }) {
     socket.connect()
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
+    socket.on('connect_error', (err) => {
+      setConnected(false)
+      console.error('Socket connection error:', err.message)
+    })
     return () => {
       socket.off('connect')
       socket.off('disconnect')
+      socket.off('connect_error')
     }
   }, [])
 

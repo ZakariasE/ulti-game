@@ -7,7 +7,7 @@ import styles from '../styles/Lobby.module.css'
 
 export default function Lobby() {
   const router = useRouter()
-  const { emit, socket } = useSocket()
+  const { emit, socket, connected } = useSocket()
   const { state, dispatch } = useGame()
   const [playerName, setPlayerName] = useState('')
   const [joinCode, setJoinCode] = useState('')
@@ -45,12 +45,14 @@ export default function Lobby() {
   }, [socket, playerName, dispatch, router])
 
   function handleCreate() {
+    if (!connected) return setError('Not connected to server. Is it running?')
     if (!playerName.trim()) return setError('Enter your name first')
     setError('')
     emit('room:create', { playerName: playerName.trim() })
   }
 
   function handleJoin() {
+    if (!connected) return setError('Not connected to server. Is it running?')
     if (!playerName.trim()) return setError('Enter your name first')
     if (!joinCode.trim()) return setError('Enter a room code')
     setError('')
@@ -63,6 +65,9 @@ export default function Lobby() {
       <div className={styles.page}>
         <h1 className={styles.title}>Ulti</h1>
         <p className={styles.subtitle}>Hungarian Card Game</p>
+        <p className={styles.status}>
+          {connected ? '● Connected' : '○ Connecting to server...'}
+        </p>
 
         <div className={styles.card}>
           <label className={styles.label}>Your name</label>
