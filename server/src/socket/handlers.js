@@ -1,7 +1,7 @@
 const rooms = require('../rooms/RoomManager')
 const {
-  applyDeal, applyTalonTake, applyTalonPass, applyDiscard,
-  applyBid, applyPass, applyPlayCard, prepareNextRound, _getLegalCardIds,
+  applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
+  applyPlayCard, prepareNextRound, biddingSnapshot, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
 
 function registerHandlers(io, socket) {
@@ -11,12 +11,7 @@ function registerHandlers(io, socket) {
     try {
       const { roomCode, state } = rooms.createRoom(socket.id, playerName)
       socket.join(roomCode)
-      socket.emit('room:created', {
-        roomCode,
-        playerId: socket.id,
-        seat: 0,
-        players: state.players,
-      })
+      socket.emit('room:created', { roomCode, playerId: socket.id, seat: 0, players: state.players })
     } catch (err) {
       socket.emit('room:error', { message: err.message })
     }
@@ -27,10 +22,7 @@ function registerHandlers(io, socket) {
       const { state, player } = rooms.joinRoom(socket.id, roomCode, playerName)
       socket.join(roomCode)
       socket.emit('room:joined', {
-        roomCode,
-        playerId: socket.id,
-        seat: player.seatIndex,
-        players: state.players,
+        roomCode, playerId: socket.id, seat: player.seatIndex, players: state.players,
       })
       socket.to(roomCode).emit('room:playerJoined', { players: state.players })
     } catch (err) {
@@ -38,7 +30,7 @@ function registerHandlers(io, socket) {
     }
   })
 
-  // ── Game start ─────────────────────────────────────────────────────────────
+  // ── Game start / deal ────────────────────────────────────────────────────────
 
   socket.on('game:start', ({ roomCode }) => {
     try {
@@ -47,23 +39,8 @@ function registerHandlers(io, socket) {
       if (state.players.length !== 3) throw new Error('Need exactly 3 players')
       if (state.phase !== 'LOBBY') throw new Error('Game already started')
 
-      const { hands, talon } = applyDeal(state)
-
-      io.to(roomCode).emit('game:started', {
-        dealerIndex: state.dealerIndex,
-        firstBidderSeat: state.bidding.currentBidderSeat,
-        players: state.players,
-      })
-
-      // Send each player their private hand
-      state.players.forEach((p) => {
-        const isFirstBidder = p.seatIndex === state.bidding.currentBidderSeat
-        io.to(p.id).emit('hand:dealt', { hand: hands[p.seatIndex], isFirstBidder })
-      })
-
-      // Offer talon to first bidder
-      const firstBidder = state.players.find((p) => p.seatIndex === state.bidding.currentBidderSeat)
-      io.to(roomCode).emit('bid:talonOffered', { playerId: firstBidder.id })
+      applyDeal(state)
+      _dealAndAnnounce(io, roomCode, state)
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -71,60 +48,33 @@ function registerHandlers(io, socket) {
 
   // ── Bidding ────────────────────────────────────────────────────────────────
 
-  socket.on('talon:take', ({ roomCode }) => {
+  socket.on('bid:discard', ({ roomCode, cardIds }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      const { talonCards } = applyTalonTake(state, socket.id)
-      io.to(socket.id).emit('bid:talonCards', { cards: talonCards })
-      io.to(roomCode).emit('bid:talonTaken', { playerId: socket.id })
+      applyBidDiscard(state, socket.id, cardIds)
+      _sendHand(io, state, socket.id) // hand went 12 → 10
+      io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
   })
 
-  socket.on('talon:pass', ({ roomCode }) => {
+  socket.on('bid:declare', ({ roomCode, contract, suit }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      const result = applyTalonPass(state, socket.id)
-
-      if (result.forced) {
-        io.to(result.forcedPlayerId).emit('bid:talonCards', { cards: result.talonCards })
-        io.to(roomCode).emit('bid:forced', { playerId: result.forcedPlayerId })
-      } else {
-        const nextPlayer = state.players.find((p) => p.seatIndex === result.nextBidderSeat)
-        io.to(roomCode).emit('bid:talonPassed', {
-          fromPlayerId: socket.id,
-          toPlayerId: nextPlayer.id,
-        })
-        io.to(roomCode).emit('bid:talonOffered', { playerId: nextPlayer.id })
-      }
+      applyDeclare(state, socket.id, contract, suit)
+      io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
   })
 
-  socket.on('talon:discard', ({ roomCode, cardIds }) => {
+  socket.on('bid:rob', ({ roomCode }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      applyDiscard(state, socket.id, cardIds)
-      // Client now needs to bid — BidPanel will prompt them
-      io.to(roomCode).emit('bid:discarded', { playerId: socket.id })
-    } catch (err) {
-      socket.emit('game:error', { message: err.message })
-    }
-  })
-
-  socket.on('bid:place', ({ roomCode, contract, suit }) => {
-    try {
-      const state = rooms.getRoom(roomCode)
-      applyBid(state, socket.id, contract, suit)
-      const nextPlayer = state.players.find((p) => p.seatIndex === state.bidding.currentBidderSeat)
-      io.to(roomCode).emit('bid:placed', {
-        playerId: socket.id,
-        contract,
-        suit,
-        nextBidderId: nextPlayer.id,
-      })
+      applyRob(state, socket.id)
+      _sendHand(io, state, socket.id) // hand went 10 → 12
+      io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -133,62 +83,43 @@ function registerHandlers(io, socket) {
   socket.on('bid:pass', ({ roomCode }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      const result = applyPass(state, socket.id)
-
+      const result = applyBidPass(state, socket.id)
       if (result.biddingComplete) {
         io.to(roomCode).emit('bid:resolved', {
-          declarerId: result.declarerId,
-          contract: result.contract,
-          suit: result.suit,
+          declarerId: result.declarerId, contract: result.contract, suit: result.suit,
         })
-        _startTrick(io, roomCode, state)
+        _promptNextTurn(io, roomCode, state)
       } else {
-        const nextPlayer = state.players.find((p) => p.seatIndex === state.bidding.currentBidderSeat)
-        io.to(roomCode).emit('bid:passed', {
-          playerId: socket.id,
-          nextBidderId: nextPlayer.id,
-        })
+        io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
       }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
   })
 
-  // ── Card play ──────────────────────────────────────────────────────────────
+  // ── Card play ────────────────────────────────────────────────────────────────
 
   socket.on('card:play', ({ roomCode, cardId }) => {
     try {
       const state = rooms.getRoom(roomCode)
       const result = applyPlayCard(state, socket.id, cardId)
-      const card = result // playCard mutates state; find the card that was played
-      // Find what card was played (it's been removed from hand, so check completed tricks or current trick)
-      const playedEntry = state.play.currentTrick.cards.find((c) => c.playerId === socket.id)
-        || state.play.completedTricks[state.play.completedTricks.length - 1]?.cards.find(
-          (c) => c.playerId === socket.id
-        )
 
       io.to(roomCode).emit('card:played', {
         playerId: socket.id,
-        card: playedEntry?.card || { id: cardId },
+        card: result.playedCard,
         trickSoFar: state.play.currentTrick.cards,
+        handCounts: handCounts(state),
       })
 
       if (result.trickComplete) {
-        io.to(roomCode).emit('trick:completed', {
-          winnerId: result.winnerId,
-          points: result.points,
-        })
-
+        io.to(roomCode).emit('trick:completed', { winnerId: result.winnerId, points: result.points })
         if (result.roundComplete) {
-          io.to(roomCode).emit('round:completed', {
-            result: state.roundResult,
-            scores: state.scores,
-          })
+          io.to(roomCode).emit('round:completed', { result: state.roundResult, scores: state.scores })
         } else {
-          _startTrick(io, roomCode, state)
+          setTimeout(() => _promptNextTurn(io, roomCode, state), 1200) // brief pause to view the trick
         }
       } else {
-        _startTrick(io, roomCode, state)
+        _promptNextTurn(io, roomCode, state)
       }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
@@ -198,56 +129,50 @@ function registerHandlers(io, socket) {
   socket.on('round:continue', ({ roomCode }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      // Track who has confirmed
       if (!state._readyForNext) state._readyForNext = new Set()
       state._readyForNext.add(socket.id)
 
-      if (state._readyForNext.size >= state.players.filter((p) => p.isConnected).length) {
+      const connected = state.players.filter((p) => p.isConnected).length
+      if (state._readyForNext.size >= connected) {
         state._readyForNext = null
         prepareNextRound(state)
-        const { hands } = applyDeal(state)
-
-        io.to(roomCode).emit('game:started', {
-          dealerIndex: state.dealerIndex,
-          firstBidderSeat: state.bidding.currentBidderSeat,
-          players: state.players,
-        })
-
-        state.players.forEach((p) => {
-          const isFirstBidder = p.seatIndex === state.bidding.currentBidderSeat
-          io.to(p.id).emit('hand:dealt', { hand: hands[p.seatIndex], isFirstBidder })
-        })
-
-        const firstBidder = state.players.find(
-          (p) => p.seatIndex === state.bidding.currentBidderSeat
-        )
-        io.to(roomCode).emit('bid:talonOffered', { playerId: firstBidder.id })
+        applyDeal(state)
+        _dealAndAnnounce(io, roomCode, state)
       }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
   })
 
-  // ── Disconnect ─────────────────────────────────────────────────────────────
-
   socket.on('disconnect', () => {
     const roomCode = rooms.removePlayer(socket.id)
-    if (roomCode) {
-      socket.to(roomCode).emit('room:playerLeft', { playerId: socket.id })
-    }
+    if (roomCode) socket.to(roomCode).emit('room:playerLeft', { playerId: socket.id })
   })
 }
 
-function _startTrick(io, roomCode, state) {
-  const { currentTrick } = state.play
-  const leaderSeat = currentTrick.leaderSeat
-  const leader = state.players.find((p) => p.seatIndex === leaderSeat)
-  const legalCardIds = _getLegalCardIds(state, leader.id)
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-  io.to(roomCode).emit('play:turnStart', {
-    currentPlayerId: leader.id,
-    legalCardIds,
+function _dealAndAnnounce(io, roomCode, state) {
+  io.to(roomCode).emit('game:started', {
+    dealerIndex: state.dealerIndex,
+    players: state.players,
   })
+  state.players.forEach((p) => _sendHand(io, state, p.id))
+  io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
+}
+
+function _sendHand(io, state, playerId) {
+  io.to(playerId).emit('hand:dealt', { hand: state.hands[playerId] })
+}
+
+// Prompt whoever is next to act in the current trick (the leader for the first
+// card, then each subsequent seat).
+function _promptNextTurn(io, roomCode, state) {
+  const { currentTrick } = state.play
+  const turnSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
+  const player = state.players.find((p) => p.seatIndex === turnSeat)
+  const legalCardIds = _getLegalCardIds(state, player.id)
+  io.to(roomCode).emit('play:turnStart', { currentPlayerId: player.id, legalCardIds })
 }
 
 module.exports = { registerHandlers }

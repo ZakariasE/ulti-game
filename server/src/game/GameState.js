@@ -1,6 +1,6 @@
 const { createDeck, shuffle, deal } = require('./deck')
-const { getLegalPlays, determineTrickWinner, countTrickPoints, isUltiWinCondition } = require('./rules')
-const { getInitialBidderSeat, getNextBidderSeat, isHigherBid, isBiddingComplete } = require('./bidding')
+const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rules')
+const { getInitialBidderSeat, getNextBidderSeat, isHigherBid, getBidRank, CONTRACT_RANKS } = require('./bidding')
 const { calculateRoundScore } = require('./scoring')
 
 function createGameState(roomCode, players = []) {
@@ -12,7 +12,6 @@ function createGameState(roomCode, players = []) {
     dealerIndex: 0,
     hands: {},
     talon: [],
-    discards: [],
     bidding: null,
     play: null,
     scores: {},
@@ -20,141 +19,137 @@ function createGameState(roomCode, players = []) {
   }
 }
 
+function _seatToPlayer(state, seat) {
+  return state.players.find((p) => p.seatIndex === seat)
+}
+
+// ── Dealing ────────────────────────────────────────────────────────────────
+
 function applyDeal(state) {
+  const n = state.players.length
   const deck = shuffle(createDeck())
   const { hands, talon } = deal(deck)
 
-  state.talon = talon
-  state.discards = []
   state.hands = {}
-  state.players.forEach((p, i) => {
-    state.hands[p.id] = hands[i]
+  state.players.forEach((p) => {
+    state.hands[p.id] = hands[p.seatIndex]
     if (state.scores[p.id] === undefined) state.scores[p.id] = 0
   })
 
-  const firstBidderSeat = getInitialBidderSeat(state.dealerIndex, state.players.length)
+  // First bidder (dealer's right) is dealt 12 cards — the talon merges into their hand.
+  const firstBidderSeat = getInitialBidderSeat(state.dealerIndex, n)
+  const firstBidder = _seatToPlayer(state, firstBidderSeat)
+  state.hands[firstBidder.id] = [...state.hands[firstBidder.id], ...talon]
+  state.talon = [] // repopulated when the first bidder discards
+
   state.bidding = {
     currentBidderSeat: firstBidderSeat,
+    phase: 'DISCARD', // first bidder must discard 2, then declare
     consecutivePasses: 0,
-    talonHolderSeat: firstBidderSeat,
-    history: [],
     currentHighBid: null,
-    phase: 'TALON_OFFER',
+    history: [],
   }
   state.play = null
   state.roundResult = null
   state.phase = 'BIDDING'
 
-  return { hands, talon }
+  return { firstBidderId: firstBidder.id }
 }
 
-function applyTalonTake(state, playerId) {
+// ── Bidding ──────────────────────────────────────────────────────────────────
+
+function applyBidDiscard(state, playerId, cardIds) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  if (state.bidding.phase !== 'TALON_OFFER') throw new Error('Talon not available')
-
-  // Merge talon into player's hand
-  state.hands[playerId] = [...state.hands[playerId], ...state.talon]
-  state.bidding.talonHolderSeat = player.seatIndex
-  state.bidding.phase = 'BIDDING'
-  state.bidding.history.push({ playerId, action: 'take_talon' })
-
-  return { talonCards: state.talon }
-}
-
-function applyTalonPass(state, playerId) {
-  const player = state.players.find((p) => p.id === playerId)
-  if (!player) throw new Error('Player not in game')
-  if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  if (state.bidding.phase !== 'TALON_OFFER') throw new Error('Talon not in offer phase')
-
-  state.bidding.history.push({ playerId, action: 'pass_talon' })
-  state.bidding.consecutivePasses++
-
-  const nextSeat = getNextBidderSeat(player.seatIndex, state.players.length)
-
-  // All 3 passed on talon — forced bid on initial bidder
-  if (state.bidding.consecutivePasses >= state.players.length) {
-    const forcedSeat = getInitialBidderSeat(state.dealerIndex, state.players.length)
-    const forcedPlayer = state.players.find((p) => p.seatIndex === forcedSeat)
-    state.hands[forcedPlayer.id] = [...state.hands[forcedPlayer.id], ...state.talon]
-    state.bidding.talonHolderSeat = forcedSeat
-    state.bidding.currentBidderSeat = forcedSeat
-    state.bidding.phase = 'FORCED'
-    return { forced: true, forcedPlayerId: forcedPlayer.id, talonCards: state.talon }
-  }
-
-  state.bidding.currentBidderSeat = nextSeat
-  state.bidding.talonHolderSeat = nextSeat
-  return { forced: false, nextBidderSeat: nextSeat }
-}
-
-function applyDiscard(state, playerId, cardIds) {
+  if (state.bidding.phase !== 'DISCARD') throw new Error('Not in discard phase')
   if (cardIds.length !== 2) throw new Error('Must discard exactly 2 cards')
-  const hand = state.hands[playerId]
-  if (!hand) throw new Error('Player has no hand')
 
+  const hand = state.hands[playerId]
   for (const id of cardIds) {
     if (!hand.find((c) => c.id === id)) throw new Error(`Card ${id} not in hand`)
   }
 
-  state.discards = hand.filter((c) => cardIds.includes(c.id))
+  state.talon = hand.filter((c) => cardIds.includes(c.id))
   state.hands[playerId] = hand.filter((c) => !cardIds.includes(c.id))
+  state.bidding.phase = 'DECLARE'
 }
 
-function applyBid(state, playerId, contract, suit) {
+function applyDeclare(state, playerId, contract, suit) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  if (!['BIDDING', 'FORCED'].includes(state.bidding.phase)) throw new Error('Not in bidding phase')
+  if (state.bidding.phase !== 'DECLARE') throw new Error('Not in declare phase')
 
   const newBid = { contract, suit }
+  if (getBidRank(contract, suit) < 0) throw new Error('Invalid contract')
   if (state.bidding.currentHighBid && !isHigherBid(newBid, state.bidding.currentHighBid)) {
     throw new Error('Bid must be higher than current bid')
   }
 
   state.bidding.currentHighBid = { playerId, contract, suit }
   state.bidding.consecutivePasses = 0
-  state.bidding.history.push({ playerId, action: 'bid', contract, suit })
+  state.bidding.history.push({ playerId, action: 'declare', contract, suit })
 
-  const nextSeat = getNextBidderSeat(player.seatIndex, state.players.length)
-  state.bidding.currentBidderSeat = nextSeat
+  state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
+  state.bidding.phase = 'ROB_OFFER'
 }
 
-function applyPass(state, playerId) {
+function applyRob(state, playerId) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  if (state.bidding.phase !== 'BIDDING') throw new Error('Not in bidding phase')
+  if (state.bidding.phase !== 'ROB_OFFER') throw new Error('Cannot rob now')
+
+  // Must be able to bid higher than the current high bid
+  const highRank = getBidRank(state.bidding.currentHighBid.contract, state.bidding.currentHighBid.suit)
+  if (highRank >= CONTRACT_RANKS.length - 1) throw new Error('Already at the highest bid')
+
+  state.hands[playerId] = [...state.hands[playerId], ...state.talon]
+  state.talon = []
+  state.bidding.phase = 'DISCARD'
+  state.bidding.history.push({ playerId, action: 'rob' })
+}
+
+function applyBidPass(state, playerId) {
+  const player = state.players.find((p) => p.id === playerId)
+  if (!player) throw new Error('Player not in game')
+  if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
+  if (state.bidding.phase !== 'ROB_OFFER') throw new Error('Cannot pass now')
 
   state.bidding.consecutivePasses++
   state.bidding.history.push({ playerId, action: 'pass' })
 
-  if (isBiddingComplete(state.bidding.consecutivePasses, state.bidding.currentHighBid)) {
-    const { playerId: declarerId, contract, suit } = state.bidding.currentHighBid
-    const defenderIds = state.players.filter((p) => p.id !== declarerId).map((p) => p.id)
-    const declarer = state.players.find((p) => p.id === declarerId)
-
-    state.bidding.phase = 'DONE'
-    state.play = {
-      declarerId,
-      defenderIds,
-      contract,
-      suit: ['betli', 'durchmars'].includes(contract) ? null : suit,
-      currentTrick: { ledSuit: null, leaderSeat: declarer.seatIndex, cards: [] },
-      completedTricks: [],
-      declarerPoints: 0,
-      trickCount: 0,
-    }
-    state.phase = 'PLAYING'
-    return { biddingComplete: true, declarerId, contract, suit }
+  // Bidding ends when everyone except the high bidder has passed
+  if (state.bidding.consecutivePasses >= state.players.length - 1 && state.bidding.currentHighBid) {
+    return _resolveBidding(state)
   }
 
-  const nextSeat = getNextBidderSeat(player.seatIndex, state.players.length)
-  state.bidding.currentBidderSeat = nextSeat
+  state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
   return { biddingComplete: false }
 }
+
+function _resolveBidding(state) {
+  const { playerId: declarerId, contract, suit } = state.bidding.currentHighBid
+  const defenderIds = state.players.filter((p) => p.id !== declarerId).map((p) => p.id)
+  const declarer = state.players.find((p) => p.id === declarerId)
+
+  state.bidding.phase = 'DONE'
+  state.play = {
+    declarerId,
+    defenderIds,
+    contract,
+    suit: ['betli', 'durchmars'].includes(contract) ? null : suit,
+    currentTrick: { ledSuit: null, leaderSeat: declarer.seatIndex, cards: [] },
+    completedTricks: [],
+    declarerPoints: 0,
+    trickCount: 0,
+  }
+  state.phase = 'PLAYING'
+  return { biddingComplete: true, declarerId, contract, suit: state.play.suit }
+}
+
+// ── Card play ────────────────────────────────────────────────────────────────
 
 function _getLegalCardIds(state, playerId) {
   const hand = state.hands[playerId]
@@ -168,11 +163,8 @@ function applyPlayCard(state, playerId, cardId) {
   if (!player) throw new Error('Player not in game')
 
   const { currentTrick } = state.play
-  if (currentTrick.leaderSeat !== player.seatIndex && currentTrick.cards.length !== (player.seatIndex - currentTrick.leaderSeat + 3) % 3) {
-    // Simpler check: whose turn is it?
-    const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
-    if (player.seatIndex !== expectedSeat) throw new Error('Not your turn')
-  }
+  const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
+  if (player.seatIndex !== expectedSeat) throw new Error('Not your turn')
 
   const legalIds = _getLegalCardIds(state, playerId)
   if (!legalIds.includes(cardId)) throw new Error('Illegal card play')
@@ -180,15 +172,13 @@ function applyPlayCard(state, playerId, cardId) {
   const card = state.hands[playerId].find((c) => c.id === cardId)
   state.hands[playerId] = state.hands[playerId].filter((c) => c.id !== cardId)
 
-  if (currentTrick.cards.length === 0) {
-    currentTrick.ledSuit = card.suit
-  }
+  if (currentTrick.cards.length === 0) currentTrick.ledSuit = card.suit
   currentTrick.cards.push({ playerId, card })
 
-  if (currentTrick.cards.length === 3) {
-    return { trickComplete: true, ...applyTrickEnd(state) }
+  if (currentTrick.cards.length === state.players.length) {
+    return { trickComplete: true, playedCard: card, ...applyTrickEnd(state) }
   }
-  return { trickComplete: false }
+  return { trickComplete: false, playedCard: card }
 }
 
 function applyTrickEnd(state) {
@@ -196,27 +186,20 @@ function applyTrickEnd(state) {
   const winner = determineTrickWinner(currentTrick.cards, trumpSuit)
   const points = countTrickPoints(currentTrick.cards, trumpSuit)
 
-  const completedTrick = { winnerId: winner.playerId, cards: currentTrick.cards, points }
-  state.play.completedTricks.push(completedTrick)
+  state.play.completedTricks.push({ winnerId: winner.playerId, cards: currentTrick.cards, points })
   state.play.trickCount++
 
   if (winner.playerId === state.play.declarerId) {
     state.play.declarerPoints += points
-    // Last trick bonus
-    if (state.play.trickCount === 10) state.play.declarerPoints += 10
+    if (state.play.trickCount === 10) state.play.declarerPoints += 10 // last-trick bonus
   }
 
   const winnerPlayer = state.players.find((p) => p.id === winner.playerId)
-  state.play.currentTrick = {
-    ledSuit: null,
-    leaderSeat: winnerPlayer.seatIndex,
-    cards: [],
-  }
+  state.play.currentTrick = { ledSuit: null, leaderSeat: winnerPlayer.seatIndex, cards: [] }
 
   if (state.play.trickCount === 10) {
     return { winnerId: winner.playerId, points, roundComplete: true, ...applyRoundEnd(state) }
   }
-
   return { winnerId: winner.playerId, points, roundComplete: false }
 }
 
@@ -228,7 +211,6 @@ function applyRoundEnd(state) {
     defenderIds: state.play.defenderIds,
     completedTricks: state.play.completedTricks,
     talon: state.talon,
-    discards: state.discards,
     declarerPoints: state.play.declarerPoints,
   })
 
@@ -245,7 +227,6 @@ function prepareNextRound(state) {
   state.round++
   state.dealerIndex = (state.dealerIndex + 1) % state.players.length
   state.talon = []
-  state.discards = []
   state.hands = {}
   state.bidding = null
   state.play = null
@@ -253,16 +234,34 @@ function prepareNextRound(state) {
   state.phase = 'DEALING'
 }
 
+// Public snapshot of bidding state (safe to broadcast — no private cards)
+function biddingSnapshot(state) {
+  const b = state.bidding
+  const currentBidder = _seatToPlayer(state, b.currentBidderSeat)
+  return {
+    currentBidderId: currentBidder ? currentBidder.id : null,
+    phase: b.phase,
+    currentHighBid: b.currentHighBid,
+  }
+}
+
+function handCounts(state) {
+  const counts = {}
+  state.players.forEach((p) => { counts[p.id] = (state.hands[p.id] || []).length })
+  return counts
+}
+
 module.exports = {
   createGameState,
   applyDeal,
-  applyTalonTake,
-  applyTalonPass,
-  applyDiscard,
-  applyBid,
-  applyPass,
+  applyBidDiscard,
+  applyDeclare,
+  applyRob,
+  applyBidPass,
   applyPlayCard,
   applyRoundEnd,
   prepareNextRound,
+  biddingSnapshot,
+  handCounts,
   _getLegalCardIds,
 }

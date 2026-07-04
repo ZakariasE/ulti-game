@@ -6,9 +6,9 @@ import styles from '../../styles/PlayerHand.module.css'
 export default function PlayerHand({ roomCode }) {
   const { emit } = useSocket()
   const { state } = useGame()
-  const { myHand, legalCardIds, phase, bidding, myPlayerId } = state
+  const { myHand, legalCardIds, phase, currentTurnId, myPlayerId } = state
 
-  const isMyTurn = phase === 'PLAYING' && bidding?.currentBidderId === myPlayerId
+  const isMyTurn = phase === 'PLAYING' && currentTurnId === myPlayerId
 
   function playCard(cardId) {
     emit('card:play', { roomCode, cardId })

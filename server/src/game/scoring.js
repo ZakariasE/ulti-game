@@ -8,7 +8,7 @@ function countCardPoints(cards, trumpSuit) {
 
 // Returns { won: bool, declarerPoints: number, deltas: { [playerId]: number } }
 function calculateRoundScore({ contract, trumpSuit, declarerId, defenderIds,
-                               completedTricks, talon, discards, declarerPoints }) {
+                               completedTricks, talon, declarerPoints }) {
   const isHearts = trumpSuit === 'piros'
   const basePoints = getBasePoints(contract, isHearts)
 
@@ -16,19 +16,15 @@ function calculateRoundScore({ contract, trumpSuit, declarerId, defenderIds,
 
   switch (contract) {
     case 'simple': {
-      // declarerPoints already includes last-trick bonus from GameState
-      // Also add card points from talon and discards
-      const talonPoints = countCardPoints(talon, trumpSuit)
-      const discardPoints = countCardPoints(discards, trumpSuit)
-      const total = declarerPoints + talonPoints + discardPoints
+      // declarerPoints already includes last-trick bonus from GameState.
+      // The final talon counts toward the declarer's card points.
+      const total = declarerPoints + countCardPoints(talon, trumpSuit)
       won = total >= 50
       break
     }
 
     case 'ulti': {
-      const talonPoints = countCardPoints(talon, trumpSuit)
-      const discardPoints = countCardPoints(discards, trumpSuit)
-      const total = declarerPoints + talonPoints + discardPoints
+      const total = declarerPoints + countCardPoints(talon, trumpSuit)
       const hasEnoughPoints = total >= 50
       const wonWithSeven = isUltiWinCondition(completedTricks, declarerId, trumpSuit)
       won = hasEnoughPoints && wonWithSeven

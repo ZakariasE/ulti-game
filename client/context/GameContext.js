@@ -1,4 +1,5 @@
 import { createContext, useContext, useReducer } from 'react'
+import { sortHand } from '../lib/cards'
 
 const GameContext = createContext(null)
 
@@ -10,18 +11,18 @@ const initialState = {
   players: [],
   phase: 'LOBBY',
   dealerIndex: null,
-  bidding: {
-    currentBidderId: null,
-    currentHighBid: null,
-    talonOfferedTo: null,
-    iHaveTalon: false,
-    discarded: false,
-  },
+  handCounts: {},
+  // Bidding
+  currentTurnId: null,
+  biddingPhase: null, // 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'DONE'
+  currentHighBid: null,
+  declarer: null, // { id, contract, suit }
+  // Play
   currentTrick: [],
   completedTricks: [],
+  legalCardIds: [],
   scores: {},
   roundResult: null,
-  legalCardIds: [],
   error: null,
 }
 
@@ -51,78 +52,36 @@ function gameReducer(state, action) {
         completedTricks: [],
         roundResult: null,
         legalCardIds: [],
-        bidding: {
-          currentBidderId: null,
-          currentHighBid: null,
-          talonOfferedTo: null,
-          iHaveTalon: false,
-          discarded: false,
-        },
+        currentTurnId: null,
+        biddingPhase: null,
+        currentHighBid: null,
+        declarer: null,
       }
 
     case 'HAND_DEALT':
-      return { ...state, myHand: action.hand }
+      return { ...state, myHand: sortHand(action.hand) }
 
-    case 'BID_TALON_OFFERED':
+    case 'BID_STATE':
       return {
         ...state,
-        bidding: { ...state.bidding, talonOfferedTo: action.playerId },
-      }
-
-    case 'BID_TALON_CARDS':
-      return {
-        ...state,
-        myHand: action.cards ? [...state.myHand, ...action.cards] : state.myHand,
-        bidding: { ...state.bidding, iHaveTalon: true },
-      }
-
-    case 'BID_TALON_TAKEN':
-      return {
-        ...state,
-        bidding: { ...state.bidding, talonOfferedTo: null },
-      }
-
-    case 'BID_DISCARDED':
-      return {
-        ...state,
-        bidding: { ...state.bidding, discarded: true, iHaveTalon: false },
-      }
-
-    case 'BID_PLACED':
-      return {
-        ...state,
-        bidding: {
-          ...state.bidding,
-          currentHighBid: { playerId: action.playerId, contract: action.contract, suit: action.suit },
-          currentBidderId: action.nextBidderId,
-        },
-      }
-
-    case 'BID_PASSED':
-      return {
-        ...state,
-        bidding: { ...state.bidding, currentBidderId: action.nextBidderId },
+        currentTurnId: action.currentBidderId,
+        biddingPhase: action.phase,
+        currentHighBid: action.currentHighBid,
+        handCounts: action.handCounts || state.handCounts,
       }
 
     case 'BID_RESOLVED':
       return {
         ...state,
         phase: 'PLAYING',
-        bidding: {
-          ...state.bidding,
-          declarerId: action.declarerId,
-          contract: action.contract,
-          suit: action.suit,
-        },
+        biddingPhase: 'DONE',
+        declarer: { id: action.declarerId, contract: action.contract, suit: action.suit },
       }
 
     case 'PLAY_TURN_START':
       return {
         ...state,
-        bidding: {
-          ...state.bidding,
-          currentBidderId: action.currentPlayerId,
-        },
+        currentTurnId: action.currentPlayerId,
         legalCardIds: action.currentPlayerId === state.myPlayerId ? action.legalCardIds : [],
       }
 
@@ -130,6 +89,7 @@ function gameReducer(state, action) {
       return {
         ...state,
         currentTrick: action.trickSoFar,
+        handCounts: action.handCounts || state.handCounts,
         myHand:
           action.playerId === state.myPlayerId
             ? state.myHand.filter((c) => c.id !== action.card.id)
@@ -140,8 +100,8 @@ function gameReducer(state, action) {
     case 'TRICK_COMPLETED':
       return {
         ...state,
-        currentTrick: [],
         completedTricks: [...state.completedTricks, { winnerId: action.winnerId }],
+        // currentTrick is cleared when the next turn starts; keep it briefly visible
       }
 
     case 'ROUND_COMPLETED':
@@ -150,6 +110,7 @@ function gameReducer(state, action) {
         phase: 'SCORING',
         roundResult: action.result,
         scores: action.scores,
+        currentTrick: [],
       }
 
     case 'ERROR':

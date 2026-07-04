@@ -1,94 +1,91 @@
 import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
+import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/BidPanel.module.css'
 
-const SUITS = ['makk', 'zold', 'piros', 'tok']
-const SUIT_NAMES = { makk: 'Makk', zold: 'Zöld', piros: 'Piros', tok: 'Tök' }
+const SUITS = ['makk', 'zold', 'tok', 'piros']
 
+// contract, whether it needs a trump suit, base points label
 const CONTRACTS = [
-  { contract: 'simple',    label: 'Simple',    points: '1/2pt' },
-  { contract: 'betli',     label: 'Betli',     points: '5pt'   },
-  { contract: 'ulti',      label: 'Ulti',      points: '4/8pt' },
-  { contract: 'durchmars', label: 'Durchmars', points: '6pt'   },
+  { contract: 'simple',    label: 'Simple',    needsSuit: true,  points: '1/2' },
+  { contract: 'betli',     label: 'Betli',     needsSuit: false, points: '5' },
+  { contract: 'ulti',      label: 'Ulti',      needsSuit: true,  points: '4/8' },
+  { contract: 'durchmars', label: 'Durchmars', needsSuit: false, points: '6' },
 ]
 
-// Bid rank for filtering available bids
+// Bid rank ladder (must match server bidding.js)
 const BID_RANKS = {
   'simple_minor': 0, 'simple_piros': 1, 'betli_null': 2,
   'ulti_minor': 3, 'durchmars_null': 4, 'ulti_piros': 5,
 }
+function rankOf(contract, suit) {
+  const key = suit === 'piros' ? 'piros' : (suit == null ? 'null' : 'minor')
+  return BID_RANKS[`${contract}_${key}`] ?? -1
+}
 
-function getBidRank(contract, suit) {
-  const suitKey = suit === 'piros' ? 'piros' : (suit === null ? 'null' : 'minor')
-  return BID_RANKS[`${contract}_${suitKey}`] ?? -1
+// Build the full list of selectable (contract, suit) bids in rank order.
+function allBids() {
+  const bids = []
+  for (const c of CONTRACTS) {
+    if (c.needsSuit) {
+      for (const s of SUITS) bids.push({ contract: c.contract, suit: s, label: c.label, points: c.points })
+    } else {
+      bids.push({ contract: c.contract, suit: null, label: c.label, points: c.points })
+    }
+  }
+  return bids.sort((a, b) => rankOf(a.contract, a.suit) - rankOf(b.contract, b.suit))
 }
 
 export default function BidPanel({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { bidding, myPlayerId } = state
-  const [selectedContract, setSelectedContract] = useState(null)
-  const [selectedSuit, setSelectedSuit] = useState(null)
+  const { currentTurnId, biddingPhase, currentHighBid, myPlayerId, players } = state
+  const [selected, setSelected] = useState(null)
 
-  const isMyTurn = bidding?.currentBidderId === myPlayerId || bidding?.talonOfferedTo === myPlayerId
-  const iHaveTalon = bidding?.iHaveTalon
-  const discarded = bidding?.discarded
-  const currentHighBid = bidding?.currentHighBid
-  const talonOfferedToMe = bidding?.talonOfferedTo === myPlayerId
-  const needsDiscard = iHaveTalon && !discarded
+  const isMyTurn = currentTurnId === myPlayerId
+  const currentRank = currentHighBid ? rankOf(currentHighBid.contract, currentHighBid.suit) : -1
 
-  // Determine which contracts are available (higher than current)
-  const currentRank = currentHighBid
-    ? getBidRank(currentHighBid.contract, currentHighBid.suit)
-    : -1
+  const highBidText = currentHighBid
+    ? `${currentHighBid.contract}${currentHighBid.suit && currentHighBid.contract !== 'betli' && currentHighBid.contract !== 'durchmars' ? ` (${SUIT_NAMES[currentHighBid.suit]})` : ''} by ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
+    : null
 
-  function canBid(contract, suit) {
-    return getBidRank(contract, suit) > currentRank
-  }
-
-  function requiresSuit(contract) {
-    return contract === 'simple' || contract === 'ulti'
-  }
-
-  function handleBid() {
-    const suit = requiresSuit(selectedContract) ? selectedSuit : null
-    emit('bid:place', { roomCode, contract: selectedContract, suit })
-    setSelectedContract(null)
-    setSelectedSuit(null)
-  }
-
-  function handlePass() {
-    emit('bid:pass', { roomCode })
-  }
-
-  if (!isMyTurn && !iHaveTalon) {
-    const currentBidder = state.players.find((p) => p.id === bidding?.currentBidderId)
+  // ── Not my turn: read-only status ──
+  if (!isMyTurn) {
+    const bidder = players.find((p) => p.id === currentTurnId)
     return (
       <div className={styles.panel}>
         <h3>Bidding</h3>
-        {currentHighBid && (
-          <p>Current bid: <strong>{currentHighBid.contract}</strong>
-            {currentHighBid.suit ? ` (${SUIT_NAMES[currentHighBid.suit] || currentHighBid.suit})` : ''} by{' '}
-            {state.players.find((p) => p.id === currentHighBid.playerId)?.name}
-          </p>
-        )}
-        <p className={styles.waiting}>Waiting for {currentBidder?.name || '...'}...</p>
+        {highBidText && <p>Current bid: <strong>{highBidText}</strong></p>}
+        <p className={styles.waiting}>Waiting for {bidder?.name || '...'}...</p>
       </div>
     )
   }
 
-  // Talon offer phase
-  if (talonOfferedToMe && !iHaveTalon) {
+  // ── DISCARD: handled by TalonView overlay ──
+  if (biddingPhase === 'DISCARD') {
     return (
       <div className={styles.panel}>
-        <h3>Talon Offered</h3>
-        <p>Take the talon to bid higher, or pass it on.</p>
+        <h3>Your turn</h3>
+        <p className={styles.waiting}>Select 2 cards from your hand to discard.</p>
+      </div>
+    )
+  }
+
+  // ── ROB_OFFER: pass, or take the talon to raise ──
+  if (biddingPhase === 'ROB_OFFER') {
+    const canRaise = currentRank < 5 // 5 = ulti (hearts), the top bid
+    return (
+      <div className={styles.panel}>
+        <h3>Your turn to bid</h3>
+        {highBidText && <p>Current bid: <strong>{highBidText}</strong></p>}
         <div className={styles.actions}>
-          <button className={styles.btnPrimary} onClick={() => emit('talon:take', { roomCode })}>
-            Take Talon
-          </button>
-          <button className={styles.btnSecondary} onClick={() => emit('talon:pass', { roomCode })}>
+          {canRaise && (
+            <button className={styles.btnPrimary} onClick={() => emit('bid:rob', { roomCode })}>
+              Take talon &amp; raise
+            </button>
+          )}
+          <button className={styles.btnSecondary} onClick={() => emit('bid:pass', { roomCode })}>
             Pass
           </button>
         </div>
@@ -96,79 +93,41 @@ export default function BidPanel({ roomCode }) {
     )
   }
 
-  // Discard phase (have talon, haven't discarded)
-  if (needsDiscard) {
-    return null // TalonView handles this
-  }
-
-  // Bidding phase (have talon, discarded — pick a contract)
-  if (iHaveTalon && discarded) {
+  // ── DECLARE: choose a contract (opening, or after robbing) ──
+  if (biddingPhase === 'DECLARE') {
+    const options = allBids().filter((b) => rankOf(b.contract, b.suit) > currentRank)
     return (
       <div className={styles.panel}>
-        <h3>Name Your Contract</h3>
+        <h3>Name your contract</h3>
+        {highBidText && <p>Must beat: <strong>{highBidText}</strong></p>}
         <div className={styles.contracts}>
-          {CONTRACTS.map(({ contract, label, points }) => (
-            SUITS.filter((s) => requiresSuit(contract) ? true : !requiresSuit(contract)).map((suit) => {
-              if (!requiresSuit(contract) && suit !== 'makk') return null
-              const suitToCheck = requiresSuit(contract) ? suit : null
-              if (!canBid(contract, suitToCheck)) return null
-              const key = `${contract}_${suit}`
-              return (
-                <button
-                  key={key}
-                  className={`${styles.contractBtn} ${selectedContract === contract && selectedSuit === suit ? styles.selected : ''}`}
-                  onClick={() => { setSelectedContract(contract); setSelectedSuit(requiresSuit(contract) ? suit : null) }}
-                >
-                  {label}{requiresSuit(contract) ? ` (${SUIT_NAMES[suit]})` : ''} — {points}
-                </button>
-              )
-            })
-          ))}
+          {options.map((b) => {
+            const key = `${b.contract}_${b.suit}`
+            const isSel = selected && selected.contract === b.contract && selected.suit === b.suit
+            return (
+              <button
+                key={key}
+                className={`${styles.contractBtn} ${isSel ? styles.selected : ''}`}
+                onClick={() => setSelected(b)}
+              >
+                {b.label}{b.suit ? ` (${SUIT_NAMES[b.suit]})` : ''} — {b.points}pt
+              </button>
+            )
+          })}
         </div>
         <button
           className={styles.btnPrimary}
-          disabled={!selectedContract}
-          onClick={handleBid}
+          disabled={!selected}
+          onClick={() => {
+            emit('bid:declare', { roomCode, contract: selected.contract, suit: selected.suit })
+            setSelected(null)
+          }}
         >
-          Confirm Bid
+          Declare
         </button>
       </div>
     )
   }
 
-  // Normal bidding turn
-  return (
-    <div className={styles.panel}>
-      <h3>Your Turn to Bid</h3>
-      {currentHighBid && (
-        <p>Current: <strong>{currentHighBid.contract}</strong></p>
-      )}
-      <div className={styles.contracts}>
-        {CONTRACTS.map(({ contract, label, points }) =>
-          SUITS.map((suit) => {
-            if (!requiresSuit(contract) && suit !== 'makk') return null
-            const suitToCheck = requiresSuit(contract) ? suit : null
-            if (!canBid(contract, suitToCheck)) return null
-            return (
-              <button
-                key={`${contract}_${suit}`}
-                className={`${styles.contractBtn} ${selectedContract === contract && selectedSuit === suit ? styles.selected : ''}`}
-                onClick={() => { setSelectedContract(contract); setSelectedSuit(requiresSuit(contract) ? suit : null) }}
-              >
-                {label}{requiresSuit(contract) ? ` (${SUIT_NAMES[suit]})` : ''} — {points}
-              </button>
-            )
-          })
-        )}
-      </div>
-      <div className={styles.actions}>
-        <button className={styles.btnPrimary} disabled={!selectedContract} onClick={handleBid}>
-          Bid
-        </button>
-        <button className={styles.btnSecondary} onClick={handlePass}>
-          Pass
-        </button>
-      </div>
-    </div>
-  )
+  return null
 }

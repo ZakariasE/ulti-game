@@ -7,44 +7,42 @@ import styles from '../../styles/TalonView.module.css'
 export default function TalonView({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { myHand, bidding } = state
+  const { myHand, biddingPhase, currentTurnId, myPlayerId } = state
   const [selected, setSelected] = useState([])
 
-  if (!bidding?.iHaveTalon || bidding?.discarded) return null
+  const shouldShow = biddingPhase === 'DISCARD' && currentTurnId === myPlayerId
+  if (!shouldShow) return null
 
   function toggleCard(cardId) {
     setSelected((prev) =>
-      prev.includes(cardId) ? prev.filter((id) => id !== cardId) : prev.length < 2 ? [...prev, cardId] : prev
+      prev.includes(cardId)
+        ? prev.filter((id) => id !== cardId)
+        : prev.length < 2 ? [...prev, cardId] : prev
     )
   }
 
   function confirm() {
-    emit('talon:discard', { roomCode, cardIds: selected })
+    emit('bid:discard', { roomCode, cardIds: selected })
     setSelected([])
   }
 
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
-        <h2>You took the talon!</h2>
-        <p>Select 2 cards to discard ({selected.length}/2 selected)</p>
+        <h2>Discard 2 cards</h2>
+        <p>You hold the talon (12 cards). Choose 2 to set aside, then declare a contract. ({selected.length}/2)</p>
         <div className={styles.hand}>
           {myHand.map((card) => (
             <CardComponent
               key={card.id}
               card={card}
               selected={selected.includes(card.id)}
-              highlighted={selected.length < 2 && !selected.includes(card.id)}
               onClick={() => toggleCard(card.id)}
             />
           ))}
         </div>
-        <button
-          className={styles.confirmBtn}
-          disabled={selected.length !== 2}
-          onClick={confirm}
-        >
-          Confirm Discard
+        <button className={styles.confirmBtn} disabled={selected.length !== 2} onClick={confirm}>
+          Discard these 2
         </button>
       </div>
     </div>
