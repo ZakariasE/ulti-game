@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
+import { sortHand } from '../../lib/cards'
 import CardComponent from './CardComponent'
 import styles from '../../styles/TalonView.module.css'
 
@@ -9,6 +10,7 @@ export default function TalonView({ roomCode }) {
   const { emit } = useSocket()
   const { myHand, biddingPhase, currentTurnId, myPlayerId } = state
   const [selected, setSelected] = useState([])
+  const sorted = useMemo(() => sortHand(myHand, 'trump'), [myHand])
 
   const shouldShow = biddingPhase === 'DISCARD' && currentTurnId === myPlayerId
   if (!shouldShow) return null
@@ -32,7 +34,7 @@ export default function TalonView({ roomCode }) {
         <h2>Discard 2 cards</h2>
         <p>You hold the talon (12 cards). Choose 2 to set aside, then declare a contract. ({selected.length}/2)</p>
         <div className={styles.hand}>
-          {myHand.map((card) => (
+          {sorted.map((card) => (
             <CardComponent
               key={card.id}
               card={card}

@@ -28,10 +28,30 @@
   font-family: monospace;
 }
 
+.banner {
+  text-align: center;
+  padding: 8px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+
+.bannerMe { background: #2e7d32; color: #fff; box-shadow: 0 0 14px rgba(46,125,50,0.6); }
+.bannerWait { background: rgba(0,0,0,0.3); color: #cfcfcf; }
+.bannerWin { background: #b8860b; color: #fff; }
+
 .myArea {
   background: rgba(0,0,0,0.2);
   border-radius: 10px;
   padding: 12px;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.myAreaActive {
+  border-color: #f1c40f;
+  box-shadow: 0 0 16px rgba(241,196,15,0.5);
 }
 
 .myInfo {

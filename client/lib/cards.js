@@ -1,25 +1,21 @@
 // Canonical suit order for displaying a hand, grouped by suit.
 export const SUIT_ORDER = { makk: 0, zold: 1, tok: 2, piros: 3 }
 
-// Rank order for display within a suit (high to low).
-export const RANK_ORDER = { asz: 0, kiraly: 1, felso: 2, also: 3, '10': 4, '9': 5, '8': 6, '7': 7 }
+// Card strength within a suit, high to low. Differs between trump games and
+// no-trump games (Betli/Durchmars): the Ten drops below the court cards.
+export const STRENGTH_TRUMP = { asz: 8, '10': 7, kiraly: 6, felso: 5, also: 4, '9': 3, '8': 2, '7': 1 }
+export const STRENGTH_NOTRUMP = { asz: 8, kiraly: 7, felso: 6, also: 5, '10': 4, '9': 3, '8': 2, '7': 1 }
 
-export const RANK_LABEL = {
-  asz: 'A', kiraly: 'K', felso: 'F', also: 'U', '10': '10', '9': '9', '8': '8', '7': '7',
+// Contracts played without trumps, where the Ten is weak.
+export const NO_TRUMP_CONTRACTS = new Set([
+  'betli', 'heart_betli', 'open_betli',
+  'durchmars', 'heart_durchmars', 'open_durchmars',
+])
+export function strengthMode(contract) {
+  return contract && NO_TRUMP_CONTRACTS.has(contract) ? 'notrump' : 'trump'
 }
 
 export const SUIT_NAMES = { makk: 'Makk', zold: 'Zöld', tok: 'Tök', piros: 'Piros' }
-
-// Colors for the four Hungarian suits.
-export const SUIT_COLORS = {
-  makk: '#7a4a1e', // acorns — brown
-  zold: '#2e7d32', // leaves — green
-  tok: '#e0a80d',  // bells — gold
-  piros: '#c62828', // hearts — red
-}
-
-const COURT_RANKS = new Set(['kiraly', 'felso', 'also'])
-export function isCourt(rank) { return COURT_RANKS.has(rank) }
 
 // Map internal suit/rank ids to the image filenames in /public/cards
 // (from github.com/tomasdrus/hungarian-playing-cards).
@@ -33,20 +29,13 @@ export function cardImage(card) {
 }
 export const CARD_BACK_IMAGE = '/cards/back.png'
 
-// Sort a hand grouped by suit, ordered by rank within each suit.
-export function sortHand(cards) {
+// Sort a hand grouped by suit, ordered by strength within each suit.
+// mode: 'trump' (default) or 'notrump' — controls where the Ten sits.
+export function sortHand(cards, mode = 'trump') {
+  const strength = mode === 'notrump' ? STRENGTH_NOTRUMP : STRENGTH_TRUMP
   return [...cards].sort(
     (a, b) =>
       (SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]) ||
-      (RANK_ORDER[a.rank] - RANK_ORDER[b.rank])
+      (strength[b.rank] - strength[a.rank])
   )
-}
-
-// Pip positions (as [col, row] on a 3-wide x 5-tall grid) for number cards.
-// Mirrors the layout of traditional playing cards.
-export const PIP_LAYOUTS = {
-  '7': [[1, 0], [0, 1], [2, 1], [1, 2], [0, 3], [2, 3], [1, 4]],
-  '8': [[0, 0], [2, 0], [0, 1], [2, 1], [0, 3], [2, 3], [0, 4], [2, 4]],
-  '9': [[0, 0], [2, 0], [0, 1], [2, 1], [1, 2], [0, 3], [2, 3], [0, 4], [2, 4]],
-  '10': [[0, 0], [2, 0], [1, 0.7], [0, 1.7], [2, 1.7], [0, 2.7], [2, 2.7], [1, 3.3], [0, 4], [2, 4]],
 }

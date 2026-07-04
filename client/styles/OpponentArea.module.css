@@ -7,6 +7,25 @@
   border-radius: 10px;
   padding: 10px 16px;
   flex: 1;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.active {
+  border-color: #f1c40f;
+  box-shadow: 0 0 14px rgba(241,196,15,0.45);
+}
+
+.won {
+  border-color: #b8860b;
+  box-shadow: 0 0 14px rgba(184,134,11,0.6);
+}
+
+.wonLabel {
+  font-size: 11px;
+  color: #f5d76e;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .name {

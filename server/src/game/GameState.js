@@ -120,8 +120,10 @@ function applyBidPass(state, playerId) {
   state.bidding.consecutivePasses++
   state.bidding.history.push({ playerId, action: 'pass' })
 
-  // Bidding ends when everyone except the high bidder has passed
-  if (state.bidding.consecutivePasses >= state.players.length - 1 && state.bidding.currentHighBid) {
+  // Bidding ends only when all players pass in succession after the last bid —
+  // including the high bidder, who gets a final chance to rob their own talon
+  // and raise. So the two other players pass, then the high bidder passes too.
+  if (state.bidding.consecutivePasses >= state.players.length && state.bidding.currentHighBid) {
     return _resolveBidding(state)
   }
 

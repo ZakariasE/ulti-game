@@ -1,5 +1,4 @@
 import { createContext, useContext, useReducer } from 'react'
-import { sortHand } from '../lib/cards'
 
 const GameContext = createContext(null)
 
@@ -20,6 +19,7 @@ const initialState = {
   // Play
   currentTrick: [],
   completedTricks: [],
+  lastTrickWinnerId: null,
   legalCardIds: [],
   scores: {},
   roundResult: null,
@@ -61,7 +61,7 @@ function gameReducer(state, action) {
       }
 
     case 'HAND_DEALT':
-      return { ...state, myHand: sortHand(action.hand) }
+      return { ...state, myHand: action.hand }
 
     case 'BID_STATE':
       return {
@@ -84,6 +84,7 @@ function gameReducer(state, action) {
       return {
         ...state,
         currentTurnId: action.currentPlayerId,
+        lastTrickWinnerId: null, // clear the previous trick's winner banner
         legalCardIds: action.currentPlayerId === state.myPlayerId ? action.legalCardIds : [],
       }
 
@@ -103,7 +104,8 @@ function gameReducer(state, action) {
       return {
         ...state,
         completedTricks: [...state.completedTricks, { winnerId: action.winnerId }],
-        // currentTrick is cleared when the next turn starts; keep it briefly visible
+        lastTrickWinnerId: action.winnerId,
+        // currentTrick stays briefly visible until the next turn starts
       }
 
     case 'ROUND_COMPLETED':
