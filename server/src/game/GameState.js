@@ -1,6 +1,9 @@
 const { createDeck, shuffle, deal } = require('./deck')
 const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rules')
-const { getInitialBidderSeat, getNextBidderSeat, isHigherBid, getBidRank, CONTRACT_RANKS } = require('./bidding')
+const {
+  getInitialBidderSeat, getNextBidderSeat, isHigherBid, getBidRank,
+  isTrumpContract, isOpenContract, MAX_BID_RANK,
+} = require('./bidding')
 const { calculateRoundScore } = require('./scoring')
 
 function createGameState(roomCode, players = []) {
@@ -103,7 +106,7 @@ function applyRob(state, playerId) {
 
   // Must be able to bid higher than the current high bid
   const highRank = getBidRank(state.bidding.currentHighBid.contract, state.bidding.currentHighBid.suit)
-  if (highRank >= CONTRACT_RANKS.length - 1) throw new Error('Already at the highest bid')
+  if (highRank >= MAX_BID_RANK) throw new Error('Already at the highest bid')
 
   state.hands[playerId] = [...state.hands[playerId], ...state.talon]
   state.talon = []
@@ -141,14 +144,38 @@ function _resolveBidding(state) {
     declarerId,
     defenderIds,
     contract,
-    suit: ['betli', 'durchmars'].includes(contract) ? null : suit,
+    suit: isTrumpContract(contract) ? suit : null,
     currentTrick: { ledSuit: null, leaderSeat: declarer.seatIndex, cards: [] },
     completedTricks: [],
     declarerPoints: 0,
     trickCount: 0,
+    kontra: { level: 1, lastParty: null }, // multiplier from kontra/rekontra
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, contract, suit: state.play.suit }
+}
+
+// ── Kontra ────────────────────────────────────────────────────────────────────
+
+// Defenders may call kontra (doubles the stakes); the declarer answers with
+// rekontra, then defenders szubkontra, and so on — each doubling again. Only
+// allowed before the first trick is completed.
+function applyKontra(state, playerId) {
+  if (state.phase !== 'PLAYING') throw new Error('Not in play')
+  if (state.play.completedTricks.length > 0) throw new Error('Kontra only before the first trick finishes')
+
+  const isDeclarer = playerId === state.play.declarerId
+  const isDefender = state.play.defenderIds.includes(playerId)
+  if (!isDeclarer && !isDefender) throw new Error('Player not in game')
+
+  const k = state.play.kontra
+  const party = isDeclarer ? 'declarer' : 'defenders'
+  if (k.level === 1 && isDeclarer) throw new Error('Only the defenders can call the first kontra')
+  if (k.lastParty === party) throw new Error('Waiting for the other side to answer')
+
+  k.level *= 2
+  k.lastParty = party
+  return { level: k.level, party }
 }
 
 // ── Card play ────────────────────────────────────────────────────────────────
@@ -206,6 +233,15 @@ function applyTrickEnd(state) {
 }
 
 function applyRoundEnd(state) {
+  // All cards the declarer played this round (their original 10) — used to
+  // detect marriages (King + Over of a suit) for the 40-100 / 20-100 contracts.
+  const declarerCards = []
+  for (const t of state.play.completedTricks) {
+    for (const c of t.cards) {
+      if (c.playerId === state.play.declarerId) declarerCards.push(c.card)
+    }
+  }
+
   const result = calculateRoundScore({
     contract: state.play.contract,
     trumpSuit: state.play.suit,
@@ -214,6 +250,8 @@ function applyRoundEnd(state) {
     completedTricks: state.play.completedTricks,
     talon: state.talon,
     declarerPoints: state.play.declarerPoints,
+    declarerCards,
+    kontraLevel: state.play.kontra.level,
   })
 
   for (const [playerId, delta] of Object.entries(result.deltas)) {
@@ -260,6 +298,7 @@ module.exports = {
   applyDeclare,
   applyRob,
   applyBidPass,
+  applyKontra,
   applyPlayCard,
   applyRoundEnd,
   prepareNextRound,

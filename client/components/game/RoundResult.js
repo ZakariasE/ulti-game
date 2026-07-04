@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import { SUIT_NAMES } from '../../lib/cards'
+import { contractLabel } from '../../lib/bids'
 import styles from '../../styles/RoundResult.module.css'
 
 export default function RoundResult({ roomCode }) {
@@ -24,8 +25,9 @@ export default function RoundResult({ roomCode }) {
       <div className={styles.modal}>
         <h2>Round Over</h2>
         <p>
-          Contract: <strong>{roundResult.contract}</strong>
+          Contract: <strong>{contractLabel(roundResult.contract)}</strong>
           {roundResult.trumpSuit ? ` (${SUIT_NAMES[roundResult.trumpSuit] || roundResult.trumpSuit})` : ''}
+          {roundResult.kontraLevel > 1 ? ` — stakes ×${roundResult.kontraLevel}` : ''}
         </p>
         <p>
           Declarer: <strong>{declarer?.name}</strong> —{' '}

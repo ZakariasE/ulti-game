@@ -2,39 +2,13 @@ import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import { SUIT_NAMES } from '../../lib/cards'
+import { enumerateBids, getBidRank, contractLabel } from '../../lib/bids'
 import styles from '../../styles/BidPanel.module.css'
 
-const SUITS = ['makk', 'zold', 'tok', 'piros']
-
-// contract, whether it needs a trump suit, base points label
-const CONTRACTS = [
-  { contract: 'simple',    label: 'Simple',    needsSuit: true,  points: '1/2' },
-  { contract: 'betli',     label: 'Betli',     needsSuit: false, points: '5' },
-  { contract: 'ulti',      label: 'Ulti',      needsSuit: true,  points: '4/8' },
-  { contract: 'durchmars', label: 'Durchmars', needsSuit: false, points: '6' },
-]
-
-// Bid rank ladder (must match server bidding.js)
-const BID_RANKS = {
-  'simple_minor': 0, 'simple_piros': 1, 'betli_null': 2,
-  'ulti_minor': 3, 'durchmars_null': 4, 'ulti_piros': 5,
-}
-function rankOf(contract, suit) {
-  const key = suit === 'piros' ? 'piros' : (suit == null ? 'null' : 'minor')
-  return BID_RANKS[`${contract}_${key}`] ?? -1
-}
-
-// Build the full list of selectable (contract, suit) bids in rank order.
-function allBids() {
-  const bids = []
-  for (const c of CONTRACTS) {
-    if (c.needsSuit) {
-      for (const s of SUITS) bids.push({ contract: c.contract, suit: s, label: c.label, points: c.points })
-    } else {
-      bids.push({ contract: c.contract, suit: null, label: c.label, points: c.points })
-    }
-  }
-  return bids.sort((a, b) => rankOf(a.contract, a.suit) - rankOf(b.contract, b.suit))
+function bidText(bid, players) {
+  const suffix = bid.suit ? ` (${SUIT_NAMES[bid.suit]})` : ''
+  const by = bid.playerId ? ` by ${players.find((p) => p.id === bid.playerId)?.name || '?'}` : ''
+  return `${contractLabel(bid.contract)}${suffix}${by}`
 }
 
 export default function BidPanel({ roomCode }) {
@@ -44,13 +18,11 @@ export default function BidPanel({ roomCode }) {
   const [selected, setSelected] = useState(null)
 
   const isMyTurn = currentTurnId === myPlayerId
-  const currentRank = currentHighBid ? rankOf(currentHighBid.contract, currentHighBid.suit) : -1
+  const currentRank = currentHighBid
+    ? getBidRank(currentHighBid.contract, currentHighBid.suit)
+    : -1
+  const highBidText = currentHighBid ? bidText(currentHighBid, players) : null
 
-  const highBidText = currentHighBid
-    ? `${currentHighBid.contract}${currentHighBid.suit && currentHighBid.contract !== 'betli' && currentHighBid.contract !== 'durchmars' ? ` (${SUIT_NAMES[currentHighBid.suit]})` : ''} by ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
-    : null
-
-  // ── Not my turn: read-only status ──
   if (!isMyTurn) {
     const bidder = players.find((p) => p.id === currentTurnId)
     return (
@@ -62,7 +34,6 @@ export default function BidPanel({ roomCode }) {
     )
   }
 
-  // ── DISCARD: handled by TalonView overlay ──
   if (biddingPhase === 'DISCARD') {
     return (
       <div className={styles.panel}>
@@ -72,9 +43,8 @@ export default function BidPanel({ roomCode }) {
     )
   }
 
-  // ── ROB_OFFER: pass, or take the talon to raise ──
   if (biddingPhase === 'ROB_OFFER') {
-    const canRaise = currentRank < 5 // 5 = ulti (hearts), the top bid
+    const canRaise = currentRank < 13 // 13 = open_durchmars, the top rung
     return (
       <div className={styles.panel}>
         <h3>Your turn to bid</h3>
@@ -93,9 +63,8 @@ export default function BidPanel({ roomCode }) {
     )
   }
 
-  // ── DECLARE: choose a contract (opening, or after robbing) ──
   if (biddingPhase === 'DECLARE') {
-    const options = allBids().filter((b) => rankOf(b.contract, b.suit) > currentRank)
+    const options = enumerateBids().filter((b) => b.rank > currentRank)
     return (
       <div className={styles.panel}>
         <h3>Name your contract</h3>
@@ -110,7 +79,7 @@ export default function BidPanel({ roomCode }) {
                 className={`${styles.contractBtn} ${isSel ? styles.selected : ''}`}
                 onClick={() => setSelected(b)}
               >
-                {b.label}{b.suit ? ` (${SUIT_NAMES[b.suit]})` : ''} — {b.points}pt
+                {contractLabel(b.contract)}{b.suit ? ` (${SUIT_NAMES[b.suit]})` : ''} — {b.points}pt
               </button>
             )
           })}

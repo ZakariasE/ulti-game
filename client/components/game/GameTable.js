@@ -1,11 +1,14 @@
 import { useGame } from '../../context/GameContext'
 import { SUIT_NAMES } from '../../lib/cards'
+import { contractLabel } from '../../lib/bids'
 import OpponentArea from './OpponentArea'
 import TrickArea from './TrickArea'
 import PlayerHand from './PlayerHand'
 import BidPanel from './BidPanel'
 import TalonView from './TalonView'
 import RoundResult from './RoundResult'
+import KontraBar from './KontraBar'
+import RevealedHand from './RevealedHand'
 import styles from '../../styles/GameTable.module.css'
 
 export default function GameTable({ roomCode }) {
@@ -51,7 +54,7 @@ export default function GameTable({ roomCode }) {
       <div className={styles.infoBar}>
         {declarer ? (
           <span>
-            Contract: <strong>{declarer.contract}</strong>
+            Contract: <strong>{contractLabel(declarer.contract)}</strong>
             {trumpSuit ? ` (${SUIT_NAMES[trumpSuit]})` : ''} — Declarer:{' '}
             <strong>{declarerPlayer?.name}</strong>
           </span>
@@ -62,6 +65,9 @@ export default function GameTable({ roomCode }) {
       </div>
 
       {banner && <div className={`${styles.banner} ${bannerClass}`}>{banner}</div>}
+
+      <KontraBar roomCode={roomCode} />
+      <RevealedHand />
 
       <TrickArea />
 

@@ -29,6 +29,8 @@ export default function GamePage() {
       'hand:dealt':        (d) => dispatch({ type: 'HAND_DEALT', ...d }),
       'bid:state':         (d) => dispatch({ type: 'BID_STATE', ...d }),
       'bid:resolved':      (d) => dispatch({ type: 'BID_RESOLVED', ...d }),
+      'kontra:updated':    (d) => dispatch({ type: 'KONTRA_UPDATED', ...d }),
+      'declarer:revealed': (d) => dispatch({ type: 'DECLARER_REVEALED', ...d }),
       'play:turnStart':    (d) => dispatch({ type: 'PLAY_TURN_START', ...d }),
       'card:played':       (d) => dispatch({ type: 'CARD_PLAYED', ...d }),
       'trick:completed':   (d) => dispatch({ type: 'TRICK_COMPLETED', ...d }),

@@ -1,8 +1,9 @@
 const rooms = require('../rooms/RoomManager')
 const {
-  applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
+  applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass, applyKontra,
   applyPlayCard, prepareNextRound, biddingSnapshot, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
+const { isOpenContract } = require('../game/bidding')
 
 function registerHandlers(io, socket) {
   // ── Lobby ──────────────────────────────────────────────────────────────────
@@ -97,6 +98,18 @@ function registerHandlers(io, socket) {
     }
   })
 
+  // ── Kontra ────────────────────────────────────────────────────────────────
+
+  socket.on('kontra:call', ({ roomCode }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const { level, party } = applyKontra(state, socket.id)
+      io.to(roomCode).emit('kontra:updated', { level, party, byId: socket.id })
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
   // ── Card play ────────────────────────────────────────────────────────────────
 
   socket.on('card:play', ({ roomCode, cardId }) => {
@@ -113,6 +126,15 @@ function registerHandlers(io, socket) {
 
       if (result.trickComplete) {
         io.to(roomCode).emit('trick:completed', { winnerId: result.winnerId, points: result.points })
+
+        // For "open" contracts, reveal the declarer's hand after the first trick.
+        if (isOpenContract(state.play.contract) && state.play.trickCount === 1) {
+          io.to(roomCode).emit('declarer:revealed', {
+            declarerId: state.play.declarerId,
+            hand: state.hands[state.play.declarerId],
+          })
+        }
+
         if (result.roundComplete) {
           io.to(roomCode).emit('round:completed', { result: state.roundResult, scores: state.scores })
         } else {

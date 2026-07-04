@@ -16,6 +16,8 @@ const initialState = {
   biddingPhase: null, // 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'DONE'
   currentHighBid: null,
   declarer: null, // { id, contract, suit }
+  kontra: { level: 1, lastParty: null },
+  revealedHand: null, // declarer's open hand (open contracts)
   // Play
   currentTrick: [],
   completedTricks: [],
@@ -57,6 +59,8 @@ function gameReducer(state, action) {
         biddingPhase: null,
         currentHighBid: null,
         declarer: null,
+        kontra: { level: 1, lastParty: null },
+        revealedHand: null,
         readyState: null,
       }
 
@@ -79,6 +83,12 @@ function gameReducer(state, action) {
         biddingPhase: 'DONE',
         declarer: { id: action.declarerId, contract: action.contract, suit: action.suit },
       }
+
+    case 'KONTRA_UPDATED':
+      return { ...state, kontra: { level: action.level, lastParty: action.party } }
+
+    case 'DECLARER_REVEALED':
+      return { ...state, revealedHand: action.hand }
 
     case 'PLAY_TURN_START':
       return {
