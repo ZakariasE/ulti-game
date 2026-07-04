@@ -1,84 +1,23 @@
 .card {
-  width: 66px;
-  height: 96px;
-  border-radius: 7px;
-  background: #fdfdf7;
-  border: 1px solid #d0d0c0;
-  position: relative;
+  width: 64px;
+  height: 104px;
+  border-radius: 6px;
+  display: block;
   user-select: none;
   box-shadow: 1px 2px 5px rgba(0,0,0,0.35);
   flex-shrink: 0;
-  overflow: hidden;
-}
-
-.corner {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-  z-index: 2;
-}
-
-.topLeft { top: 4px; left: 5px; }
-
-.bottomRight {
-  bottom: 4px;
-  right: 5px;
-  transform: rotate(180deg);
-}
-
-.rank {
-  font-weight: 700;
-  font-size: 13px;
-  margin-bottom: 1px;
-}
-
-.centerBig {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.court {
-  position: absolute;
-  inset: 18px 14px;
-  border: 2px solid;
-  border-radius: 5px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  background: rgba(0,0,0,0.02);
-}
-
-.courtLetter {
-  font-size: 22px;
-  font-weight: 800;
-}
-
-.pipGrid {
-  position: absolute;
-  inset: 15px 16px;
-}
-
-.pip {
-  position: absolute;
-  transform: translate(-50%, -50%);
+  background: #fff;
+  object-fit: contain;
 }
 
 .cardBack {
-  width: 66px;
-  height: 96px;
-  border-radius: 7px;
-  background:
-    repeating-linear-gradient(45deg, #14448f 0 6px, #1258b8 6px 12px);
-  border: 2px solid #fdfdf7;
+  width: 64px;
+  height: 104px;
+  border-radius: 6px;
+  display: block;
   box-shadow: 1px 2px 5px rgba(0,0,0,0.35);
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .clickable {
@@ -94,7 +33,7 @@
 .highlighted {
   outline: 3px solid #f1c40f;
   outline-offset: 1px;
-  box-shadow: 0 0 12px rgba(241,196,15,0.7);
+  box-shadow: 0 0 12px rgba(241,196,15,0.75);
 }
 
 .selected {
@@ -104,5 +43,5 @@
 }
 
 .disabled {
-  opacity: 0.45;
+  opacity: 0.5;
 }

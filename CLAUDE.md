@@ -84,3 +84,12 @@ Eight ranks per suit: Ász (Ace), Király (King), Felső (Over), Alsó (Under), 
 - **Backend:** Node.js, Express, Socket.io
 - **Monorepo:** npm workspaces (`/server`, `/client`)
 - **Rooms:** 6-character alphanumeric room codes, no auth
+
+## Credits
+
+- Card images: Hungarian playing cards (Tell pattern) from
+  [tomasdrus/hungarian-playing-cards](https://github.com/tomasdrus/hungarian-playing-cards),
+  stored in `client/public/cards/` (medium size). Filenames are
+  `{suit}-{rank}.png` where suit ∈ {acorn, leaf, bell, heart} and
+  rank ∈ {ace, king, ober, unter, ten, nine, eight, seven}, plus `back.png`.
+  The mapping to internal ids lives in `client/lib/cards.js`.

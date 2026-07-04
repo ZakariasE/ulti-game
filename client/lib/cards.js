@@ -21,6 +21,18 @@ export const SUIT_COLORS = {
 const COURT_RANKS = new Set(['kiraly', 'felso', 'also'])
 export function isCourt(rank) { return COURT_RANKS.has(rank) }
 
+// Map internal suit/rank ids to the image filenames in /public/cards
+// (from github.com/tomasdrus/hungarian-playing-cards).
+const IMG_SUIT = { makk: 'acorn', zold: 'leaf', tok: 'bell', piros: 'heart' }
+const IMG_RANK = {
+  asz: 'ace', kiraly: 'king', felso: 'ober', also: 'unter',
+  '10': 'ten', '9': 'nine', '8': 'eight', '7': 'seven',
+}
+export function cardImage(card) {
+  return `/cards/${IMG_SUIT[card.suit]}-${IMG_RANK[card.rank]}.png`
+}
+export const CARD_BACK_IMAGE = '/cards/back.png'
+
 // Sort a hand grouped by suit, ordered by rank within each suit.
 export function sortHand(cards) {
   return [...cards].sort(
