@@ -1,0 +1,76 @@
+.card {
+  width: 60px;
+  height: 90px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #ccc;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+
+.red { color: #c0392b; }
+.black { color: #2c3e50; }
+
+.corner {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.bottomRight {
+  top: auto;
+  left: auto;
+  bottom: 4px;
+  right: 5px;
+  transform: rotate(180deg);
+}
+
+.rank { font-weight: bold; }
+.suit { font-size: 10px; }
+
+.center {
+  font-size: 22px;
+}
+
+.cardBack {
+  width: 60px;
+  height: 90px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #1565c0, #0d47a1);
+  border: 2px solid #fff;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+
+.clickable {
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.clickable:hover {
+  transform: translateY(-6px);
+  box-shadow: 2px 6px 12px rgba(0,0,0,0.4);
+}
+
+.highlighted {
+  outline: 3px solid #f1c40f;
+  outline-offset: 2px;
+}
+
+.selected {
+  outline: 3px solid #e74c3c;
+  outline-offset: 2px;
+  transform: translateY(-8px);
+}
+
+.disabled {
+  opacity: 0.5;
+}

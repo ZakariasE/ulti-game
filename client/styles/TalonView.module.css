@@ -1,0 +1,41 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #2d5a3d;
+  border-radius: 14px;
+  padding: 28px;
+  max-width: 600px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal h2 { color: #f1c40f; }
+.modal p { color: #ccc; font-size: 14px; }
+
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.confirmBtn {
+  background: #c0392b;
+  color: white;
+  font-size: 15px;
+  padding: 12px;
+  align-self: center;
+  min-width: 180px;
+}
+
+.confirmBtn:hover:not(:disabled) { background: #e74c3c; }

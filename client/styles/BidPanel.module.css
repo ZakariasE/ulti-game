@@ -1,0 +1,59 @@
+.panel {
+  background: rgba(0,0,0,0.75);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel h3 {
+  font-size: 16px;
+  color: #f1c40f;
+}
+
+.waiting {
+  color: #aaa;
+  font-size: 14px;
+}
+
+.contracts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contractBtn {
+  background: #37474f;
+  color: white;
+  font-size: 13px;
+  padding: 8px 14px;
+}
+
+.contractBtn:hover { background: #546e7a; }
+
+.contractBtn.selected {
+  background: #1565c0;
+  outline: 2px solid #42a5f5;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btnPrimary {
+  background: #2e7d32;
+  color: white;
+  flex: 1;
+}
+
+.btnPrimary:hover:not(:disabled) { background: #388e3c; }
+
+.btnSecondary {
+  background: #455a64;
+  color: white;
+  flex: 1;
+}
+
+.btnSecondary:hover { background: #546e7a; }

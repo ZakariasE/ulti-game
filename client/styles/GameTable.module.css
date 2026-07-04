@@ -1,0 +1,43 @@
+.table {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  padding: 12px;
+  gap: 10px;
+}
+
+.opponents {
+  display: flex;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.infoBar {
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.room {
+  color: #aaa;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.myArea {
+  background: rgba(0,0,0,0.2);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.myInfo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #ccc;
+}
