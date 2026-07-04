@@ -10,7 +10,8 @@ import styles from '../../styles/GameTable.module.css'
 
 export default function GameTable({ roomCode }) {
   const { state } = useGame()
-  const { players, myPlayerId, scores, phase, declarer, handCounts } = state
+  const { players, myPlayerId, scores, phase, declarer } = state
+  const handCounts = state.handCounts || {}
 
   const me = players.find((p) => p.id === myPlayerId)
   const opponents = players.filter((p) => p.id !== myPlayerId)
