@@ -52,3 +52,10 @@
 }
 
 .btn:hover { background: #1976d2; }
+
+.waiting {
+  color: #f1c40f;
+  font-size: 14px;
+  text-align: center;
+  align-self: center;
+}

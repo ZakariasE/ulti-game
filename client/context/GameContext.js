@@ -23,6 +23,7 @@ const initialState = {
   legalCardIds: [],
   scores: {},
   roundResult: null,
+  readyState: null, // { readyCount, total }
   error: null,
 }
 
@@ -56,6 +57,7 @@ function gameReducer(state, action) {
         biddingPhase: null,
         currentHighBid: null,
         declarer: null,
+        readyState: null,
       }
 
     case 'HAND_DEALT':
@@ -111,7 +113,11 @@ function gameReducer(state, action) {
         roundResult: action.result,
         scores: action.scores,
         currentTrick: [],
+        readyState: null,
       }
+
+    case 'ROUND_READY':
+      return { ...state, readyState: { readyCount: action.readyCount, total: action.total } }
 
     case 'ERROR':
       return { ...state, error: action.message }

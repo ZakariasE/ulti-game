@@ -33,6 +33,7 @@ export default function GamePage() {
       'card:played':       (d) => dispatch({ type: 'CARD_PLAYED', ...d }),
       'trick:completed':   (d) => dispatch({ type: 'TRICK_COMPLETED', ...d }),
       'round:completed':   (d) => dispatch({ type: 'ROUND_COMPLETED', ...d }),
+      'round:ready':       (d) => dispatch({ type: 'ROUND_READY', ...d }),
       'game:error':        (d) => dispatch({ type: 'ERROR', message: d.message }),
       'room:error':        (d) => dispatch({ type: 'ERROR', message: d.message }),
     }

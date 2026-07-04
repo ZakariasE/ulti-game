@@ -133,6 +133,11 @@ function registerHandlers(io, socket) {
       state._readyForNext.add(socket.id)
 
       const connected = state.players.filter((p) => p.isConnected).length
+      io.to(roomCode).emit('round:ready', {
+        readyCount: state._readyForNext.size,
+        total: connected,
+      })
+
       if (state._readyForNext.size >= connected) {
         state._readyForNext = null
         prepareNextRound(state)

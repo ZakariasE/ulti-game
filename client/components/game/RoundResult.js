@@ -1,15 +1,23 @@
+import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
+import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/RoundResult.module.css'
 
 export default function RoundResult({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { roundResult, scores, players, phase } = state
+  const { roundResult, scores, players, phase, readyState } = state
+  const [clicked, setClicked] = useState(false)
 
   if (phase !== 'SCORING' || !roundResult) return null
 
   const declarer = players.find((p) => p.id === roundResult.declarerId)
+
+  function nextRound() {
+    setClicked(true)
+    emit('round:continue', { roomCode })
+  }
 
   return (
     <div className={styles.overlay}>
@@ -17,7 +25,7 @@ export default function RoundResult({ roomCode }) {
         <h2>Round Over</h2>
         <p>
           Contract: <strong>{roundResult.contract}</strong>
-          {roundResult.trumpSuit ? ` (${roundResult.trumpSuit})` : ''}
+          {roundResult.trumpSuit ? ` (${SUIT_NAMES[roundResult.trumpSuit] || roundResult.trumpSuit})` : ''}
         </p>
         <p>
           Declarer: <strong>{declarer?.name}</strong> —{' '}
@@ -46,9 +54,16 @@ export default function RoundResult({ roomCode }) {
           </tbody>
         </table>
 
-        <button className={styles.btn} onClick={() => emit('round:continue', { roomCode })}>
-          Next Round
-        </button>
+        {clicked ? (
+          <p className={styles.waiting}>
+            Waiting for other players
+            {readyState ? ` (${readyState.readyCount}/${readyState.total} ready)` : '...'}
+          </p>
+        ) : (
+          <button className={styles.btn} onClick={nextRound}>
+            Next Round
+          </button>
+        )}
       </div>
     </div>
   )
