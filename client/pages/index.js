@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useSocket } from '../context/SocketContext'
 import { useGame } from '../context/GameContext'
+import GameOptionsModal from '../components/lobby/GameOptionsModal'
 import styles from '../styles/Lobby.module.css'
 
 export default function Lobby() {
@@ -12,6 +13,7 @@ export default function Lobby() {
   const [playerName, setPlayerName] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
+  const [showOptions, setShowOptions] = useState(false)
 
   useEffect(() => {
     const saved = sessionStorage.getItem('playerName')
@@ -48,7 +50,12 @@ export default function Lobby() {
     if (!connected) return setError('Nincs kapcsolat a szerverrel. Fut a szerver?')
     if (!playerName.trim()) return setError('Előbb add meg a neved')
     setError('')
-    emit('room:create', { playerName: playerName.trim() })
+    setShowOptions(true)
+  }
+
+  function createWithOptions(options) {
+    setShowOptions(false)
+    emit('room:create', { playerName: playerName.trim(), options })
   }
 
   function handleJoin() {
@@ -100,6 +107,9 @@ export default function Lobby() {
           {error && <p className={styles.error}>{error}</p>}
         </div>
       </div>
+      {showOptions && (
+        <GameOptionsModal onConfirm={createWithOptions} onCancel={() => setShowOptions(false)} />
+      )}
     </>
   )
 }

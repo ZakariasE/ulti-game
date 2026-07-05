@@ -14,10 +14,10 @@ class RoomManager {
     return code
   }
 
-  createRoom(socketId, playerName) {
+  createRoom(socketId, playerName, options) {
     const roomCode = this._generateCode()
     const player = { id: socketId, name: playerName, seatIndex: 0, isConnected: true }
-    const state = createGameState(roomCode, [player])
+    const state = createGameState(roomCode, [player], options)
     this.rooms.set(roomCode, state)
     this.socketToRoom.set(socketId, roomCode)
     return { roomCode, state }

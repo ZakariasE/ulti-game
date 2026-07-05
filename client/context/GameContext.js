@@ -32,6 +32,10 @@ const initialState = {
   dealerIndex: null,
   handCounts: {},
   talonCardIds: [], // ids of the two cards I just picked up from the talon
+  // House rules
+  options: null, // { felkezes, buli:{on,handsPerBuli,premium}, kotelezo:{on,ultiPenalty,betliPenalty}, stake }
+  buli: null, // buli progress/standings (buli mode)
+  declaredScores: {}, // pid -> declarer-only cumulative points (buli mode)
   // Bidding
   currentTurnId: null,
   biddingPhase: null, // 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'DONE'
@@ -107,6 +111,7 @@ function gameReducer(state, action) {
         myPlayerId: action.playerId,
         mySeat: action.seat,
         players: action.players,
+        options: action.options || state.options,
         phase: 'LOBBY',
       }
 
@@ -114,7 +119,12 @@ function gameReducer(state, action) {
       return { ...state, players: action.players }
 
     case 'GAME_STARTED':
-      return { ...resetForNewRound(state), dealerIndex: action.dealerIndex, players: action.players || state.players }
+      return {
+        ...resetForNewRound(state),
+        dealerIndex: action.dealerIndex,
+        players: action.players || state.players,
+        options: action.options || state.options,
+      }
 
     case 'HAND_DEALT':
       return { ...state, myHand: action.hand }

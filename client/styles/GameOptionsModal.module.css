@@ -1,0 +1,128 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+}
+
+.modal {
+  background: #2d5a3d;
+  border-radius: 14px;
+  padding: 24px 28px;
+  max-width: 460px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal h2 { color: #f1c40f; text-align: center; }
+
+.block {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.disabledBlock { opacity: 0.6; }
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
+}
+
+.knob {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #37474f;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #cfd8dc;
+  transition: transform 0.15s;
+}
+
+.toggleOn .knob { background: #1565c0; }
+.toggleOn .knob::after { transform: translateX(18px); background: #fff; }
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fields label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: #cfe3d4;
+  gap: 4px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.fields input {
+  background: #1b3a29;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 15px;
+  padding: 7px 10px;
+  width: 100%;
+}
+
+.note { font-size: 12px; color: #9fb4c7; font-style: italic; }
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btnPrimary {
+  background: #1565c0;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px;
+  border-radius: 8px;
+  flex: 2;
+}
+.btnPrimary:hover { background: #1976d2; }
+
+.btnSecondary {
+  background: #455a64;
+  color: #fff;
+  font-size: 15px;
+  padding: 11px;
+  border-radius: 8px;
+  flex: 1;
+}
+.btnSecondary:hover { background: #546e7a; }

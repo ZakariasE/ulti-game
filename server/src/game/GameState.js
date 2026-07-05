@@ -8,7 +8,28 @@ const { calculateRoundScore } = require('./scoring')
 
 const MINOR_SUITS = ['makk', 'zold', 'tok']
 
-function createGameState(roomCode, players = []) {
+// House-rule options, merged with any partial `options` supplied at room creation.
+function normalizeOptions(options = {}) {
+  const o = options || {}
+  const buli = o.buli || {}
+  const kotelezo = o.kotelezo || {}
+  return {
+    felkezes: !!o.felkezes,
+    buli: {
+      on: !!buli.on,
+      handsPerBuli: Number(buli.handsPerBuli) > 0 ? Math.floor(Number(buli.handsPerBuli)) : 6,
+      premium: Number.isFinite(Number(buli.premium)) ? Number(buli.premium) : 100,
+    },
+    kotelezo: {
+      on: !!kotelezo.on,
+      ultiPenalty: Number.isFinite(Number(kotelezo.ultiPenalty)) ? Number(kotelezo.ultiPenalty) : 220,
+      betliPenalty: Number.isFinite(Number(kotelezo.betliPenalty)) ? Number(kotelezo.betliPenalty) : 110,
+    },
+    stake: Number.isFinite(Number(o.stake)) ? Number(o.stake) : 1,
+  }
+}
+
+function createGameState(roomCode, players = [], options = {}) {
   return {
     roomCode,
     phase: 'LOBBY',
@@ -17,11 +38,15 @@ function createGameState(roomCode, players = []) {
     dealerIndex: 0,
     hands: {},
     talon: [],
+    reserve: [], // félkezes: cards held back for the second deal
     bidding: null,
     play: null,
     scores: {},
+    declaredScores: {}, // buli: pid -> cumulative declarer-only points (+ premiums/penalties)
+    buli: null, // buli: { index, handsPlayed, points, kotelezo, history }
     roundResult: null,
     talonInHand: null, // { playerId, cardIds } while a player holds the picked-up talon
+    options: normalizeOptions(options),
   }
 }
 

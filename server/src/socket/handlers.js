@@ -9,11 +9,13 @@ const {
 function registerHandlers(io, socket) {
   // ── Lobby ──────────────────────────────────────────────────────────────────
 
-  socket.on('room:create', ({ playerName }) => {
+  socket.on('room:create', ({ playerName, options }) => {
     try {
-      const { roomCode, state } = rooms.createRoom(socket.id, playerName)
+      const { roomCode, state } = rooms.createRoom(socket.id, playerName, options)
       socket.join(roomCode)
-      socket.emit('room:created', { roomCode, playerId: socket.id, seat: 0, players: state.players })
+      socket.emit('room:created', {
+        roomCode, playerId: socket.id, seat: 0, players: state.players, options: state.options,
+      })
     } catch (err) {
       socket.emit('room:error', { message: err.message })
     }
@@ -24,7 +26,7 @@ function registerHandlers(io, socket) {
       const { state, player } = rooms.joinRoom(socket.id, roomCode, playerName)
       socket.join(roomCode)
       socket.emit('room:joined', {
-        roomCode, playerId: socket.id, seat: player.seatIndex, players: state.players,
+        roomCode, playerId: socket.id, seat: player.seatIndex, players: state.players, options: state.options,
       })
       socket.to(roomCode).emit('room:playerJoined', { players: state.players })
     } catch (err) {
@@ -204,7 +206,9 @@ function _commitKontra(io, roomCode, state, playerId, components) {
 }
 
 function _dealAndAnnounce(io, roomCode, state) {
-  io.to(roomCode).emit('game:started', { dealerIndex: state.dealerIndex, players: state.players })
+  io.to(roomCode).emit('game:started', {
+    dealerIndex: state.dealerIndex, players: state.players, options: state.options,
+  })
   state.players.forEach((p) => _sendHand(io, state, p.id))
   // Tell the first bidder which two of their cards came from the talon.
   if (state.talonInHand) {

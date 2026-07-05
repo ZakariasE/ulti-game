@@ -6,10 +6,16 @@ import styles from '../../styles/WaitingRoom.module.css'
 export default function WaitingRoom({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { players, myPlayerId } = state
+  const { players, myPlayerId, options } = state
   const isHost = players[0]?.id === myPlayerId
   const canStart = players.length === 3
   const [copied, setCopied] = useState(false)
+
+  const rules = []
+  if (options?.felkezes) rules.push('Félkezes (5 lap, 4×)')
+  if (options?.buli?.on) rules.push(`Buli — ${options.buli.handsPerBuli} leosztás, prémium ${options.buli.premium}`)
+  if (options?.kotelezo?.on) rules.push(`Kötelező mondások (Ulti −${options.kotelezo.ultiPenalty}, Betli/40-100 −${options.kotelezo.betliPenalty})`)
+  if (options?.stake != null) rules.push(`Tét: ${options.stake} / pont`)
 
   function copyCode() {
     navigator.clipboard.writeText(roomCode)
@@ -43,6 +49,13 @@ export default function WaitingRoom({ roomCode }) {
             várakozás...
           </div>
         ))}
+      </div>
+
+      <div className={styles.playerList}>
+        <h3>Házirend</h3>
+        {rules.length ? rules.map((r, i) => (
+          <div key={i} className={styles.player}><span className={styles.dot}>•</span>{r}</div>
+        )) : <div className={`${styles.player} ${styles.empty}`}>Alap szabályok</div>}
       </div>
 
       {isHost && (
