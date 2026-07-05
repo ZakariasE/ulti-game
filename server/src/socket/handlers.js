@@ -54,9 +54,14 @@ function registerHandlers(io, socket) {
   socket.on('bid:discard', ({ roomCode, cardIds }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      applyBidDiscard(state, socket.id, cardIds)
+      const result = applyBidDiscard(state, socket.id, cardIds)
       _sendHand(io, state, socket.id)
-      io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
+      if (result && result.biddingComplete) {
+        // Félkezes: the declarer's post-deal discard starts play.
+        _announceResolved(io, roomCode, state, result)
+      } else {
+        io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
+      }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -89,18 +94,12 @@ function registerHandlers(io, socket) {
     try {
       const state = rooms.getRoom(roomCode)
       const result = applyBidPass(state, socket.id)
-      if (result.biddingComplete) {
-        io.to(roomCode).emit('bid:resolved', {
-          declarerId: result.declarerId,
-          declaration: publicDeclaration(result.declaration),
-        })
-        // Privately tell the declarer what they can announce at the opening lead.
-        const decl = state.play.declaration
-        io.to(result.declarerId).emit('opening:info', {
-          needTrump: !decl.isNoTrump && decl.color === 'normal',
-          availableMarriages: availableMarriages(state.hands[result.declarerId]),
-        })
-        _promptNextTurn(io, roomCode, state)
+      if (result.secondDeal) {
+        // Félkezes: reserve dealt; send everyone their new hands, declarer discards.
+        state.players.forEach((p) => _sendHand(io, state, p.id))
+        io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
+      } else if (result.biddingComplete) {
+        _announceResolved(io, roomCode, state, result)
       } else {
         io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
       }
@@ -197,6 +196,20 @@ function registerHandlers(io, socket) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+// Bidding resolved → announce the declarer/contract and begin play.
+function _announceResolved(io, roomCode, state, result) {
+  io.to(roomCode).emit('bid:resolved', {
+    declarerId: result.declarerId,
+    declaration: publicDeclaration(result.declaration),
+  })
+  const decl = state.play.declaration
+  io.to(result.declarerId).emit('opening:info', {
+    needTrump: !decl.isNoTrump && decl.color === 'normal',
+    availableMarriages: availableMarriages(state.hands[result.declarerId]),
+  })
+  _promptNextTurn(io, roomCode, state)
+}
 
 // Apply the kontra components a player staged, just before they play their card.
 function _commitKontra(io, roomCode, state, playerId, components) {

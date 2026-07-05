@@ -60,7 +60,7 @@ export default function RoundResult({ roomCode }) {
               <tr key={c.key}>
                 <td>{c.label}</td>
                 <td className={c.won ? styles.win : styles.loss}>{c.won ? 'nyert' : 'vesztett'}</td>
-                <td>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}</td>
+                <td>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{roundResult.stakeMultiplier > 1 ? ` ×${roundResult.stakeMultiplier}` : ''}</td>
               </tr>
             ))}
           </tbody>

@@ -1,4 +1,4 @@
-const { createDeck, shuffle, deal } = require('./deck')
+const { createDeck, shuffle, deal, dealFelkezes } = require('./deck')
 const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rules')
 const {
   getInitialBidderSeat, getNextBidderSeat, isHigherDeclaration,
@@ -59,27 +59,45 @@ function _seatToPlayer(state, seat) {
 function applyDeal(state) {
   const n = state.players.length
   const deck = shuffle(createDeck())
-  const { hands, talon } = deal(deck)
-
-  state.hands = {}
-  state.players.forEach((p) => {
-    state.hands[p.id] = hands[p.seatIndex]
-    if (state.scores[p.id] === undefined) state.scores[p.id] = 0
-  })
-
   const firstBidderSeat = getInitialBidderSeat(state.dealerIndex, n)
   const firstBidder = _seatToPlayer(state, firstBidderSeat)
-  state.hands[firstBidder.id] = [...state.hands[firstBidder.id], ...talon]
-  state.talonInHand = { playerId: firstBidder.id, cardIds: talon.map((c) => c.id) }
-  state.talon = []
 
-  state.bidding = {
-    currentBidderSeat: firstBidderSeat,
-    phase: 'DISCARD',
-    consecutivePasses: 0,
-    currentHighBid: null, // { playerId, declaration }
-    history: [],
+  state.hands = {}
+  state.talonInHand = null
+  state.talon = []
+  state.reserve = []
+
+  if (state.options.felkezes) {
+    // Deal 5 each; hold the other 17 for the second deal. No talon during bidding.
+    const { hands, reserve } = dealFelkezes(deck)
+    state.players.forEach((p) => { state.hands[p.id] = hands[p.seatIndex] })
+    state.reserve = reserve
+    state.bidding = {
+      currentBidderSeat: firstBidderSeat,
+      phase: 'DECLARE', // opener must declare; no discard/rob during félkezes bidding
+      consecutivePasses: 0,
+      currentHighBid: null,
+      history: [],
+    }
+  } else {
+    const { hands, talon } = deal(deck)
+    state.players.forEach((p) => { state.hands[p.id] = hands[p.seatIndex] })
+    state.hands[firstBidder.id] = [...state.hands[firstBidder.id], ...talon]
+    state.talonInHand = { playerId: firstBidder.id, cardIds: talon.map((c) => c.id) }
+    state.bidding = {
+      currentBidderSeat: firstBidderSeat,
+      phase: 'DISCARD',
+      consecutivePasses: 0,
+      currentHighBid: null,
+      history: [],
+    }
   }
+
+  state.players.forEach((p) => {
+    if (state.scores[p.id] === undefined) state.scores[p.id] = 0
+    if (state.declaredScores[p.id] === undefined) state.declaredScores[p.id] = 0
+  })
+
   state.play = null
   state.roundResult = null
   state.phase = 'BIDDING'
@@ -93,7 +111,8 @@ function applyBidDiscard(state, playerId, cardIds) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  if (state.bidding.phase !== 'DISCARD') throw new Error('Not in discard phase')
+  const phase = state.bidding.phase
+  if (phase !== 'DISCARD' && phase !== 'POST_DEAL_DISCARD') throw new Error('Not in discard phase')
   if (cardIds.length !== 2) throw new Error('Must discard exactly 2 cards')
 
   const hand = state.hands[playerId]
@@ -104,7 +123,13 @@ function applyBidDiscard(state, playerId, cardIds) {
   state.talon = hand.filter((c) => cardIds.includes(c.id))
   state.hands[playerId] = hand.filter((c) => !cardIds.includes(c.id))
   state.talonInHand = null // the talon is set aside again
+
+  if (phase === 'POST_DEAL_DISCARD') {
+    // Félkezes: the declaration is already locked; play starts now.
+    return _startPlay(state, playerId, state.bidding.currentHighBid.declaration)
+  }
   state.bidding.phase = 'DECLARE'
+  return null
 }
 
 // payload: { type:'simple', color } | { type:'trump', components, color } | { type:'notrump', contract }
@@ -119,7 +144,13 @@ function applyDeclare(state, playerId, payload) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  if (state.bidding.phase !== 'DECLARE') throw new Error('Not in declare phase')
+  const felkezes = state.options.felkezes
+  // Félkezes turns are declare-or-pass (phase DECLARE for the opener, BID after);
+  // normal bidding declares only in the DECLARE phase (after discarding/robbing).
+  const canDeclare = felkezes
+    ? (state.bidding.phase === 'DECLARE' || state.bidding.phase === 'BID')
+    : state.bidding.phase === 'DECLARE'
+  if (!canDeclare) throw new Error('Not in declare phase')
 
   const declaration = _declarationFromPayload(payload)
   const current = state.bidding.currentHighBid
@@ -132,7 +163,7 @@ function applyDeclare(state, playerId, payload) {
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
-  state.bidding.phase = 'ROB_OFFER'
+  state.bidding.phase = felkezes ? 'BID' : 'ROB_OFFER'
 }
 
 function applyRob(state, playerId) {
@@ -152,21 +183,47 @@ function applyBidPass(state, playerId) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  if (state.bidding.phase !== 'ROB_OFFER') throw new Error('Cannot pass now')
+  const felkezes = state.options.felkezes
+  const passPhase = felkezes ? 'BID' : 'ROB_OFFER'
+  if (state.bidding.phase !== passPhase) throw new Error('Cannot pass now')
 
   state.bidding.consecutivePasses++
   state.bidding.history.push({ playerId, action: 'pass' })
 
   if (state.bidding.consecutivePasses >= state.players.length && state.bidding.currentHighBid) {
-    return _resolveBidding(state)
+    return felkezes ? _felkezesSecondDeal(state) : _resolveBidding(state)
   }
 
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
   return { biddingComplete: false }
 }
 
+// Félkezes: once the winning bid is set, deal the 17-card reserve — declarer +7
+// (→12), each defender +5 (→10) — then have the declarer discard 2.
+function _felkezesSecondDeal(state) {
+  const { playerId: declarerId } = state.bidding.currentHighBid
+  const declarer = state.players.find((p) => p.id === declarerId)
+  const reserve = state.reserve
+  state.hands[declarerId] = [...state.hands[declarerId], ...reserve.slice(0, 7)]
+  let idx = 7
+  state.players.filter((p) => p.id !== declarerId).forEach((p) => {
+    state.hands[p.id] = [...state.hands[p.id], ...reserve.slice(idx, idx + 5)]
+    idx += 5
+  })
+  state.reserve = []
+  state.bidding.phase = 'POST_DEAL_DISCARD'
+  state.bidding.currentBidderSeat = declarer.seatIndex
+  return { secondDeal: true, declarerId }
+}
+
 function _resolveBidding(state) {
   const { playerId: declarerId, declaration } = state.bidding.currentHighBid
+  return _startPlay(state, declarerId, declaration)
+}
+
+// Build the play state and enter PLAYING. Shared by normal resolution and the
+// félkezes post-deal discard.
+function _startPlay(state, declarerId, declaration) {
   const defenderIds = state.players.filter((p) => p.id !== declarerId).map((p) => p.id)
   const declarer = state.players.find((p) => p.id === declarerId)
 
@@ -370,6 +427,7 @@ function applyRoundEnd(state) {
     declarerPoints: state.play.declarerPoints,
     kontra: state.play.kontra,
     marriages: state.play.marriages,
+    stakeMultiplier: state.options.felkezes ? 4 : 1, // félkezes: every bid worth 4×
   })
 
   for (const [playerId, delta] of Object.entries(result.deltas)) {
@@ -517,6 +575,7 @@ function prepareNextRound(state) {
   state.round++
   state.dealerIndex = (state.dealerIndex + 1) % state.players.length
   state.talon = []
+  state.reserve = []
   state.talonInHand = null
   state.hands = {}
   state.bidding = null

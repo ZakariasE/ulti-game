@@ -60,7 +60,8 @@ function marriagePoints(marriages, ids, eligible) {
 
 // Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
 function calculateRoundScore({ declaration, declarerId, defenderIds,
-                               completedTricks, talon, declarerPoints, kontra = {}, marriages = {} }) {
+                               completedTricks, talon, declarerPoints, kontra = {}, marriages = {},
+                               stakeMultiplier = 1 }) {
   const trumpSuit = declaration.trumpSuit
   const announced = marriages[declarerId] || [] // declarer's own (for 40-100 / 20-100)
 
@@ -118,7 +119,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     const kontraLevel = (kontra[key] && kontra[key].level) || 1
     // Reaching 100 card points doubles the Parti stake — for whichever side won it.
     const hundred = key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100
-    const payout = basePoints * kontraLevel * (hundred ? 2 : 1)
+    const payout = basePoints * kontraLevel * (hundred ? 2 : 1) * stakeMultiplier
 
     if (won) {
       deltas[declarerId] += payout * defenderIds.length
@@ -130,7 +131,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, delta: won ? payout : -payout }
   })
 
-  return { components, deltas, cardTotal, partiDetail, declarerId, color: declaration.color }
+  return { components, deltas, cardTotal, partiDetail, declarerId, color: declaration.color, stakeMultiplier }
 }
 
 module.exports = { calculateRoundScore }

@@ -30,4 +30,16 @@ function deal(shuffledDeck) {
   return { hands, talon }
 }
 
-module.exports = { SUITS, RANKS, createDeck, shuffle, deal }
+// Félkezes: 5 cards to each player, the remaining 17 held back for the second
+// deal (declarer +7, defenders +5) once the winning bid is known.
+function dealFelkezes(shuffledDeck) {
+  const hands = [
+    shuffledDeck.slice(0, 5),
+    shuffledDeck.slice(5, 10),
+    shuffledDeck.slice(10, 15),
+  ]
+  const reserve = shuffledDeck.slice(15) // 17 cards
+  return { hands, reserve }
+}
+
+module.exports = { SUITS, RANKS, createDeck, shuffle, deal, dealFelkezes }

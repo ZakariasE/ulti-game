@@ -22,8 +22,11 @@ export default function PlayerHand({ roomCode }) {
   const effectiveTrump = trumpSuit || pendingTrump
   const trumpReady = !needTrump || !!pendingTrump
   const canPlay = myPlayTurn && (!openingLead || trumpReady)
-  // Discarding: the talon holder picks 2 cards straight from the hand.
-  const isDiscarding = phase === 'BIDDING' && biddingPhase === 'DISCARD' && currentTurnId === myPlayerId
+  // Discarding: the talon holder (normal) or the declarer after the félkezes
+  // second deal picks 2 cards straight from the hand.
+  const isDiscarding = phase === 'BIDDING' &&
+    (biddingPhase === 'DISCARD' || biddingPhase === 'POST_DEAL_DISCARD') &&
+    currentTurnId === myPlayerId
 
   // Order by strength; the ranking differs for no-trump contracts (Betli/Durchmars).
   const sorted = useMemo(
