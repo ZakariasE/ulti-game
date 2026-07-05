@@ -16,9 +16,9 @@ export const NO_TRUMP_CONTRACTS = {
   betli:           { base: 5,  label: 'Betli' },
   heart_betli:     { base: 10, label: 'Piros betli' },
   open_betli:      { base: 20, label: 'Terített betli' },
-  durchmars_nt:    { base: 6,  label: 'Durchmars' },
-  heart_durchmars: { base: 12, label: 'Piros durchmars' },
-  open_durchmars:  { base: 24, label: 'Terített durchmars' },
+  durchmars_nt:    { base: 12, label: 'Durchmars' },
+  heart_durchmars: { base: 24, label: 'Piros durchmars' },
+  open_durchmars:  { base: 48, label: 'Terített durchmars' },
 }
 
 export function componentLabel(component) {
@@ -45,9 +45,6 @@ export function validateBundle(components) {
   if (comps.length === 0) return { ok: false, error: 'Válassz legalább egy bemondást' }
   if (comps.includes('forty_hundred') && comps.includes('twenty_hundred')) {
     return { ok: false, error: 'Csak a 40-100 vagy a 20-100 egyike' }
-  }
-  if (comps.includes('durchmars') && comps.length === 1) {
-    return { ok: false, error: 'A Durchmarsot mással kell kombinálni' }
   }
   const hasParti = comps.every((c) => PARTI_BEARERS.has(c))
   const scoring = hasParti ? [...comps, 'parti'] : [...comps]

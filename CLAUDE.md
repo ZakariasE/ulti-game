@@ -64,14 +64,16 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 | 20-100 | 8 | Card points ≥ 100 incl. an announced 20 (K+O non-trump) |
 | Durchmars | 6 | Declarer wins all 10 tricks |
 
-**No-trump standalone contracts** (flat; cannot combine): Betli 5, Heart Betli 10, Open Betli 20, Durchmars 6, Heart Durchmars 12, Open Durchmars 24. Betli = win zero tricks; Durchmars = win all tricks. "Open" reveals the declarer's hand after trick 1.
+**No-trump standalone contracts** (flat; cannot combine): Betli 5, Heart Betli 10, Open Betli 20, Durchmars 12, Heart Durchmars 24, Open Durchmars 48. Betli = win zero tricks; Durchmars = win all tricks. "Open" reveals the declarer's hand after trick 1.
+
+**Early termination:** a pure Betli or a pure Durchmars (trump or no-trump) ends the **instant its goal becomes impossible** — Betli the moment the declarer wins a trick, Durchmars the moment a defender wins one — and is scored as a loss without playing out the remaining tricks. (A Durchmars combined with other trump components plays on.)
 
 **Combination rules:**
 - Combinable: Ulti, 40-100, 20-100, 4 Aces, Durchmars (any subset).
 - Betli never combines.
 - At most **one** of {40-100, 20-100}.
 - **Parti** is bundled only when *every* component is a parti-bearer (Ulti / 4 Aces). Mixing a parti-bearer with a non-parti component drops the parti — e.g. `40-100 + Ulti = 4+4 = 8`, not 9. `Ulti + 4 Aces = 4+4+1 = 9`.
-- Trump Durchmars must be combined with another trump component (standalone Durchmars is the no-trump contract).
+- Trump Durchmars may be declared standalone (worth 6, or 12 in red) or combined with other trump components. The no-trump Durchmars (12 / 24 / 48) is a separate contract.
 
 **Bid ranking** ignores the **+1/+2 Parti bonus**: rank by the sum of the *non-parti* component bases (×2 for Red), with a fixed tiebreak. So a clean **Betli (5) outranks Ulti (4+1)**, and **Heart Betli (10) outranks Heart Ulti (8+2)**. (The full value, incl. parti, is still used for scoring and display.)
 

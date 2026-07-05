@@ -2,7 +2,7 @@ import { cardImage, CARD_BACK_IMAGE } from '../../lib/cards'
 import styles from '../../styles/Card.module.css'
 
 // size: 'normal' (default) | 'large' | 'small'
-export default function CardComponent({ card, faceDown, highlighted, selected, fromTalon, onClick, disabled, size = 'normal' }) {
+export default function CardComponent({ card, faceDown, highlighted, selected, fromTalon, hoverable, onClick, disabled, size = 'normal' }) {
   const sizeClass = size === 'large' ? styles.large : size === 'small' ? styles.small : ''
 
   if (faceDown) {
@@ -17,6 +17,7 @@ export default function CardComponent({ card, faceDown, highlighted, selected, f
     fromTalon ? styles.fromTalon : '',
     disabled ? styles.disabled : '',
     onClick && !disabled ? styles.clickable : '',
+    hoverable ? styles.hoverable : '',
   ].filter(Boolean).join(' ')
 
   return (

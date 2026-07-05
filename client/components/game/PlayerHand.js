@@ -91,6 +91,7 @@ export default function PlayerHand({ roomCode }) {
               key={card.id}
               card={card}
               size="large"
+              hoverable
               highlighted={canPlay && isLegal}
               disabled={canPlay && !isLegal}
               onClick={canPlay && isLegal ? () => playCard(card.id) : undefined}

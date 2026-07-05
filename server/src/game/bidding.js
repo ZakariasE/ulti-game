@@ -19,9 +19,9 @@ const NO_TRUMP_CONTRACTS = {
   betli:           { base: 5,  label: 'Betli' },
   heart_betli:     { base: 10, label: 'Piros betli' },
   open_betli:      { base: 20, label: 'Terített betli' },
-  durchmars_nt:    { base: 6,  label: 'Durchmars' },
-  heart_durchmars: { base: 12, label: 'Piros durchmars' },
-  open_durchmars:  { base: 24, label: 'Terített durchmars' },
+  durchmars_nt:    { base: 12, label: 'Durchmars' },
+  heart_durchmars: { base: 24, label: 'Piros durchmars' },
+  open_durchmars:  { base: 48, label: 'Terített durchmars' },
 }
 
 function isNoTrumpContract(key) {
@@ -38,10 +38,6 @@ function buildDeclaration(components, color) {
   }
   if (comps.includes('forty_hundred') && comps.includes('twenty_hundred')) {
     throw new Error('Cannot declare both 40-100 and 20-100')
-  }
-  // durchmars must be combined with another trump component
-  if (comps.includes('durchmars') && comps.length === 1) {
-    throw new Error('Trump Durchmars must be combined with another contract')
   }
 
   // Parti is bundled only when every chosen component is a parti-bearer.

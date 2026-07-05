@@ -29,7 +29,6 @@ export default function TrumpChoice() {
             </button>
           ))}
         </div>
-        <p className={styles.hint}>Utána a szokásos módon játszd ki a lapjaidat.</p>
       </div>
     </div>
   )

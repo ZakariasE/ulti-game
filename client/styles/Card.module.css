@@ -34,6 +34,16 @@
   box-shadow: 2px 8px 14px rgba(0,0,0,0.45);
 }
 
+/* Lift on hover for your own cards even when it isn't your turn. */
+.hoverable {
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.hoverable:hover {
+  transform: translateY(-8px);
+  box-shadow: 2px 8px 14px rgba(0,0,0,0.45);
+}
+
 .highlighted {
   outline: 3px solid #f1c40f;
   outline-offset: 1px;

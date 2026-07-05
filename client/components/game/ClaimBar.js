@@ -7,20 +7,37 @@ const BETLI = new Set(['betli', 'heart_betli', 'open_betli'])
 // "Nincs több ütés": the declarer claims all remaining tricks; both defenders
 // must agree, then the round ends immediately with the declarer winning.
 export default function ClaimBar({ roomCode }) {
-  const { state } = useGame()
+  const { state, dispatch } = useGame()
   const { emit } = useSocket()
-  const { phase, declaration, declarerId, myPlayerId, currentTrick, completedTricks, claim } = state
+  const { phase, declaration, declarerId, myPlayerId, currentTrick, completedTricks, claim, claimVote } = state
 
   if (phase !== 'PLAYING' || !declaration) return null
   const amDeclarer = declarerId === myPlayerId
 
   // A defender voting on a pending claim.
   if (claim && !amDeclarer) {
+    function vote(v) {
+      dispatch({ type: 'SET_CLAIM_VOTE', vote: v })
+      emit('claim:respond', { roomCode, agree: v === 'yes' })
+    }
     return (
       <div className={`${styles.bar} ${styles.vote}`}>
         <span>A felvevő az összes maradék ütést kéri (nincs több ütés). Elfogadod?</span>
-        <button className={styles.yes} onClick={() => emit('claim:respond', { roomCode, agree: true })}>Elfogadom</button>
-        <button className={styles.no} onClick={() => emit('claim:respond', { roomCode, agree: false })}>Elutasítom</button>
+        <button
+          className={`${styles.yes} ${claimVote === 'yes' ? styles.chosen : ''} ${claimVote === 'no' ? styles.dim : ''}`}
+          disabled={!!claimVote}
+          onClick={() => vote('yes')}
+        >
+          {claimVote === 'yes' ? '✓ Elfogadva' : 'Elfogadom'}
+        </button>
+        <button
+          className={`${styles.no} ${claimVote === 'no' ? styles.chosen : ''} ${claimVote === 'yes' ? styles.dim : ''}`}
+          disabled={!!claimVote}
+          onClick={() => vote('no')}
+        >
+          {claimVote === 'no' ? '✗ Elutasítva' : 'Elutasítom'}
+        </button>
+        {claimVote && <span className={styles.waiting}>a másik játékosra várunk…</span>}
       </div>
     )
   }

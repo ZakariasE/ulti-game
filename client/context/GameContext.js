@@ -51,6 +51,7 @@ const initialState = {
   needsOpeningLead: false,
   revealedHand: null,
   claim: null, // { declarerId } while a "nincs több ütés" claim awaits defender votes
+  claimVote: null, // this player's own vote ('yes' | 'no') on a pending claim
   currentTrick: [],
   completedTricks: [], // [{ winnerId, cards }]
   lastTrickWinnerId: null,
@@ -89,6 +90,7 @@ function resetForNewRound(state) {
     needsOpeningLead: false,
     revealedHand: null,
     claim: null,
+    claimVote: null,
     readyState: null,
     announcements: [],
     talonCardIds: [],
@@ -250,16 +252,20 @@ function gameReducer(state, action) {
       return { ...state, revealedHand: action.hand }
 
     case 'CLAIM_PENDING':
-      return { ...state, claim: { declarerId: action.declarerId } }
+      return { ...state, claim: { declarerId: action.declarerId }, claimVote: null }
+
+    case 'SET_CLAIM_VOTE':
+      return { ...state, claimVote: action.vote }
 
     case 'CLAIM_RESULT':
       // Accepted → round:completed follows. Rejected → drop the claim; the
       // reveal is withdrawn and play continues.
       return action.accepted
-        ? { ...state, claim: null }
+        ? { ...state, claim: null, claimVote: null }
         : {
             ...state,
             claim: null,
+            claimVote: null,
             revealedHand: null,
             ...announce(state, 'A felvevő kérését elutasították', 'kontra'),
           }

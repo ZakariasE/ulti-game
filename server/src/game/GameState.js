@@ -312,7 +312,27 @@ function applyTrickEnd(state) {
   if (state.play.trickCount === 10) {
     return { winnerId: winner.playerId, points, roundComplete: true, ...applyRoundEnd(state) }
   }
+  // Pure Betli / Durchmars end the instant the goal becomes impossible.
+  if (_goalFailed(state, winner.playerId)) {
+    return { winnerId: winner.playerId, points, roundComplete: true, ...applyRoundEnd(state) }
+  }
   return { winnerId: winner.playerId, points, roundComplete: false }
+}
+
+const BETLI_KEYS = new Set(['betli', 'heart_betli', 'open_betli'])
+const DURCHMARS_KEYS = new Set(['durchmars', 'durchmars_nt', 'heart_durchmars', 'open_durchmars'])
+
+// A pure Betli fails the moment the declarer wins a trick; a pure Durchmars the
+// moment a defender does. (Durchmars combined with other components plays on.)
+function _goalFailed(state, trickWinnerId) {
+  const scoring = state.play.declaration.scoring
+  if (scoring.some((k) => BETLI_KEYS.has(k))) {
+    return trickWinnerId === state.play.declarerId
+  }
+  if (scoring.every((k) => DURCHMARS_KEYS.has(k))) {
+    return trickWinnerId !== state.play.declarerId
+  }
+  return false
 }
 
 function applyRoundEnd(state) {

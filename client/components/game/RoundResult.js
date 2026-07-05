@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import styles from '../../styles/RoundResult.module.css'
@@ -8,6 +8,11 @@ export default function RoundResult({ roomCode }) {
   const { emit } = useSocket()
   const { roundResult, scores, players, phase, readyState } = state
   const [clicked, setClicked] = useState(false)
+
+  // This component never unmounts between rounds, so reset the "clicked" latch
+  // whenever a new round's result arrives — otherwise the Next button stays
+  // hidden and every round after the first is stuck on "waiting".
+  useEffect(() => { setClicked(false) }, [roundResult])
 
   if (phase !== 'SCORING' || !roundResult) return null
 
