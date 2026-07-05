@@ -2,7 +2,7 @@ import CardComponent from './CardComponent'
 import TrickPile from './TrickPile'
 import styles from '../../styles/OpponentArea.module.css'
 
-export default function OpponentArea({ player, cardCount, score, isDeclarer, isActive, wonTrick, revealable }) {
+export default function OpponentArea({ player, cardCount, score, isDeclarer, isActive, wonTrick, revealable, marriages }) {
   const cls = [styles.area, isActive ? styles.active : '', wonTrick ? styles.won : '']
     .filter(Boolean).join(' ')
 
@@ -12,6 +12,7 @@ export default function OpponentArea({ player, cardCount, score, isDeclarer, isA
         {player.name}{isDeclarer ? ' 👑' : ''}{isActive ? ' ⏳' : ''}
       </div>
       <div className={styles.score}>Score: {score ?? 0}</div>
+      {marriages ? <div className={styles.marriage}>💍 {marriages}</div> : null}
       <div className={styles.cards}>
         {Array.from({ length: Math.min(cardCount, 12) }).map((_, i) => (
           <CardComponent key={i} faceDown size="small" />

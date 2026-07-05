@@ -25,6 +25,14 @@ export function componentLabel(component) {
   return (TRUMP_COMPONENTS[component] || NO_TRUMP_CONTRACTS[component] || {}).label || component
 }
 
+// Escalating kontra names, keyed by the multiplier reached.
+export const KONTRA_LEVEL_NAME = {
+  2: 'Kontra', 4: 'Rekontra', 8: 'Szubkontra', 16: 'Mordkontra', 32: 'Hirskontra', 64: 'Fedáksári',
+}
+export function kontraLevelName(level) {
+  return KONTRA_LEVEL_NAME[level] || `×${level}`
+}
+
 function componentBasePoints(component, color) {
   if (NO_TRUMP_CONTRACTS[component]) return NO_TRUMP_CONTRACTS[component].base
   const info = TRUMP_COMPONENTS[component]

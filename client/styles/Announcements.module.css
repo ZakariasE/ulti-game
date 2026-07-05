@@ -1,0 +1,38 @@
+.stack {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  width: max-content;
+  max-width: 92vw;
+}
+
+.toast {
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  background: rgba(20, 20, 24, 0.92);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: center;
+  animation: pop 0.25s ease-out;
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Per-kind accents */
+.contract { background: #1565c0; border-color: rgba(255, 255, 255, 0.25); }
+.trump    { background: #6a1b9a; }
+.marriage { background: #ad1457; }
+.kontra   { background: #c62828; }

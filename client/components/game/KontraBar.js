@@ -1,10 +1,9 @@
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
-import { componentLabel } from '../../lib/bids'
+import { componentLabel, kontraLevelName } from '../../lib/bids'
 import styles from '../../styles/KontraBar.module.css'
 
-const LEVEL_NAME = { 2: 'Kontra', 4: 'Rekontra', 8: 'Szubkontra', 16: 'Mordkontra', 32: 'Hirskontra', 64: 'Fedáksári' }
-function nextName(level) { return LEVEL_NAME[level * 2] || `×${level * 2}` }
+function nextName(level) { return kontraLevelName(level * 2) }
 
 export default function KontraBar({ roomCode }) {
   const { state } = useGame()

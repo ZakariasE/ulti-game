@@ -12,13 +12,17 @@ import RoundResult from './RoundResult'
 import KontraBar from './KontraBar'
 import MarriageBar from './MarriageBar'
 import RevealedHand from './RevealedHand'
+import Announcements from './Announcements'
 import styles from '../../styles/GameTable.module.css'
 
 export default function GameTable({ roomCode }) {
   const { state } = useGame()
   const { players, myPlayerId, scores, phase, declaration, declarerId, trumpSuit,
-    announcedMarriages, currentTurnId, lastTrickWinnerId } = state
+    currentTurnId, lastTrickWinnerId } = state
   const handCounts = state.handCounts || {}
+  const marriagesByPlayer = state.marriagesByPlayer || {}
+  const fmtMarriages = (list) =>
+    (list || []).map((m) => `${SUIT_NAMES[m.suit]} +${m.value}`).join(', ')
 
   const me = players.find((p) => p.id === myPlayerId)
   const opponents = players.filter((p) => p.id !== myPlayerId)
@@ -42,12 +46,10 @@ export default function GameTable({ roomCode }) {
     bannerClass = myTurn ? styles.bannerMe : styles.bannerWait
   }
 
-  const marriageText = announcedMarriages?.length
-    ? ' · marriages: ' + announcedMarriages.map((m) => `${SUIT_NAMES[m.suit]} +${m.value}`).join(', ')
-    : ''
-
   return (
     <div className={styles.table}>
+      <Announcements />
+
       <div className={styles.opponents}>
         {opponents.map((opp) => (
           <OpponentArea
@@ -59,16 +61,20 @@ export default function GameTable({ roomCode }) {
             isActive={currentTurnId === opp.id}
             wonTrick={lastTrickWinnerId === opp.id}
             revealable={mySide.includes(opp.id)}
+            marriages={fmtMarriages(marriagesByPlayer[opp.id])}
           />
         ))}
       </div>
 
       <div className={styles.infoBar}>
         {declaration ? (
-          <span>
-            <strong>{declarationLabel(declaration)}</strong>
-            {trumpSuit ? ` — trump ${SUIT_NAMES[trumpSuit]}` : ' — trump hidden'}
-            {' '}by <strong>{declarerPlayer?.name}</strong>{marriageText}
+          <span className={styles.goal}>
+            <span className={styles.goalLabel}>Goal:</span>
+            <strong className={styles.goalContract}>{declarationLabel(declaration)}</strong>
+            <span className={styles.goalMeta}>
+              {trumpSuit ? `trump ${SUIT_NAMES[trumpSuit]}` : 'trump hidden'}
+              {' · by '}<strong>{declarerPlayer?.id === myPlayerId ? 'you' : declarerPlayer?.name}</strong>
+            </span>
           </span>
         ) : (
           <span>Bidding in progress...</span>
@@ -91,7 +97,12 @@ export default function GameTable({ roomCode }) {
 
       <div className={`${styles.myArea} ${myTurn ? styles.myAreaActive : ''}`}>
         <div className={styles.myInfo}>
-          <span>{me?.name} (you){declarerId === myPlayerId ? ' 👑 Declarer' : ''}</span>
+          <span>
+            {me?.name} (you){declarerId === myPlayerId ? ' 👑 Declarer' : ''}
+            {marriagesByPlayer[myPlayerId]?.length
+              ? <span className={styles.marriageTag}>💍 {fmtMarriages(marriagesByPlayer[myPlayerId])}</span>
+              : null}
+          </span>
           <span className={styles.myPile}><TrickPile ownerId={myPlayerId} revealable align="left" /></span>
           <span>Score: {scores[myPlayerId] ?? 0}</span>
         </div>

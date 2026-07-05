@@ -1,6 +1,25 @@
 import { createContext, useContext, useReducer } from 'react'
+import { declarationLabel, componentLabel, kontraLevelName } from '../lib/bids'
+import { SUIT_NAMES } from '../lib/cards'
 
 const GameContext = createContext(null)
+
+// Resolve a player's display name from state ("You" for the local player).
+function nameOf(state, id) {
+  if (id === state.myPlayerId) return 'You'
+  return state.players.find((p) => p.id === id)?.name || 'Someone'
+}
+
+function marriageText(marriages) {
+  return (marriages || []).map((m) => `${SUIT_NAMES[m.suit]} +${m.value}`).join(', ')
+}
+
+// Append a transient toast to the announcement queue. Returns the fields to
+// merge into the next state (keeps `announceSeq` monotonic for stable keys).
+function announce(state, text, kind) {
+  const id = state.announceSeq + 1
+  return { announceSeq: id, announcements: [...state.announcements, { id, text, kind }] }
+}
 
 const initialState = {
   roomCode: null,
@@ -35,6 +54,8 @@ const initialState = {
   scores: {},
   roundResult: null,
   readyState: null,
+  announcements: [], // transient toasts: [{ id, text, kind }]
+  announceSeq: 0,
   error: null,
 }
 
@@ -63,6 +84,7 @@ function resetForNewRound(state) {
     openingInfo: null,
     revealedHand: null,
     readyState: null,
+    announcements: [],
   }
 }
 
@@ -105,25 +127,43 @@ function gameReducer(state, action) {
         declaration: action.declaration,
         declarerId: action.declarerId,
         trumpSuit: action.declaration?.trumpSuit || null,
+        ...announce(
+          state,
+          `${nameOf(state, action.declarerId)} declared ${declarationLabel(action.declaration)}`,
+          'contract',
+        ),
       }
 
     case 'OPENING_INFO':
       return { ...state, openingInfo: { needTrump: action.needTrump, availableMarriages: action.availableMarriages } }
 
-    case 'DECLARER_TRUMP':
-      return { ...state, trumpSuit: action.trumpSuit }
+    case 'DECLARER_TRUMP': {
+      // Trump was hidden during a normal declaration; announce when it's revealed.
+      const reveal = action.trumpSuit && !state.trumpSuit
+      return {
+        ...state,
+        trumpSuit: action.trumpSuit,
+        ...(reveal ? announce(state, `Trump is ${SUIT_NAMES[action.trumpSuit]}`, 'trump') : {}),
+      }
+    }
 
     case 'DECLARER_MARRIAGES':
       return {
         ...state,
         announcedMarriages: action.announcedMarriages,
         marriagesByPlayer: { ...state.marriagesByPlayer, [state.declarerId]: action.announcedMarriages },
+        ...(action.announcedMarriages?.length
+          ? announce(state, `${nameOf(state, state.declarerId)} announced marriage: ${marriageText(action.announcedMarriages)}`, 'marriage')
+          : {}),
       }
 
     case 'MARRIAGE_ANNOUNCED':
       return {
         ...state,
         marriagesByPlayer: { ...state.marriagesByPlayer, [action.playerId]: action.marriages },
+        ...(action.marriages?.length
+          ? announce(state, `${nameOf(state, action.playerId)} announced marriage: ${marriageText(action.marriages)}`, 'marriage')
+          : {}),
       }
 
     case 'TOGGLE_MARRIAGE':
@@ -134,8 +174,19 @@ function gameReducer(state, action) {
           : [...state.pendingMarriages, action.suit],
       }
 
-    case 'KONTRA_UPDATED':
-      return { ...state, kontra: action.kontra }
+    case 'KONTRA_UPDATED': {
+      const raised = action.raised || []
+      let toast = {}
+      if (raised.length) {
+        const level = action.kontra?.[raised[0]]?.level || 2
+        const comps = raised.map(componentLabel).join(', ')
+        toast = announce(state, `${nameOf(state, action.byId)} called ${kontraLevelName(level)} on ${comps}`, 'kontra')
+      }
+      return { ...state, kontra: action.kontra, ...toast }
+    }
+
+    case 'DISMISS_ANNOUNCEMENT':
+      return { ...state, announcements: state.announcements.filter((a) => a.id !== action.id) }
 
     case 'PLAY_TURN_START':
       return {
