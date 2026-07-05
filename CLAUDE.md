@@ -49,30 +49,46 @@ Eight ranks per suit: Ász (Ace), Király (King), Felső (Over), Alsó (Under), 
 5. The highest bidder is the **declarer**; the other two are **defenders**.
 6. The final talon on the table counts toward the declarer's card points.
 
-### Contracts
+### Declarations = bundles of components
 
-| Contract | Points (minor / hearts) | Win Condition |
+A bid is a **declaration**: a set of scoring components plus a **color** (Normal or Red = Hearts, which doubles the trump components). Each component is scored **independently** (won/lost) at round end; the round delta is the sum.
+
+**Trump components** (base points per defender; ×2 if Red):
+
+| Component | Base | Win condition |
 |---|---|---|
-| Simple (Parti) | 1 / 2 | Declarer scores ≥ 50 of 90 card points |
-| 40-100 | 4 / 8 | Score ≥ 100 incl. a 40-pt marriage (K+O) in the **trump** suit |
-| 20-100 | 8 / 16 | Score ≥ 100 incl. a 20-pt marriage (K+O) in a **non-trump** suit |
-| Ulti | 4 / 8 (lose: −8 / −16) | Score ≥ 50 AND win last trick with the 7 of trumps |
-| Betli | 5 (flat) | Declarer wins zero tricks (no trumps) |
-| Heart Betli | 10 (flat) | As Betli, higher stake |
-| Open Betli | 20 (flat) | Betli with declarer's hand revealed after trick 1 |
-| Durchmars | 6 (flat) | Declarer wins all 10 tricks (no trumps) |
-| Heart Durchmars | 12 (flat) | As Durchmars, higher stake |
-| Open Durchmars | 24 (flat) | Durchmars with declarer's hand revealed after trick 1 |
+| Parti | 1 | Declarer's card points ≥ 50 (of 90 + announced marriages) |
+| Ulti | 4 | Win the last trick with the 7 of trumps |
+| 4 Aces (Négy Ász) | 4 | Declarer wins all four aces in tricks |
+| 40-100 | 4 | Card points ≥ 100 incl. an announced 40 (K+O in trump) |
+| 20-100 | 8 | Card points ≥ 100 incl. an announced 20 (K+O non-trump) |
+| Durchmars | 6 | Declarer wins all 10 tricks |
 
-**Bid ladder (low → high):** Simple(minor) < Simple(hearts) < 40-100(minor) < Betli < Ulti(minor) < Durchmars < 40-100(hearts) < 20-100(minor) < Ulti(hearts) < Heart Betli < Heart Durchmars < 20-100(hearts) < Open Betli < Open Durchmars.
+**No-trump standalone contracts** (flat; cannot combine): Betli 5, Heart Betli 10, Open Betli 20, Durchmars 6, Heart Durchmars 12, Open Durchmars 24. Betli = win zero tricks; Durchmars = win all tricks. "Open" reveals the declarer's hand after trick 1.
 
-**Payout:** On win, each defender pays the declarer `basePoints`. On loss, the declarer pays each defender `basePoints`. Hearts doubles the trump contracts (Simple, 40-100, Ulti, 20-100); the Betli/Durchmars variants are flat.
+**Combination rules:**
+- Combinable: Ulti, 40-100, 20-100, 4 Aces, Durchmars (any subset).
+- Betli never combines.
+- At most **one** of {40-100, 20-100}.
+- **Parti** is bundled only when *every* component is a parti-bearer (Ulti / 4 Aces). Mixing a parti-bearer with a non-parti component drops the parti — e.g. `40-100 + Ulti = 4+4 = 8`, not 9. `Ulti + 4 Aces = 4+4+1 = 9`.
+- Trump Durchmars must be combined with another trump component (standalone Durchmars is the no-trump contract).
 
-**Marriages** (40-100 / 20-100) are auto-detected from the King + Over the declarer held in the relevant suit (simplified — no explicit in-play declaration yet).
+**Bid ranking** = total declaration value (Σ component base, ×2 for Red), with a fixed tiebreak for equal values.
 
-### Kontra (doubling)
+**Hidden trump:** you bid only Normal or Red. For a Normal declaration the concrete trump (Makk/Zöld/Tök) is chosen **when the declarer leads the first card**, and revealed then. Red = Hearts, known upfront.
 
-Before the first trick finishes, a **defender** may call **Kontra** (×2). The declarer answers with **Rekontra** (×4), then a defender **Szubkontra** (×8), and so on — each doubling the stakes. The multiplier applies to the round's payout.
+**Marriages:** at the opening lead the declarer chooses which held marriages (K+O) to announce — none / any combo. Announced marriages add **40** (trump suit) or **20** (other) to the declarer's card points (needs ≥1 trick won). 40-100 requires an announced 40; 20-100 an announced 20.
+
+**Payout:** per component — on win each defender pays `base × kontra`; on loss the declarer pays each defender.
+
+### Kontra (per component, tied to card plays)
+
+Each component can be doubled **independently**. Timing follows each player's own card count:
+- A **defender** may Kontra (×2) a component as they play their **1st** card.
+- The **declarer** answers Rekontra (×4) as they play their **2nd** card.
+- Defenders Szubkontra (×8) on their **2nd** cards, and so on — each step only if the previous was made.
+
+You may kontra all components or just individual ones.
 
 ### Trick-Taking Rules
 
