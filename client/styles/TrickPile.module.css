@@ -39,7 +39,7 @@
   border-radius: 10px;
   padding: 10px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.5);
-  max-width: 460px;
+  max-width: 560px;
 }
 
 .center { left: 50%; transform: translateX(-50%); }
@@ -79,13 +79,5 @@
 
 .groupCards {
   display: flex;
-  gap: 3px;
-}
-
-/* Shrink cards inside the reveal so a whole trick fits neatly. */
-.mini {
-  transform: scale(0.5);
-  transform-origin: top center;
-  width: 32px;
-  height: 52px;
+  gap: 4px;
 }

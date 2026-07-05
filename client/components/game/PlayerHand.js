@@ -34,6 +34,7 @@ export default function PlayerHand({ roomCode }) {
           <CardComponent
             key={card.id}
             card={card}
+            size="large"
             highlighted={isMyTurn && isLegal}
             disabled={isMyTurn && !isLegal}
             onClick={isMyTurn && isLegal ? () => playCard(card.id) : undefined}

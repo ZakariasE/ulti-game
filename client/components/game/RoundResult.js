@@ -26,6 +26,22 @@ export default function RoundResult({ roomCode }) {
           Declarer: <strong>{declarer?.name}</strong> — card points {roundResult.cardTotal}
         </p>
 
+        {roundResult.partiDetail && (
+          <div className={styles.parti}>
+            <div className={styles.partiTitle}>Parti breakdown</div>
+            <div className={styles.partiLine}>
+              {roundResult.partiDetail.hits} <span className={styles.hu}>ütés</span>
+              {' + '}{roundResult.partiDetail.announcements} <span className={styles.hu}>bemondás</span>
+              {' + '}{roundResult.partiDetail.lastTrick} <span className={styles.hu}>utolsó ütés</span>
+              {roundResult.partiDetail.talon > 0 && <>{' + '}{roundResult.partiDetail.talon} <span className={styles.hu}>talon</span></>}
+              {' = '}<strong>{roundResult.partiDetail.declarerTotal}</strong>
+            </div>
+            <div className={styles.partiVs}>
+              declarer <strong>{roundResult.partiDetail.declarerTotal}</strong> vs defenders <strong>{roundResult.partiDetail.defenderTotal}</strong>
+            </div>
+          </div>
+        )}
+
         <table className={styles.scoreTable}>
           <thead>
             <tr><th>Component</th><th>Result</th><th>Stake</th></tr>

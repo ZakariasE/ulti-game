@@ -20,6 +20,10 @@
   object-fit: contain;
 }
 
+/* Size variants */
+.large { width: 92px; height: 148px; border-radius: 8px; }
+.small { width: 46px; height: 74px; border-radius: 5px; }
+
 .clickable {
   cursor: pointer;
   transition: transform 0.1s, box-shadow 0.1s;

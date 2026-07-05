@@ -1,13 +1,17 @@
 import { cardImage, CARD_BACK_IMAGE } from '../../lib/cards'
 import styles from '../../styles/Card.module.css'
 
-export default function CardComponent({ card, faceDown, highlighted, selected, onClick, disabled }) {
+// size: 'normal' (default) | 'large' | 'small'
+export default function CardComponent({ card, faceDown, highlighted, selected, onClick, disabled, size = 'normal' }) {
+  const sizeClass = size === 'large' ? styles.large : size === 'small' ? styles.small : ''
+
   if (faceDown) {
-    return <img className={styles.cardBack} src={CARD_BACK_IMAGE} alt="card back" draggable={false} />
+    return <img className={`${styles.cardBack} ${sizeClass}`} src={CARD_BACK_IMAGE} alt="card back" draggable={false} />
   }
 
   const classes = [
     styles.card,
+    sizeClass,
     highlighted ? styles.highlighted : '',
     selected ? styles.selected : '',
     disabled ? styles.disabled : '',

@@ -78,6 +78,20 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   const defenderTotal = defenderTrickPoints + defenderMarriage
   const cardTotal = declarerTotal
 
+  // Breakdown of the declarer's Parti total (for the round-over screen).
+  let partiDetail = null
+  if (declaration.scoring.includes('parti')) {
+    const hits = completedTricks
+      .filter((t) => t.winnerId === declarerId)
+      .reduce((s, t) => s + t.cards.reduce((x, c) => x + (c.card.rank === 'asz' || c.card.rank === '10' ? 10 : 0), 0), 0)
+    const lastTrick = completedTricks.length && completedTricks[completedTricks.length - 1].winnerId === declarerId ? 10 : 0
+    const talonPts = countCardPoints(talon, trumpSuit)
+    partiDetail = {
+      hits, announcements: declarerMarriage, lastTrick, talon: talonPts,
+      declarerTotal, defenderTotal,
+    }
+  }
+
   const ctx = { declaration, declarerId, completedTricks, declarerTotal, defenderTotal, announced }
   const deltas = {}
   const setup = (id) => { if (deltas[id] === undefined) deltas[id] = 0 }
@@ -100,7 +114,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     return { key, label: componentLabel(key), won, basePoints, kontraLevel, delta: won ? payout : -payout }
   })
 
-  return { components, deltas, cardTotal, declarerId, color: declaration.color }
+  return { components, deltas, cardTotal, partiDetail, declarerId, color: declaration.color }
 }
 
 module.exports = { calculateRoundScore }

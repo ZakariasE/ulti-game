@@ -59,3 +59,25 @@
   text-align: center;
   align-self: center;
 }
+
+.parti {
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.partiTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9fd3ac;
+}
+
+.partiLine { font-size: 15px; }
+
+.partiVs { font-size: 13px; color: #cfe3d4; }
+
+.hu { color: #9fb4c7; font-size: 12px; font-style: italic; }

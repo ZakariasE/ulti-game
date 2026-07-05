@@ -14,7 +14,7 @@ export default function OpponentArea({ player, cardCount, score, isDeclarer, isA
       <div className={styles.score}>Score: {score ?? 0}</div>
       <div className={styles.cards}>
         {Array.from({ length: Math.min(cardCount, 12) }).map((_, i) => (
-          <CardComponent key={i} faceDown />
+          <CardComponent key={i} faceDown size="small" />
         ))}
       </div>
       {wonTrick && <div className={styles.wonLabel}>won trick</div>}
