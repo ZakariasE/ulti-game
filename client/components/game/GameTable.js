@@ -8,6 +8,8 @@ import PlayerHand from './PlayerHand'
 import BidPanel from './BidPanel'
 import TrumpChoice from './TrumpChoice'
 import RoundResult from './RoundResult'
+import BuliResult from './BuliResult'
+import BuliScoreboard from './BuliScoreboard'
 import KontraBar from './KontraBar'
 import MarriageBar from './MarriageBar'
 import ClaimBar from './ClaimBar'
@@ -89,6 +91,8 @@ export default function GameTable({ roomCode }) {
         <span className={styles.room}>Szoba: {roomCode}</span>
       </div>
 
+      <BuliScoreboard />
+
       {banner && <div className={`${styles.banner} ${bannerClass}`}>{banner}</div>}
 
       <KontraBar roomCode={roomCode} />
@@ -101,6 +105,7 @@ export default function GameTable({ roomCode }) {
       {phase === 'BIDDING' && <BidPanel roomCode={roomCode} />}
       <TrumpChoice />
       <RoundResult roomCode={roomCode} />
+      <BuliResult roomCode={roomCode} />
 
       <div className={`${styles.myArea} ${myTurn ? styles.myAreaActive : ''}`}>
         <div className={styles.myInfo}>

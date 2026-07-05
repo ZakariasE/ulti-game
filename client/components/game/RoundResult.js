@@ -6,8 +6,9 @@ import styles from '../../styles/RoundResult.module.css'
 export default function RoundResult({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { roundResult, scores, players, phase, readyState } = state
+  const { roundResult, scores, players, phase, readyState, options, declaredScores } = state
   const [clicked, setClicked] = useState(false)
+  const buliMode = !!options?.buli?.on
 
   // This component never unmounts between rounds, so reset the "clicked" latch
   // whenever a new round's result arrives — otherwise the Next button stays
@@ -84,14 +85,18 @@ export default function RoundResult({ roomCode }) {
           </thead>
           <tbody>
             {players.map((p) => {
-              const delta = roundResult.deltas[p.id] || 0
+              // In buli mode only the declarer's points are tracked.
+              const delta = buliMode
+                ? (p.id === roundResult.declarerId ? (roundResult.deltas[p.id] || 0) : 0)
+                : (roundResult.deltas[p.id] || 0)
+              const total = buliMode ? (declaredScores[p.id] ?? 0) : (scores[p.id] ?? 0)
               return (
                 <tr key={p.id}>
                   <td>{p.name}</td>
                   <td className={delta >= 0 ? styles.pos : styles.neg}>
                     {delta >= 0 ? '+' : ''}{delta}
                   </td>
-                  <td>{scores[p.id] ?? 0}</td>
+                  <td>{total}</td>
                 </tr>
               )
             })}

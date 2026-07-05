@@ -1,0 +1,38 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.label { color: #f1c40f; font-weight: 700; }
+
+.players { display: flex; gap: 16px; flex-wrap: wrap; }
+
+.player { display: flex; align-items: center; gap: 6px; }
+
+.name { color: #cfe3d4; }
+
+.pos { color: #2ecc71; font-weight: 700; }
+.neg { color: #e74c3c; font-weight: 700; }
+
+.badges { display: flex; gap: 3px; margin-left: 2px; }
+
+.badges span {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.done { background: #2e7d32; color: #fff; }
+.todo { background: #5a2a2a; color: #e0a0a0; }

@@ -2,6 +2,7 @@ const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
   applyFirstLead, applyKontra, applyPlayCard, startClaim, respondClaim, prepareNextRound,
+  startBuli, buliSnapshot,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
@@ -42,6 +43,7 @@ function registerHandlers(io, socket) {
       if (!state) throw new Error('Room not found')
       if (state.players.length !== 3) throw new Error('Need exactly 3 players')
       if (state.phase !== 'LOBBY') throw new Error('Game already started')
+      if (state.options.buli.on) startBuli(state)
       applyDeal(state)
       _dealAndAnnounce(io, roomCode, state)
     } catch (err) {
@@ -162,7 +164,7 @@ function registerHandlers(io, socket) {
         io.to(roomCode).emit('claim:result', { accepted: false })
       } else if (res.accepted) {
         io.to(roomCode).emit('claim:result', { accepted: true })
-        io.to(roomCode).emit('round:completed', { result: state.roundResult, scores: state.scores })
+        io.to(roomCode).emit('round:completed', _roundCompleted(state))
       }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
@@ -180,10 +182,32 @@ function registerHandlers(io, socket) {
 
       if (state._readyForNext.size >= connected) {
         state._readyForNext = null
-        prepareNextRound(state)
-        applyDeal(state)
-        _dealAndAnnounce(io, roomCode, state)
+        if (state.buli && state.buli.over) {
+          // Buli finished — show its result instead of dealing the next hand.
+          state.phase = 'BULI_OVER'
+          io.to(roomCode).emit('buli:completed', {
+            buli: buliSnapshot(state), declaredScores: state.declaredScores,
+          })
+        } else {
+          prepareNextRound(state)
+          applyDeal(state)
+          _dealAndAnnounce(io, roomCode, state)
+        }
       }
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  // Start the next buli (keeps declaredScores + history).
+  socket.on('buli:next', ({ roomCode }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      if (!state.buli || !state.buli.over) throw new Error('No finished buli')
+      startBuli(state)
+      prepareNextRound(state)
+      applyDeal(state)
+      _dealAndAnnounce(io, roomCode, state)
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -196,6 +220,15 @@ function registerHandlers(io, socket) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+function _roundCompleted(state) {
+  return {
+    result: state.roundResult,
+    scores: state.scores,
+    declaredScores: state.declaredScores,
+    buli: buliSnapshot(state),
+  }
+}
 
 // Bidding resolved → announce the declarer/contract and begin play.
 function _announceResolved(io, roomCode, state, result) {
@@ -258,7 +291,7 @@ function _afterPlay(io, roomCode, state, playerId, result) {
     }
 
     if (result.roundComplete) {
-      io.to(roomCode).emit('round:completed', { result: state.roundResult, scores: state.scores })
+      io.to(roomCode).emit('round:completed', _roundCompleted(state))
     } else {
       setTimeout(() => _promptNextTurn(io, roomCode, state), 1200)
     }

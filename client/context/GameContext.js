@@ -281,7 +281,26 @@ function gameReducer(state, action) {
           }
 
     case 'ROUND_COMPLETED':
-      return { ...state, phase: 'SCORING', roundResult: action.result, scores: action.scores, claim: null, currentTrick: [], readyState: null }
+      return {
+        ...state,
+        phase: 'SCORING',
+        roundResult: action.result,
+        scores: action.scores,
+        declaredScores: action.declaredScores || state.declaredScores,
+        buli: action.buli || state.buli,
+        claim: null,
+        currentTrick: [],
+        readyState: null,
+      }
+
+    case 'BULI_COMPLETED':
+      return {
+        ...state,
+        phase: 'BULI_OVER',
+        buli: action.buli,
+        declaredScores: action.declaredScores || state.declaredScores,
+        readyState: null,
+      }
 
     case 'ROUND_READY':
       return { ...state, readyState: { readyCount: action.readyCount, total: action.total } }

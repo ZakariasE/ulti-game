@@ -430,13 +430,113 @@ function applyRoundEnd(state) {
     stakeMultiplier: state.options.felkezes ? 4 : 1, // félkezes: every bid worth 4×
   })
 
-  for (const [playerId, delta] of Object.entries(result.deltas)) {
-    state.scores[playerId] = (state.scores[playerId] || 0) + delta
+  const declarerId = state.play.declarerId
+  const buliOn = state.options.buli.on && state.buli
+  if (buliOn) {
+    // Buli: track ONLY the declarer's own points; defender results are not accumulated.
+    const d = result.deltas[declarerId] || 0
+    state.declaredScores[declarerId] = (state.declaredScores[declarerId] || 0) + d
+    state.buli.points[declarerId] = (state.buli.points[declarerId] || 0) + d
+    state.buli.handsPlayed++
+    _markKotelezo(state, declarerId, state.play.declaration)
+  } else {
+    for (const [playerId, delta] of Object.entries(result.deltas)) {
+      state.scores[playerId] = (state.scores[playerId] || 0) + delta
+    }
   }
 
   state.roundResult = result
   state.phase = 'SCORING'
+
+  if (buliOn && state.buli.handsPlayed >= state.options.buli.handsPerBuli) {
+    _settleBuli(state) // marks buli.over; round:continue will show the buli result
+  }
   return { roundResult: result }
+}
+
+// ── Buli (chain of hands with an end-of-buli premium) ──────────────────────────
+
+const KOTELEZO_BETLI_KEYS = new Set(['betli', 'heart_betli', 'open_betli', 'forty_hundred'])
+
+// (Re)start a buli — index++ and reset per-buli trackers, keeping declaredScores
+// and history. Called at game start (buli on) and on "Következő buli".
+function startBuli(state) {
+  const points = {}
+  const kotelezo = {}
+  state.players.forEach((p) => { points[p.id] = 0; kotelezo[p.id] = { ulti: false, betli: false } })
+  state.buli = {
+    index: state.buli ? state.buli.index + 1 : 1,
+    handsPlayed: 0,
+    points,
+    kotelezo,
+    over: false,
+    result: null,
+    history: state.buli ? state.buli.history : [],
+  }
+}
+
+// Kötelező mondások: record that the declarer said an Ulti / Betli-40-100.
+function _markKotelezo(state, declarerId, declaration) {
+  const k = state.buli.kotelezo[declarerId] || (state.buli.kotelezo[declarerId] = { ulti: false, betli: false })
+  if (declaration.scoring.includes('ulti')) k.ulti = true
+  if (declaration.scoring.some((s) => KOTELEZO_BETLI_KEYS.has(s))) k.betli = true
+}
+
+// End of buli: premium to 1st / −premium to last, per-player kötelező penalties.
+function _settleBuli(state) {
+  const points = state.buli.points
+  const ranked = [...state.players].sort(
+    (a, b) => (points[b.id] - points[a.id]) || (a.seatIndex - b.seatIndex)
+  )
+  const allEqual = ranked.every((p) => points[p.id] === points[ranked[0].id])
+
+  const premiums = {}
+  const penalties = {}
+  state.players.forEach((p) => { premiums[p.id] = 0; penalties[p.id] = 0 })
+
+  const premium = state.options.buli.premium
+  if (!allEqual && premium) {
+    premiums[ranked[0].id] = premium
+    premiums[ranked[ranked.length - 1].id] = -premium
+  }
+
+  if (state.options.kotelezo.on) {
+    const { ultiPenalty, betliPenalty } = state.options.kotelezo
+    state.players.forEach((p) => {
+      const k = state.buli.kotelezo[p.id] || { ulti: false, betli: false }
+      if (!k.ulti) penalties[p.id] -= ultiPenalty
+      if (!k.betli) penalties[p.id] -= betliPenalty
+    })
+  }
+
+  state.players.forEach((p) => {
+    state.declaredScores[p.id] = (state.declaredScores[p.id] || 0) + premiums[p.id] + penalties[p.id]
+  })
+
+  const result = {
+    index: state.buli.index,
+    points: { ...points },
+    premiums,
+    penalties,
+    kotelezo: JSON.parse(JSON.stringify(state.buli.kotelezo)),
+    declaredScores: { ...state.declaredScores },
+  }
+  state.buli.over = true
+  state.buli.result = result
+  state.buli.history.push(result)
+}
+
+function buliSnapshot(state) {
+  if (!state.buli) return null
+  return {
+    index: state.buli.index,
+    handsPlayed: state.buli.handsPlayed,
+    handsPerBuli: state.options.buli.handsPerBuli,
+    points: state.buli.points,
+    kotelezo: state.buli.kotelezo,
+    over: state.buli.over,
+    result: state.buli.result,
+  }
 }
 
 // ── Claim: "nincs több ütés" (declarer takes all remaining tricks) ─────────────
@@ -632,6 +732,8 @@ module.exports = {
   startClaim,
   respondClaim,
   applyRoundEnd,
+  startBuli,
+  buliSnapshot,
   prepareNextRound,
   availableMarriages,
   marriageOptionsFor,
