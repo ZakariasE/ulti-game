@@ -1,7 +1,8 @@
 import CardComponent from './CardComponent'
+import TrickPile from './TrickPile'
 import styles from '../../styles/OpponentArea.module.css'
 
-export default function OpponentArea({ player, cardCount, score, isDeclarer, isActive, wonTrick }) {
+export default function OpponentArea({ player, cardCount, score, isDeclarer, isActive, wonTrick, revealable }) {
   const cls = [styles.area, isActive ? styles.active : '', wonTrick ? styles.won : '']
     .filter(Boolean).join(' ')
 
@@ -17,6 +18,7 @@ export default function OpponentArea({ player, cardCount, score, isDeclarer, isA
         ))}
       </div>
       {wonTrick && <div className={styles.wonLabel}>won trick</div>}
+      <TrickPile ownerId={player.id} revealable={revealable} align="center" />
     </div>
   )
 }

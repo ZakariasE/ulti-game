@@ -67,6 +67,14 @@ export function declarationValue(decl) {
   return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
 }
 
+// Bidding rank ignores the +1/+2 parti bonus (Betli 5 outranks Ulti 4+1).
+export function rankValue(decl) {
+  if (!decl || decl.invalid) return -1
+  const nonParti = decl.scoring.filter((c) => c !== 'parti')
+  if (nonParti.length === 0) return componentBasePoints('parti', decl.color)
+  return nonParti.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+}
+
 const TIEBREAK = [
   'parti', 'betli', 'ulti', 'four_aces', 'forty_hundred', 'durchmars_nt',
   'durchmars', 'twenty_hundred', 'heart_betli', 'heart_durchmars', 'open_betli', 'open_durchmars',
@@ -80,7 +88,7 @@ function tiebreakKey(decl) {
 
 export function isHigherDeclaration(next, current) {
   if (!current) return true
-  const dv = declarationValue(next) - declarationValue(current)
+  const dv = rankValue(next) - rankValue(current)
   if (dv !== 0) return dv > 0
   return tiebreakKey(next) > tiebreakKey(current)
 }

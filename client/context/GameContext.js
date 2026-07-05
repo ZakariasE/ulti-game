@@ -22,11 +22,14 @@ const initialState = {
   announcedMarriages: [],
   kontra: {}, // component -> { level, lastParty }
   kontraOptions: [], // components I may double right now
+  marriageOptions: [], // suits I may announce right now (my first card)
+  pendingMarriages: [], // suits I've toggled to announce with my next card
+  marriagesByPlayer: {}, // playerId -> [{suit,value}]
   needsOpeningLead: false,
   openingInfo: null, // { needTrump, availableMarriages } (declarer only)
   revealedHand: null,
   currentTrick: [],
-  completedTricks: [],
+  completedTricks: [], // [{ winnerId, cards }]
   lastTrickWinnerId: null,
   legalCardIds: [],
   scores: {},
@@ -53,6 +56,9 @@ function resetForNewRound(state) {
     announcedMarriages: [],
     kontra: {},
     kontraOptions: [],
+    marriageOptions: [],
+    pendingMarriages: [],
+    marriagesByPlayer: {},
     needsOpeningLead: false,
     openingInfo: null,
     revealedHand: null,
@@ -108,7 +114,25 @@ function gameReducer(state, action) {
       return { ...state, trumpSuit: action.trumpSuit }
 
     case 'DECLARER_MARRIAGES':
-      return { ...state, announcedMarriages: action.announcedMarriages }
+      return {
+        ...state,
+        announcedMarriages: action.announcedMarriages,
+        marriagesByPlayer: { ...state.marriagesByPlayer, [state.declarerId]: action.announcedMarriages },
+      }
+
+    case 'MARRIAGE_ANNOUNCED':
+      return {
+        ...state,
+        marriagesByPlayer: { ...state.marriagesByPlayer, [action.playerId]: action.marriages },
+      }
+
+    case 'TOGGLE_MARRIAGE':
+      return {
+        ...state,
+        pendingMarriages: state.pendingMarriages.includes(action.suit)
+          ? state.pendingMarriages.filter((s) => s !== action.suit)
+          : [...state.pendingMarriages, action.suit],
+      }
 
     case 'KONTRA_UPDATED':
       return { ...state, kontra: action.kontra }
@@ -120,6 +144,8 @@ function gameReducer(state, action) {
         lastTrickWinnerId: null,
         needsOpeningLead: action.currentPlayerId === state.myPlayerId ? !!action.needsOpeningLead : false,
         kontraOptions: action.currentPlayerId === state.myPlayerId ? (action.kontraOptions || []) : [],
+        marriageOptions: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
+        pendingMarriages: [],
         kontra: action.kontra || state.kontra,
         trumpSuit: action.trumpSuit ?? state.trumpSuit,
         legalCardIds: action.currentPlayerId === state.myPlayerId ? action.legalCardIds : [],
@@ -136,13 +162,15 @@ function gameReducer(state, action) {
             : state.myHand,
         legalCardIds: [],
         kontraOptions: [],
+        marriageOptions: [],
+        pendingMarriages: [],
         needsOpeningLead: false,
       }
 
     case 'TRICK_COMPLETED':
       return {
         ...state,
-        completedTricks: [...state.completedTricks, { winnerId: action.winnerId }],
+        completedTricks: [...state.completedTricks, { winnerId: action.winnerId, cards: action.cards || [] }],
         lastTrickWinnerId: action.winnerId,
       }
 

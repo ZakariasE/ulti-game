@@ -97,9 +97,18 @@ function componentLabel(component) {
   return (TRUMP_COMPONENTS[component] || NO_TRUMP_CONTRACTS[component] || {}).label || component
 }
 
-// Total point value of a declaration — used to rank bids.
+// Total point value of a declaration (incl. parti) — used for display.
 function declarationValue(decl) {
   return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+}
+
+// Bidding rank ignores the +1/+2 parti bonus: a "clean" Betli (5) outranks an
+// Ulti (4+1), and Heart Betli (10) outranks Heart Ulti (8+2). A lone Simple is
+// ranked by its parti value.
+function rankValue(decl) {
+  const nonParti = decl.scoring.filter((c) => c !== 'parti')
+  if (nonParti.length === 0) return componentBasePoints('parti', decl.color)
+  return nonParti.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
 }
 
 // Tiebreak for equal values: order no-trump specials, then by a component
@@ -116,7 +125,7 @@ function tiebreakKey(decl) {
 }
 
 function isHigherDeclaration(next, current) {
-  const dv = declarationValue(next) - declarationValue(current)
+  const dv = rankValue(next) - rankValue(current)
   if (dv !== 0) return dv > 0
   return tiebreakKey(next) > tiebreakKey(current)
 }
@@ -148,6 +157,7 @@ module.exports = {
   componentBasePoints,
   componentLabel,
   declarationValue,
+  rankValue,
   isHigherDeclaration,
   declarationLabel,
   getInitialBidderSeat,

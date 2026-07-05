@@ -1,0 +1,36 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
+.label {
+  font-size: 13px;
+  color: #f1c40f;
+  font-weight: 600;
+}
+
+.chip {
+  background: #37474f;
+  color: #fff;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 14px;
+}
+
+.chip:hover { background: #546e7a; }
+
+.on {
+  background: #1565c0;
+  outline: 2px solid #42a5f5;
+}
+
+.hint {
+  font-size: 11px;
+  color: #9fb4c7;
+}

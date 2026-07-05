@@ -160,6 +160,7 @@ function _resolveBidding(state) {
     trickCount: 0,
     kontra,
     cardsPlayed,
+    marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, declaration }
@@ -174,6 +175,19 @@ function availableMarriages(hand) {
     const hasOver = hand.some((c) => c.suit === suit && c.rank === 'felso')
     return hasKing && hasOver
   })
+}
+
+// Validate & record a player's announced marriages (called on their first card).
+function _recordMarriages(state, playerId, announcedSuits) {
+  const trumpSuit = state.play.declaration.trumpSuit
+  const available = availableMarriages(state.hands[playerId])
+  const marriages = []
+  for (const suit of announcedSuits || []) {
+    if (!available.includes(suit)) throw new Error('You do not hold that marriage')
+    marriages.push({ suit, value: suit === trumpSuit ? 40 : 20 })
+  }
+  state.play.marriages[playerId] = marriages
+  return marriages
 }
 
 // ── Card play ────────────────────────────────────────────────────────────────
@@ -202,23 +216,22 @@ function applyFirstLead(state, playerId, cardId, trumpSuit, announcedSuits = [])
     decl.trumpSuit = trumpSuit
   }
 
-  // Validate & record announced marriages.
-  const available = availableMarriages(state.hands[playerId])
-  const marriages = []
-  for (const suit of announcedSuits || []) {
-    if (!available.includes(suit)) throw new Error('You do not hold that marriage')
-    marriages.push({ suit, value: suit === decl.trumpSuit ? 40 : 20 })
-  }
-  decl.announcedMarriages = marriages
+  // Trump is set above; record the declarer's announced marriages.
+  const marriages = _recordMarriages(state, playerId, announcedSuits)
+  decl.announcedMarriages = marriages // declarer's, for display
   state.play.openingLeadDone = true
 
   return _playCardCore(state, playerId, cardId)
 }
 
-function applyPlayCard(state, playerId, cardId) {
+function applyPlayCard(state, playerId, cardId, announcedSuits) {
   // The declarer's very first card must go through applyFirstLead.
   if (!state.play.openingLeadDone && playerId === state.play.declarerId) {
     throw new Error('Declarer must make the opening lead')
+  }
+  // A player may announce marriages on their own first card.
+  if (state.play.cardsPlayed[playerId] === 0 && announcedSuits && announcedSuits.length) {
+    _recordMarriages(state, playerId, announcedSuits)
   }
   return _playCardCore(state, playerId, cardId)
 }
@@ -279,6 +292,7 @@ function applyRoundEnd(state) {
     talon: state.talon,
     declarerPoints: state.play.declarerPoints,
     kontra: state.play.kontra,
+    marriages: state.play.marriages,
   })
 
   for (const [playerId, delta] of Object.entries(result.deltas)) {
@@ -332,6 +346,16 @@ function applyKontra(state, playerId, components) {
     raised.push(c)
   }
   return { raised, kontra: state.play.kontra }
+}
+
+// Marriages a player may announce right now: only on their own first card,
+// and not the declarer's opening lead (that is handled in the opening-lead UI).
+function marriageOptionsFor(state, playerId) {
+  if (!state.play || state.phase !== 'PLAYING') return []
+  if (state.play.cardsPlayed[playerId] !== 0) return []
+  const needsOpeningLead = !state.play.openingLeadDone && playerId === state.play.declarerId
+  if (needsOpeningLead) return []
+  return availableMarriages(state.hands[playerId])
 }
 
 // True if the given player currently has any component they may double.
@@ -410,6 +434,7 @@ module.exports = {
   applyRoundEnd,
   prepareNextRound,
   availableMarriages,
+  marriageOptionsFor,
   eligibleKontra,
   biddingSnapshot,
   publicDeclaration,

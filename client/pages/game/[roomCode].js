@@ -32,6 +32,7 @@ export default function GamePage() {
       'opening:info':      (d) => dispatch({ type: 'OPENING_INFO', ...d }),
       'declarer:trump':    (d) => dispatch({ type: 'DECLARER_TRUMP', ...d }),
       'declarer:marriages':(d) => dispatch({ type: 'DECLARER_MARRIAGES', ...d }),
+      'marriage:announced':(d) => dispatch({ type: 'MARRIAGE_ANNOUNCED', ...d }),
       'kontra:updated':    (d) => dispatch({ type: 'KONTRA_UPDATED', ...d }),
       'declarer:revealed': (d) => dispatch({ type: 'DECLARER_REVEALED', ...d }),
       'play:turnStart':    (d) => dispatch({ type: 'PLAY_TURN_START', ...d }),

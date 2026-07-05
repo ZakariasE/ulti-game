@@ -2,8 +2,8 @@ const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
   applyFirstLead, applyKontra, applyPlayCard, prepareNextRound,
-  availableMarriages, eligibleKontra, biddingSnapshot, publicDeclaration,
-  handCounts, _getLegalCardIds,
+  availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
+  publicDeclaration, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
 
 function registerHandlers(io, socket) {
@@ -133,10 +133,15 @@ function registerHandlers(io, socket) {
     }
   })
 
-  socket.on('card:play', ({ roomCode, cardId }) => {
+  socket.on('card:play', ({ roomCode, cardId, announcedMarriages }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      const result = applyPlayCard(state, socket.id, cardId)
+      const wasFirstCard = state.play.cardsPlayed[socket.id] === 0
+      const result = applyPlayCard(state, socket.id, cardId, announcedMarriages)
+      const mine = state.play.marriages[socket.id]
+      if (wasFirstCard && mine && mine.length) {
+        io.to(roomCode).emit('marriage:announced', { playerId: socket.id, marriages: mine })
+      }
       _afterPlay(io, roomCode, state, socket.id, result)
     } catch (err) {
       socket.emit('game:error', { message: err.message })
@@ -190,7 +195,12 @@ function _afterPlay(io, roomCode, state, playerId, result) {
   })
 
   if (result.trickComplete) {
-    io.to(roomCode).emit('trick:completed', { winnerId: result.winnerId, points: result.points })
+    const lastTrick = state.play.completedTricks[state.play.completedTricks.length - 1]
+    io.to(roomCode).emit('trick:completed', {
+      winnerId: result.winnerId,
+      points: result.points,
+      cards: lastTrick.cards,
+    })
 
     if (state.play.declaration.open && state.play.trickCount === 1) {
       io.to(roomCode).emit('declarer:revealed', {
@@ -218,6 +228,7 @@ function _promptNextTurn(io, roomCode, state) {
     legalCardIds: _getLegalCardIds(state, player.id),
     needsOpeningLead: !state.play.openingLeadDone && player.id === state.play.declarerId,
     kontraOptions: eligibleKontra(state, player.id),
+    marriageOptions: marriageOptionsFor(state, player.id),
     kontra: state.play.kontra,
     trumpSuit: state.play.declaration.trumpSuit,
   })

@@ -21,21 +21,23 @@ function acesWonByDeclarer(completedTricks, declarerId) {
 
 // Decide whether one scoring component was fulfilled.
 function componentWon(component, ctx) {
-  const { declaration, declarerId, completedTricks, cardTotal, announced } = ctx
+  const { declaration, declarerId, completedTricks, declarerTotal, defenderTotal, announced } = ctx
   const trumpSuit = declaration.trumpSuit
   const declTricks = declarerTrickCount(completedTricks, declarerId)
 
   switch (component) {
     case 'parti':
-      return cardTotal >= 50
+      // The declarer must capture more points than the defenders (each side's
+      // total includes its own announced marriages).
+      return declarerTotal > defenderTotal
     case 'ulti':
       return isUltiWinCondition(completedTricks, declarerId, trumpSuit)
     case 'four_aces':
       return acesWonByDeclarer(completedTricks, declarerId) === 4
     case 'forty_hundred':
-      return announced.some((m) => m.value === 40) && cardTotal >= 100
+      return announced.some((m) => m.value === 40) && declarerTotal >= 100
     case 'twenty_hundred':
-      return announced.some((m) => m.value === 20) && cardTotal >= 100
+      return announced.some((m) => m.value === 20) && declarerTotal >= 100
     case 'durchmars': // trump component
       return declTricks === completedTricks.length
     case 'betli':
@@ -51,16 +53,32 @@ function componentWon(component, ctx) {
   }
 }
 
+function marriagePoints(marriages, ids, eligible) {
+  if (!eligible) return 0
+  return ids.reduce((sum, id) => sum + (marriages[id] || []).reduce((s, m) => s + m.value, 0), 0)
+}
+
 // Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
 function calculateRoundScore({ declaration, declarerId, defenderIds,
-                               completedTricks, talon, declarerPoints, kontra = {} }) {
+                               completedTricks, talon, declarerPoints, kontra = {}, marriages = {} }) {
   const trumpSuit = declaration.trumpSuit
-  const announced = declaration.announcedMarriages || []
-  const wonATrick = declarerTrickCount(completedTricks, declarerId) > 0
-  const marriagePoints = wonATrick ? announced.reduce((s, m) => s + m.value, 0) : 0
-  const cardTotal = declarerPoints + countCardPoints(talon, trumpSuit) + marriagePoints
+  const announced = marriages[declarerId] || [] // declarer's own (for 40-100 / 20-100)
 
-  const ctx = { declaration, declarerId, completedTricks, cardTotal, announced }
+  // Trick points: declarer's captured points (incl. talon) vs the rest.
+  const declarerTrickPoints = declarerPoints + countCardPoints(talon, trumpSuit)
+  const defenderTrickPoints = 90 - declarerTrickPoints
+
+  // Marriages count only if the announcing side won at least one trick.
+  const declWonATrick = declarerTrickCount(completedTricks, declarerId) > 0
+  const defWonATrick = completedTricks.some((t) => defenderIds.includes(t.winnerId))
+  const declarerMarriage = marriagePoints(marriages, [declarerId], declWonATrick)
+  const defenderMarriage = marriagePoints(marriages, defenderIds, defWonATrick)
+
+  const declarerTotal = declarerTrickPoints + declarerMarriage
+  const defenderTotal = defenderTrickPoints + defenderMarriage
+  const cardTotal = declarerTotal
+
+  const ctx = { declaration, declarerId, completedTricks, declarerTotal, defenderTotal, announced }
   const deltas = {}
   const setup = (id) => { if (deltas[id] === undefined) deltas[id] = 0 }
   setup(declarerId)

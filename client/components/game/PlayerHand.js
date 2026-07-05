@@ -9,7 +9,8 @@ import styles from '../../styles/PlayerHand.module.css'
 export default function PlayerHand({ roomCode }) {
   const { emit } = useSocket()
   const { state } = useGame()
-  const { myHand, legalCardIds, phase, currentTurnId, myPlayerId, declaration, needsOpeningLead } = state
+  const { myHand, legalCardIds, phase, currentTurnId, myPlayerId, declaration,
+    needsOpeningLead, pendingMarriages } = state
 
   // While the opening-lead modal is up, playing happens there, not here.
   const isMyTurn = phase === 'PLAYING' && currentTurnId === myPlayerId && !needsOpeningLead
@@ -21,7 +22,8 @@ export default function PlayerHand({ roomCode }) {
   )
 
   function playCard(cardId) {
-    emit('card:play', { roomCode, cardId })
+    // Include any marriages the player toggled (only recorded on their first card).
+    emit('card:play', { roomCode, cardId, announcedMarriages: pendingMarriages })
   }
 
   return (

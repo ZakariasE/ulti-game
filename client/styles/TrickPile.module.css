@@ -1,0 +1,91 @@
+.pile {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: default;
+}
+
+.stack {
+  position: relative;
+  width: 44px;
+  height: 34px;
+}
+
+.stackCard {
+  position: absolute;
+  width: 26px;
+  height: 38px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(45deg, #14448f 0 4px, #1258b8 4px 8px);
+  border: 1.5px solid #fdfdf7;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.35);
+}
+
+.count {
+  font-size: 11px;
+  color: #cfe3d4;
+  white-space: nowrap;
+}
+
+.popover {
+  position: absolute;
+  z-index: 60;
+  bottom: 100%;
+  margin-bottom: 8px;
+  background: #1f3d2a;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+  max-width: 460px;
+}
+
+.center { left: 50%; transform: translateX(-50%); }
+.left { left: 0; }
+.right { right: 0; }
+
+.popTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9fd3ac;
+  margin-bottom: 6px;
+}
+
+.groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.groupLabel {
+  font-size: 10px;
+  color: #f5d76e;
+  font-weight: 700;
+}
+
+.groupCards {
+  display: flex;
+  gap: 3px;
+}
+
+/* Shrink cards inside the reveal so a whole trick fits neatly. */
+.mini {
+  transform: scale(0.5);
+  transform-origin: top center;
+  width: 32px;
+  height: 52px;
+}
