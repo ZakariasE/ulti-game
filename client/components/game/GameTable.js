@@ -10,6 +10,7 @@ import TrumpChoice from './TrumpChoice'
 import RoundResult from './RoundResult'
 import KontraBar from './KontraBar'
 import MarriageBar from './MarriageBar'
+import ClaimBar from './ClaimBar'
 import RevealedHand from './RevealedHand'
 import Announcements from './Announcements'
 import styles from '../../styles/GameTable.module.css'
@@ -90,6 +91,7 @@ export default function GameTable({ roomCode }) {
 
       <KontraBar roomCode={roomCode} />
       <MarriageBar />
+      <ClaimBar roomCode={roomCode} />
       <RevealedHand />
 
       <TrickArea />

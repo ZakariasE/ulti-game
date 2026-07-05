@@ -1,7 +1,7 @@
 const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
-  applyFirstLead, applyKontra, applyPlayCard, prepareNextRound,
+  applyFirstLead, applyKontra, applyPlayCard, startClaim, respondClaim, prepareNextRound,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
@@ -135,6 +135,34 @@ function registerHandlers(io, socket) {
         io.to(roomCode).emit('marriage:announced', { playerId: socket.id, marriages: mine })
       }
       _afterPlay(io, roomCode, state, socket.id, result)
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  // ── Claim: "nincs több ütés" ───────────────────────────────────────────────
+
+  socket.on('claim:start', ({ roomCode }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const { hand } = startClaim(state, socket.id)
+      io.to(roomCode).emit('declarer:revealed', { declarerId: socket.id, hand })
+      io.to(roomCode).emit('claim:pending', { declarerId: socket.id })
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  socket.on('claim:respond', ({ roomCode, agree }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const res = respondClaim(state, socket.id, agree)
+      if (res.rejected) {
+        io.to(roomCode).emit('claim:result', { accepted: false })
+      } else if (res.accepted) {
+        io.to(roomCode).emit('claim:result', { accepted: true })
+        io.to(roomCode).emit('round:completed', { result: state.roundResult, scores: state.scores })
+      }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }

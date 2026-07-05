@@ -10,10 +10,12 @@ export default function MarriageBar() {
 
   if (phase !== 'PLAYING' || currentTurnId !== myPlayerId || !marriageOptions?.length) return null
 
-  // Values depend on the trump suit, so wait until it's chosen (opening lead).
+  // Values depend on the trump suit, so wait until it's known. For defenders the
+  // trump is already revealed (trumpSuit); for the declarer it's their pending
+  // choice at the opening lead.
   const effectiveTrump = trumpSuit || pendingTrump
   const needTrump = declaration && !declaration.isNoTrump && declaration.color === 'normal'
-  const trumpReady = !needTrump || !!pendingTrump
+  const trumpReady = !needTrump || !!effectiveTrump
   if (!trumpReady) return null
 
   return (

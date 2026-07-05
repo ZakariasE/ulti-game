@@ -31,6 +31,7 @@ export default function RoundResult({ roomCode }) {
             <div className={styles.partiTitle}>Parti részletezés</div>
             {[['declarer', 'Felvevő'], ['defenders', 'Ellenfelek']].map(([key, label]) => {
               const d = roundResult.partiDetail[key]
+              if (!d) return null
               return (
                 <div key={key} className={styles.partiLine}>
                   <span className={styles.partiSide}>{label}:</span>{' '}

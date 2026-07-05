@@ -35,6 +35,8 @@ export default function GamePage() {
       'marriage:announced':(d) => dispatch({ type: 'MARRIAGE_ANNOUNCED', ...d }),
       'kontra:updated':    (d) => dispatch({ type: 'KONTRA_UPDATED', ...d }),
       'declarer:revealed': (d) => dispatch({ type: 'DECLARER_REVEALED', ...d }),
+      'claim:pending':     (d) => dispatch({ type: 'CLAIM_PENDING', ...d }),
+      'claim:result':      (d) => dispatch({ type: 'CLAIM_RESULT', ...d }),
       'play:turnStart':    (d) => dispatch({ type: 'PLAY_TURN_START', ...d }),
       'card:played':       (d) => dispatch({ type: 'CARD_PLAYED', ...d }),
       'trick:completed':   (d) => dispatch({ type: 'TRICK_COMPLETED', ...d }),

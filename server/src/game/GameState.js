@@ -165,6 +165,7 @@ function _resolveBidding(state) {
     kontra,
     cardsPlayed,
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
+    claim: null, // { responses } while a "nincs több ütés" claim is pending
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, declaration }
@@ -335,6 +336,68 @@ function applyRoundEnd(state) {
   return { roundResult: result }
 }
 
+// ── Claim: "nincs több ütés" (declarer takes all remaining tricks) ─────────────
+
+const BETLI_CONTRACTS = new Set(['betli', 'heart_betli', 'open_betli'])
+function _isBetliContract(decl) {
+  return decl.scoring.some((k) => BETLI_CONTRACTS.has(k))
+}
+
+// The declarer offers to take every remaining trick. Both defenders must agree.
+function startClaim(state, playerId) {
+  if (state.phase !== 'PLAYING') throw new Error('Not in play')
+  if (playerId !== state.play.declarerId) throw new Error('Only the declarer can claim')
+  if (!state.play.openingLeadDone) throw new Error('Play has not started')
+  if (state.play.currentTrick.cards.length !== 0) throw new Error('Finish the current trick first')
+  if (state.play.trickCount >= 10) throw new Error('No tricks left')
+  if (_isBetliContract(state.play.declaration)) throw new Error('Cannot claim in a Betli')
+  state.play.claim = { responses: {} }
+  return { hand: state.hands[playerId], defenderIds: state.play.defenderIds }
+}
+
+function respondClaim(state, playerId, agree) {
+  if (!state.play || !state.play.claim) throw new Error('No pending claim')
+  if (!state.play.defenderIds.includes(playerId)) throw new Error('Only defenders may respond')
+  state.play.claim.responses[playerId] = !!agree
+  if (!agree) {
+    state.play.claim = null
+    return { rejected: true }
+  }
+  const allAgreed = state.play.defenderIds.every((id) => state.play.claim.responses[id] === true)
+  if (!allAgreed) return { pending: true }
+  state.play.claim = null
+  return { accepted: true, ...applyClaimAll(state) }
+}
+
+// Award every remaining trick to the declarer and end the round. Remaining cards
+// are folded into synthetic declarer-won tricks (the 7 of trump goes last so an
+// announced Ulti still resolves correctly).
+function applyClaimAll(state) {
+  const declarerId = state.play.declarerId
+  const trump = state.play.declaration.trumpSuit
+  const declHand = [...state.hands[declarerId]]
+  if (trump) {
+    const i = declHand.findIndex((c) => c.suit === trump && c.rank === '7')
+    if (i >= 0) declHand.push(declHand.splice(i, 1)[0])
+  }
+  const defHands = state.play.defenderIds.map((id) => [...state.hands[id]])
+  let added = 0
+  for (let i = 0; i < declHand.length; i++) {
+    const cards = [{ playerId: declarerId, card: declHand[i] }]
+    state.play.defenderIds.forEach((id, di) => {
+      if (defHands[di][i]) cards.push({ playerId: id, card: defHands[di][i] })
+    })
+    const points = countTrickPoints(cards, trump)
+    added += points
+    state.play.completedTricks.push({ winnerId: declarerId, cards, points })
+  }
+  state.play.trickCount = 10
+  state.play.declarerPoints += added + (trump ? 10 : 0) // + last-trick bonus (trump games)
+  state.players.forEach((p) => { state.hands[p.id] = [] })
+  state.play.currentTrick = { ledSuit: null, leaderSeat: 0, cards: [] }
+  return applyRoundEnd(state)
+}
+
 // ── Kontra (per component, tied to card-play timing) ───────────────────────────
 
 // The escalation step `d` (number of doublings so far) is raised by:
@@ -462,6 +525,8 @@ module.exports = {
   applyFirstLead,
   applyKontra,
   applyPlayCard,
+  startClaim,
+  respondClaim,
   applyRoundEnd,
   prepareNextRound,
   availableMarriages,

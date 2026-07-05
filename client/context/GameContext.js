@@ -50,6 +50,7 @@ const initialState = {
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
   needsOpeningLead: false,
   revealedHand: null,
+  claim: null, // { declarerId } while a "nincs több ütés" claim awaits defender votes
   currentTrick: [],
   completedTricks: [], // [{ winnerId, cards }]
   lastTrickWinnerId: null,
@@ -87,6 +88,7 @@ function resetForNewRound(state) {
     marriagesByPlayer: {},
     needsOpeningLead: false,
     revealedHand: null,
+    claim: null,
     readyState: null,
     announcements: [],
     talonCardIds: [],
@@ -247,8 +249,23 @@ function gameReducer(state, action) {
     case 'DECLARER_REVEALED':
       return { ...state, revealedHand: action.hand }
 
+    case 'CLAIM_PENDING':
+      return { ...state, claim: { declarerId: action.declarerId } }
+
+    case 'CLAIM_RESULT':
+      // Accepted → round:completed follows. Rejected → drop the claim; the
+      // reveal is withdrawn and play continues.
+      return action.accepted
+        ? { ...state, claim: null }
+        : {
+            ...state,
+            claim: null,
+            revealedHand: null,
+            ...announce(state, 'A felvevő kérését elutasították', 'kontra'),
+          }
+
     case 'ROUND_COMPLETED':
-      return { ...state, phase: 'SCORING', roundResult: action.result, scores: action.scores, currentTrick: [], readyState: null }
+      return { ...state, phase: 'SCORING', roundResult: action.result, scores: action.scores, claim: null, currentTrick: [], readyState: null }
 
     case 'ROUND_READY':
       return { ...state, readyState: { readyCount: action.readyCount, total: action.total } }
