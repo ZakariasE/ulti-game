@@ -73,11 +73,11 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 - **Parti** is bundled only when *every* component is a parti-bearer (Ulti / 4 Aces). Mixing a parti-bearer with a non-parti component drops the parti — e.g. `40-100 + Ulti = 4+4 = 8`, not 9. `Ulti + 4 Aces = 4+4+1 = 9`.
 - Trump Durchmars must be combined with another trump component (standalone Durchmars is the no-trump contract).
 
-**Bid ranking** = total declaration value (Σ component base, ×2 for Red), with a fixed tiebreak for equal values.
+**Bid ranking** ignores the **+1/+2 Parti bonus**: rank by the sum of the *non-parti* component bases (×2 for Red), with a fixed tiebreak. So a clean **Betli (5) outranks Ulti (4+1)**, and **Heart Betli (10) outranks Heart Ulti (8+2)**. (The full value, incl. parti, is still used for scoring and display.)
 
 **Hidden trump:** you bid only Normal or Red. For a Normal declaration the concrete trump (Makk/Zöld/Tök) is chosen **when the declarer leads the first card**, and revealed then. Red = Hearts, known upfront.
 
-**Marriages:** at the opening lead the declarer chooses which held marriages (K+O) to announce — none / any combo. Announced marriages add **40** (trump suit) or **20** (other) to the declarer's card points (needs ≥1 trick won). 40-100 requires an announced 40; 20-100 an announced 20.
+**Marriages:** **every player** may announce held marriages (K+O) on **their own first card** — none / any combo. A marriage adds **40** (trump suit) or **20** (other) to the announcing side's card points (that side must win ≥1 trick). The **Parti** is won when the declarer's total (trick points + own marriages) **exceeds the defenders' total** (their points + their marriages). 40-100 needs the declarer to announce a 40; 20-100 a 20.
 
 **Payout:** per component — on win each defender pays `base × kontra`; on loss the declarer pays each defender.
 
