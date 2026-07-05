@@ -49,9 +49,9 @@
   opacity: 0.5;
 }
 
-/* Cards that came from the talon (visible only to the holder), kept visible
- * through the round. Uses box-shadow so it coexists with the legal-play/select
- * outlines. */
+/* Cards picked up from the talon, shown only while discarding (they vanish once
+ * you set your own talon). Yellow ring via box-shadow so it coexists with the
+ * red select outline. */
 .fromTalon {
-  box-shadow: 0 0 0 3px #3498db, 0 0 12px rgba(52,152,219,0.7);
+  box-shadow: 0 0 0 3px #f1c40f, 0 0 12px rgba(241,196,15,0.7);
 }

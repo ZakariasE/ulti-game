@@ -93,7 +93,6 @@ export default function PlayerHand({ roomCode }) {
               size="large"
               highlighted={canPlay && isLegal}
               disabled={canPlay && !isLegal}
-              fromTalon={talonCardIds.includes(card.id)}
               onClick={canPlay && isLegal ? () => playCard(card.id) : undefined}
             />
           )

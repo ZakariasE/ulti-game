@@ -13,6 +13,7 @@ import MarriageBar from './MarriageBar'
 import ClaimBar from './ClaimBar'
 import RevealedHand from './RevealedHand'
 import Announcements from './Announcements'
+import ErrorToast from './ErrorToast'
 import styles from '../../styles/GameTable.module.css'
 
 export default function GameTable({ roomCode }) {
@@ -54,6 +55,7 @@ export default function GameTable({ roomCode }) {
   return (
     <div className={styles.table}>
       <Announcements />
+      <ErrorToast />
 
       <div className={styles.opponents}>
         {opponents.map((opp) => (
