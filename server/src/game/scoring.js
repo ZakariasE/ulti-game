@@ -116,7 +116,9 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     const won = componentWon(key, ctx)
     const basePoints = componentBasePoints(key, declaration.color)
     const kontraLevel = (kontra[key] && kontra[key].level) || 1
-    const payout = basePoints * kontraLevel
+    // Reaching 100 card points doubles the Parti stake — for whichever side won it.
+    const hundred = key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100
+    const payout = basePoints * kontraLevel * (hundred ? 2 : 1)
 
     if (won) {
       deltas[declarerId] += payout * defenderIds.length
@@ -125,7 +127,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
       deltas[declarerId] -= payout * defenderIds.length
       defenderIds.forEach((id) => { deltas[id] += payout })
     }
-    return { key, label: componentLabel(key), won, basePoints, kontraLevel, delta: won ? payout : -payout }
+    return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, delta: won ? payout : -payout }
   })
 
   return { components, deltas, cardTotal, partiDetail, declarerId, color: declaration.color }

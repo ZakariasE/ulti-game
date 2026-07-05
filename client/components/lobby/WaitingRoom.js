@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import styles from '../../styles/WaitingRoom.module.css'
@@ -8,9 +9,12 @@ export default function WaitingRoom({ roomCode }) {
   const { players, myPlayerId } = state
   const isHost = players[0]?.id === myPlayerId
   const canStart = players.length === 3
+  const [copied, setCopied] = useState(false)
 
   function copyCode() {
     navigator.clipboard.writeText(roomCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
@@ -19,7 +23,9 @@ export default function WaitingRoom({ roomCode }) {
 
       <div className={styles.roomCode}>
         <span className={styles.code}>{roomCode}</span>
-        <button className={styles.copyBtn} onClick={copyCode}>Másolás</button>
+        <button className={`${styles.copyBtn} ${copied ? styles.copied : ''}`} onClick={copyCode}>
+          {copied ? 'Másolva ✓' : 'Másolás'}
+        </button>
       </div>
       <p className={styles.hint}>Oszd meg ezt a kódot 2 baráttal</p>
 

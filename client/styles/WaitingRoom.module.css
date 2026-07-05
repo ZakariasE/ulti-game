@@ -34,6 +34,13 @@
   color: white;
   font-size: 13px;
   padding: 6px 12px;
+  transition: background 0.15s;
+}
+
+.copyBtn:hover { background: #546e7a; }
+
+.copied {
+  background: #2e7d32;
 }
 
 .hint {
