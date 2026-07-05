@@ -37,7 +37,6 @@
 .highlighted {
   outline: 3px solid #f1c40f;
   outline-offset: 1px;
-  box-shadow: 0 0 12px rgba(241,196,15,0.75);
 }
 
 .selected {
@@ -50,9 +49,9 @@
   opacity: 0.5;
 }
 
-/* Cards that just came from the talon (visible only to the holder). */
+/* Cards that came from the talon (visible only to the holder), kept visible
+ * through the round. Uses box-shadow so it coexists with the legal-play/select
+ * outlines. */
 .fromTalon {
-  outline: 3px dashed #3498db;
-  outline-offset: 2px;
-  box-shadow: 0 0 12px rgba(52,152,219,0.7);
+  box-shadow: 0 0 0 3px #3498db, 0 0 12px rgba(52,152,219,0.7);
 }

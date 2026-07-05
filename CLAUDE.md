@@ -77,7 +77,7 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 
 **Hidden trump:** you bid only Normal or Red. For a Normal declaration the concrete trump (Makk/Zöld/Tök) is chosen **when the declarer leads the first card**, and revealed then. Red = Hearts, known upfront.
 
-**Marriages:** **every player** may announce held marriages (K+O) on **their own first card** — none / any combo. A marriage adds **40** (trump suit) or **20** (other) to the announcing side's card points (that side must win ≥1 trick). The **Parti** is won when the declarer's total (trick points + own marriages) **exceeds the defenders' total** (their points + their marriages). 40-100 needs the declarer to announce a 40; 20-100 a 20.
+**Marriages (jelentés):** **every player** may announce held marriages (K+O) on **their own first card** — announced by default, opt out per suit. A jelentés adds **40** (trump suit) or **20** (other) to the announcing side's card points (that side must win ≥1 trick). Only the **value** (20/40) is announced publicly — never the suit. Jelentések can **only** be announced in contracts that carry a **Parti**; in Parti-less contracts (Betli, Durchmars, 40-100, 20-100, …) they cannot be announced. For **40-100 / 20-100** the required 40 (trump K+O) / 20 (a non-trump K+O) is **implied by the contract** and auto-counted for the declarer, not announced. The **Parti** is won when the declarer's total (trick points + own marriages) **exceeds the defenders' total** (their points + their marriages).
 
 **Payout:** per component — on win each defender pays `base × kontra`; on loss the declarer pays each defender.
 

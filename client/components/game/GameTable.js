@@ -6,7 +6,7 @@ import TrickArea from './TrickArea'
 import TrickPile from './TrickPile'
 import PlayerHand from './PlayerHand'
 import BidPanel from './BidPanel'
-import OpeningLead from './OpeningLead'
+import TrumpChoice from './TrumpChoice'
 import RoundResult from './RoundResult'
 import KontraBar from './KontraBar'
 import MarriageBar from './MarriageBar'
@@ -20,9 +20,12 @@ export default function GameTable({ roomCode }) {
     currentTurnId, lastTrickWinnerId } = state
   const handCounts = state.handCounts || {}
   const marriagesByPlayer = state.marriagesByPlayer || {}
-  // Public marriage display hides the suit — only the value is announced.
-  const fmtMarriages = (list) =>
-    (list || []).map((m) => `+${m.value}`).join(', ')
+  // Public jelentés display hides the suit — only the value (20/40) is shown.
+  const fmtMarriages = (list) => {
+    if (!list || !list.length) return ''
+    const values = list.map((m) => m.value).join(', ')
+    return `${list.length > 1 ? 'jelentések' : 'jelentés'}: ${values}`
+  }
 
   const me = players.find((p) => p.id === myPlayerId)
   const opponents = players.filter((p) => p.id !== myPlayerId)
@@ -92,7 +95,7 @@ export default function GameTable({ roomCode }) {
       <TrickArea />
 
       {phase === 'BIDDING' && <BidPanel roomCode={roomCode} />}
-      <OpeningLead roomCode={roomCode} />
+      <TrumpChoice />
       <RoundResult roomCode={roomCode} />
 
       <div className={`${styles.myArea} ${myTurn ? styles.myAreaActive : ''}`}>
@@ -100,7 +103,7 @@ export default function GameTable({ roomCode }) {
           <span>
             {me?.name} (te){declarerId === myPlayerId ? ' 👑 Felvevő' : ''}
             {marriagesByPlayer[myPlayerId]?.length
-              ? <span className={styles.marriageTag}>💍 {fmtMarriages(marriagesByPlayer[myPlayerId])}</span>
+              ? <span className={styles.marriageTag}>{fmtMarriages(marriagesByPlayer[myPlayerId])}</span>
               : null}
           </span>
           <span className={styles.myPile}><TrickPile ownerId={myPlayerId} revealable align="left" /></span>

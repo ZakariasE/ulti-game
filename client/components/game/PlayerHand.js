@@ -10,12 +10,18 @@ export default function PlayerHand({ roomCode }) {
   const { emit } = useSocket()
   const { state } = useGame()
   const { myHand, legalCardIds, phase, biddingPhase, currentTurnId, myPlayerId,
-    declaration, needsOpeningLead, pendingMarriages, pendingKontra, talonCardIds } = state
+    declaration, trumpSuit, pendingTrump, needsOpeningLead, pendingMarriages,
+    pendingKontra, talonCardIds } = state
 
   const [discardSel, setDiscardSel] = useState([])
 
-  // While the opening-lead modal is up, playing happens there, not here.
-  const isMyTurn = phase === 'PLAYING' && currentTurnId === myPlayerId && !needsOpeningLead
+  const myPlayTurn = phase === 'PLAYING' && currentTurnId === myPlayerId
+  // The declarer's very first card is the opening lead (played inline now).
+  const openingLead = myPlayTurn && needsOpeningLead
+  const needTrump = declaration && !declaration.isNoTrump && declaration.color === 'normal'
+  const effectiveTrump = trumpSuit || pendingTrump
+  const trumpReady = !needTrump || !!pendingTrump
+  const canPlay = myPlayTurn && (!openingLead || trumpReady)
   // Discarding: the talon holder picks 2 cards straight from the hand.
   const isDiscarding = phase === 'BIDDING' && biddingPhase === 'DISCARD' && currentTurnId === myPlayerId
 
@@ -26,9 +32,16 @@ export default function PlayerHand({ roomCode }) {
   )
 
   function playCard(cardId) {
-    // Include any marriages announced (first card) and kontra staged this turn;
-    // both are finalized only now, when the card is actually played.
-    emit('card:play', { roomCode, cardId, announcedMarriages: pendingMarriages, kontra: pendingKontra })
+    // Marriages announced (first card) and kontra staged this turn are finalized
+    // only now, when the card is actually played.
+    if (openingLead) {
+      emit('play:firstLead', {
+        roomCode, cardId, trumpSuit: effectiveTrump,
+        announcedMarriages: pendingMarriages, kontra: pendingKontra,
+      })
+    } else {
+      emit('card:play', { roomCode, cardId, announcedMarriages: pendingMarriages, kontra: pendingKontra })
+    }
   }
 
   function toggleDiscard(cardId) {
@@ -78,9 +91,10 @@ export default function PlayerHand({ roomCode }) {
               key={card.id}
               card={card}
               size="large"
-              highlighted={isMyTurn && isLegal}
-              disabled={isMyTurn && !isLegal}
-              onClick={isMyTurn && isLegal ? () => playCard(card.id) : undefined}
+              highlighted={canPlay && isLegal}
+              disabled={canPlay && !isLegal}
+              fromTalon={talonCardIds.includes(card.id)}
+              onClick={canPlay && isLegal ? () => playCard(card.id) : undefined}
             />
           )
         })}

@@ -182,7 +182,13 @@ function availableMarriages(hand) {
 }
 
 // Validate & record a player's announced marriages (called on their first card).
+// Marriages (jelentés) only count in contracts that carry a Parti; otherwise
+// there is nothing for them to contribute to, so they cannot be announced.
 function _recordMarriages(state, playerId, announcedSuits) {
+  if (!state.play.declaration.hasParti) {
+    state.play.marriages[playerId] = []
+    return []
+  }
   const trumpSuit = state.play.declaration.trumpSuit
   const available = availableMarriages(state.hands[playerId])
   const marriages = []
@@ -223,9 +229,30 @@ function applyFirstLead(state, playerId, cardId, trumpSuit, announcedSuits = [])
   // Trump is set above; record the declarer's announced marriages.
   const marriages = _recordMarriages(state, playerId, announcedSuits)
   decl.announcedMarriages = marriages // declarer's, for display
+  // 40-100 / 20-100 imply the declarer's K+O even though it isn't a jelentés.
+  _autoRecordContractMarriage(state)
   state.play.openingLeadDone = true
 
   return _playCardCore(state, playerId, cardId)
+}
+
+// For 40-100 / 20-100 the required 40 (trump K+O) or 20 (a non-trump K+O) is
+// part of the contract, not an announcement — record it silently for scoring.
+function _autoRecordContractMarriage(state) {
+  const decl = state.play.declaration
+  const declarerId = state.play.declarerId
+  const trump = decl.trumpSuit
+  const avail = availableMarriages(state.hands[declarerId])
+  const list = state.play.marriages[declarerId] || []
+  const has = (s) => list.some((m) => m.suit === s)
+  if (decl.scoring.includes('forty_hundred') && trump && avail.includes(trump) && !has(trump)) {
+    list.push({ suit: trump, value: 40 })
+  }
+  if (decl.scoring.includes('twenty_hundred')) {
+    const nonTrump = avail.find((s) => s !== trump && !has(s))
+    if (nonTrump) list.push({ suit: nonTrump, value: 20 })
+  }
+  state.play.marriages[declarerId] = list
 }
 
 function applyPlayCard(state, playerId, cardId, announcedSuits) {
@@ -352,13 +379,12 @@ function applyKontra(state, playerId, components) {
   return { raised, kontra: state.play.kontra }
 }
 
-// Marriages a player may announce right now: only on their own first card,
-// and not the declarer's opening lead (that is handled in the opening-lead UI).
+// Marriages (jelentés) a player may announce right now: only on their own first
+// card, and only in contracts that carry a Parti (otherwise they don't count).
 function marriageOptionsFor(state, playerId) {
   if (!state.play || state.phase !== 'PLAYING') return []
   if (state.play.cardsPlayed[playerId] !== 0) return []
-  const needsOpeningLead = !state.play.openingLeadDone && playerId === state.play.declarerId
-  if (needsOpeningLead) return []
+  if (!state.play.declaration.hasParti) return []
   return availableMarriages(state.hands[playerId])
 }
 

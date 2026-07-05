@@ -10,9 +10,9 @@ function nameOf(state, id) {
   return state.players.find((p) => p.id === id)?.name || 'Valaki'
 }
 
-// Public marriage text hides the suit — only the value is announced.
+// Public jelentés text hides the suit — only the value (20/40) is announced.
 function marriageText(marriages) {
-  return (marriages || []).map((m) => `+${m.value}`).join(', ')
+  return (marriages || []).map((m) => `${m.value}`).join(', ')
 }
 
 // Append a transient toast to the announcement queue. Returns the fields to
@@ -40,6 +40,7 @@ const initialState = {
   declaration: null, // public declaration once bidding resolves
   declarerId: null,
   trumpSuit: null, // revealed at the opening lead
+  pendingTrump: null, // declarer's chosen minor trump before leading (normal contracts)
   announcedMarriages: [],
   kontra: {}, // component -> { level, lastParty }
   kontraOptions: [], // components I may double right now
@@ -48,7 +49,6 @@ const initialState = {
   pendingMarriages: [], // suits I've toggled to announce with my next card
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
   needsOpeningLead: false,
-  openingInfo: null, // { needTrump, availableMarriages } (declarer only)
   revealedHand: null,
   currentTrick: [],
   completedTricks: [], // [{ winnerId, cards }]
@@ -77,6 +77,7 @@ function resetForNewRound(state) {
     declaration: null,
     declarerId: null,
     trumpSuit: null,
+    pendingTrump: null,
     announcedMarriages: [],
     kontra: {},
     kontraOptions: [],
@@ -85,7 +86,6 @@ function resetForNewRound(state) {
     pendingMarriages: [],
     marriagesByPlayer: {},
     needsOpeningLead: false,
-    openingInfo: null,
     revealedHand: null,
     readyState: null,
     announcements: [],
@@ -142,9 +142,6 @@ function gameReducer(state, action) {
         ),
       }
 
-    case 'OPENING_INFO':
-      return { ...state, openingInfo: { needTrump: action.needTrump, availableMarriages: action.availableMarriages } }
-
     case 'DECLARER_TRUMP': {
       // Trump was hidden during a normal declaration; announce when it's revealed.
       const reveal = action.trumpSuit && !state.trumpSuit
@@ -161,7 +158,7 @@ function gameReducer(state, action) {
         announcedMarriages: action.announcedMarriages,
         marriagesByPlayer: { ...state.marriagesByPlayer, [state.declarerId]: action.announcedMarriages },
         ...(action.announcedMarriages?.length
-          ? announce(state, `${nameOf(state, state.declarerId)} házasságot jelentett: ${marriageText(action.announcedMarriages)}`, 'marriage')
+          ? announce(state, `${nameOf(state, state.declarerId)} jelentett: ${marriageText(action.announcedMarriages)}`, 'marriage')
           : {}),
       }
 
@@ -170,7 +167,7 @@ function gameReducer(state, action) {
         ...state,
         marriagesByPlayer: { ...state.marriagesByPlayer, [action.playerId]: action.marriages },
         ...(action.marriages?.length
-          ? announce(state, `${nameOf(state, action.playerId)} házasságot jelentett: ${marriageText(action.marriages)}`, 'marriage')
+          ? announce(state, `${nameOf(state, action.playerId)} jelentett: ${marriageText(action.marriages)}`, 'marriage')
           : {}),
       }
 
@@ -181,6 +178,9 @@ function gameReducer(state, action) {
           ? state.pendingMarriages.filter((s) => s !== action.suit)
           : [...state.pendingMarriages, action.suit],
       }
+
+    case 'SET_TRUMP_CHOICE':
+      return { ...state, pendingTrump: action.suit }
 
     case 'TOGGLE_KONTRA':
       return {

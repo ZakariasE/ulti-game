@@ -12,7 +12,7 @@ export default function OpponentArea({ player, cardCount, score, isDeclarer, isA
         {player.name}{isDeclarer ? ' 👑' : ''}{isActive ? ' ⏳' : ''}
       </div>
       <div className={styles.score}>Pont: {score ?? 0}</div>
-      {marriages ? <div className={styles.marriage}>💍 {marriages}</div> : null}
+      {marriages ? <div className={styles.marriage}>{marriages}</div> : null}
       <div className={styles.cards}>
         {Array.from({ length: Math.min(cardCount, 12) }).map((_, i) => (
           <CardComponent key={i} faceDown size="small" />

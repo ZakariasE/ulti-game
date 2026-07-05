@@ -35,7 +35,7 @@ export default function RoundResult({ roomCode }) {
                 <div key={key} className={styles.partiLine}>
                   <span className={styles.partiSide}>{label}:</span>{' '}
                   {d.hits} <span className={styles.hu}>ütés</span>
-                  {' + '}{d.announcements} <span className={styles.hu}>bemondás</span>
+                  {' + '}{d.announcements} <span className={styles.hu}>jelentés</span>
                   {' + '}{d.lastTrick} <span className={styles.hu}>utolsó ütés</span>
                   {d.talon > 0 && <>{' + '}{d.talon} <span className={styles.hu}>talon</span></>}
                   {' = '}<strong>{d.total}</strong>

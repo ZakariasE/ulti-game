@@ -30,7 +30,6 @@ export default function GamePage() {
       'talon:held':        (d) => dispatch({ type: 'TALON_HELD', ...d }),
       'bid:state':         (d) => dispatch({ type: 'BID_STATE', ...d }),
       'bid:resolved':      (d) => dispatch({ type: 'BID_RESOLVED', ...d }),
-      'opening:info':      (d) => dispatch({ type: 'OPENING_INFO', ...d }),
       'declarer:trump':    (d) => dispatch({ type: 'DECLARER_TRUMP', ...d }),
       'declarer:marriages':(d) => dispatch({ type: 'DECLARER_MARRIAGES', ...d }),
       'marriage:announced':(d) => dispatch({ type: 'MARRIAGE_ANNOUNCED', ...d }),

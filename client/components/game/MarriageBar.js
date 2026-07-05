@@ -2,17 +2,25 @@ import { useGame } from '../../context/GameContext'
 import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/MarriageBar.module.css'
 
+// Jelentés (K+O) picker: announced by default, click a suit to opt OUT.
 export default function MarriageBar() {
   const { state, dispatch } = useGame()
-  const { marriageOptions, pendingMarriages, trumpSuit, currentTurnId, myPlayerId, phase } = state
+  const { marriageOptions, pendingMarriages, trumpSuit, pendingTrump, declaration,
+    currentTurnId, myPlayerId, phase } = state
 
   if (phase !== 'PLAYING' || currentTurnId !== myPlayerId || !marriageOptions?.length) return null
 
+  // Values depend on the trump suit, so wait until it's chosen (opening lead).
+  const effectiveTrump = trumpSuit || pendingTrump
+  const needTrump = declaration && !declaration.isNoTrump && declaration.color === 'normal'
+  const trumpReady = !needTrump || !!pendingTrump
+  if (!trumpReady) return null
+
   return (
     <div className={styles.bar}>
-      <span className={styles.label}>Bemondott házasságok:</span>
+      <span className={styles.label}>Jelentések:</span>
       {marriageOptions.map((suit) => {
-        const value = suit === trumpSuit ? 40 : 20
+        const value = suit === effectiveTrump ? 40 : 20
         const on = pendingMarriages.includes(suit)
         return (
           <button
@@ -20,11 +28,11 @@ export default function MarriageBar() {
             className={`${styles.chip} ${on ? styles.on : styles.off}`}
             onClick={() => dispatch({ type: 'TOGGLE_MARRIAGE', suit })}
           >
-            {SUIT_NAMES[suit]} +{value}
+            {SUIT_NAMES[suit]} {value}
           </button>
         )
       })}
-      <span className={styles.hint}>alapból bemondva — kattints egyre a kihagyáshoz</span>
+      <span className={styles.hint}>alapból bejelentve — kattints egyre a kihagyáshoz</span>
     </div>
   )
 }
