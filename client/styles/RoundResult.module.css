@@ -78,6 +78,11 @@
 
 .partiLine { font-size: 15px; }
 
-.partiVs { font-size: 13px; color: #cfe3d4; }
+.partiSide {
+  display: inline-block;
+  min-width: 78px;
+  font-weight: 700;
+  color: #9fd3ac;
+}
 
 .hu { color: #9fb4c7; font-size: 12px; font-style: italic; }

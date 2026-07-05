@@ -29,16 +29,19 @@ export default function RoundResult({ roomCode }) {
         {roundResult.partiDetail && (
           <div className={styles.parti}>
             <div className={styles.partiTitle}>Parti breakdown</div>
-            <div className={styles.partiLine}>
-              {roundResult.partiDetail.hits} <span className={styles.hu}>ütés</span>
-              {' + '}{roundResult.partiDetail.announcements} <span className={styles.hu}>bemondás</span>
-              {' + '}{roundResult.partiDetail.lastTrick} <span className={styles.hu}>utolsó ütés</span>
-              {roundResult.partiDetail.talon > 0 && <>{' + '}{roundResult.partiDetail.talon} <span className={styles.hu}>talon</span></>}
-              {' = '}<strong>{roundResult.partiDetail.declarerTotal}</strong>
-            </div>
-            <div className={styles.partiVs}>
-              declarer <strong>{roundResult.partiDetail.declarerTotal}</strong> vs defenders <strong>{roundResult.partiDetail.defenderTotal}</strong>
-            </div>
+            {[['declarer', 'Declarer'], ['defenders', 'Defenders']].map(([key, label]) => {
+              const d = roundResult.partiDetail[key]
+              return (
+                <div key={key} className={styles.partiLine}>
+                  <span className={styles.partiSide}>{label}:</span>{' '}
+                  {d.hits} <span className={styles.hu}>ütés</span>
+                  {' + '}{d.announcements} <span className={styles.hu}>bemondás</span>
+                  {' + '}{d.lastTrick} <span className={styles.hu}>utolsó ütés</span>
+                  {d.talon > 0 && <>{' + '}{d.talon} <span className={styles.hu}>talon</span></>}
+                  {' = '}<strong>{d.total}</strong>
+                </div>
+              )
+            })}
           </div>
         )}
 

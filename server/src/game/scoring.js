@@ -64,9 +64,12 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   const trumpSuit = declaration.trumpSuit
   const announced = marriages[declarerId] || [] // declarer's own (for 40-100 / 20-100)
 
-  // Trick points: declarer's captured points (incl. talon) vs the rest.
-  const declarerTrickPoints = declarerPoints + countCardPoints(talon, trumpSuit)
-  const defenderTrickPoints = 90 - declarerTrickPoints
+  // Trick points. The talon's point cards (Aces/Tens) belong to the DEFENDERS:
+  // `declarerPoints` is only what the declarer captured in tricks, so everything
+  // else — the defenders' own tricks plus the talon — makes up their total.
+  const talonPts = countCardPoints(talon, trumpSuit)
+  const declarerTrickPoints = declarerPoints
+  const defenderTrickPoints = 90 - declarerPoints
 
   // Marriages count only if the announcing side won at least one trick.
   const declWonATrick = declarerTrickCount(completedTricks, declarerId) > 0
@@ -78,17 +81,28 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   const defenderTotal = defenderTrickPoints + defenderMarriage
   const cardTotal = declarerTotal
 
-  // Breakdown of the declarer's Parti total (for the round-over screen).
+  // Breakdown of the Parti card race, per side (for the round-over screen).
   let partiDetail = null
   if (declaration.scoring.includes('parti')) {
-    const hits = completedTricks
-      .filter((t) => t.winnerId === declarerId)
+    const sumHits = (ids) => completedTricks
+      .filter((t) => ids.includes(t.winnerId))
       .reduce((s, t) => s + t.cards.reduce((x, c) => x + (c.card.rank === 'asz' || c.card.rank === '10' ? 10 : 0), 0), 0)
-    const lastTrick = completedTricks.length && completedTricks[completedTricks.length - 1].winnerId === declarerId ? 10 : 0
-    const talonPts = countCardPoints(talon, trumpSuit)
+    const lastWinner = completedTricks.length ? completedTricks[completedTricks.length - 1].winnerId : null
     partiDetail = {
-      hits, announcements: declarerMarriage, lastTrick, talon: talonPts,
-      declarerTotal, defenderTotal,
+      declarer: {
+        hits: sumHits([declarerId]),
+        announcements: declarerMarriage,
+        lastTrick: lastWinner === declarerId ? 10 : 0,
+        talon: 0,
+        total: declarerTotal,
+      },
+      defenders: {
+        hits: sumHits(defenderIds),
+        announcements: defenderMarriage,
+        lastTrick: lastWinner && defenderIds.includes(lastWinner) ? 10 : 0,
+        talon: talonPts,
+        total: defenderTotal,
+      },
     }
   }
 

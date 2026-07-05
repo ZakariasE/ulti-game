@@ -34,7 +34,7 @@ Eight ranks per suit: Ász (Ace), Király (King), Felső (Over), Alsó (Under), 
 - Aces and Tens = 10 points each (8 cards × 10 = 80 pts)
 - Winning the last trick = 10 points
 - Total available = 90 points
-- Talon and discards count toward the declarer's point total
+- The talon's point cards (Aces/Tens) count toward the **defenders'** total when scoring the Parti (they show as a separate `talon` term in the defenders' breakdown)
 
 ### Deal
 
@@ -47,7 +47,7 @@ Eight ranks per suit: Ász (Ace), Király (King), Felső (Over), Alsó (Under), 
 3. Going anticlockwise, each other player may **pass**, or **"rob"** — pick up the 2-card talon, discard 2, and declare a **higher** contract.
 4. Bidding ends only when **all three players pass in succession** after the last bid. The high bidder gets a final turn to rob their **own** talon and raise; if they pass too, bidding closes.
 5. The highest bidder is the **declarer**; the other two are **defenders**.
-6. The final talon on the table counts toward the declarer's card points.
+6. The final talon on the table counts toward the **defenders'** card points when scoring (its Aces/Tens go to the defense).
 
 ### Declarations = bundles of components
 
