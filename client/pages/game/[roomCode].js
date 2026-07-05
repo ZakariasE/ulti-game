@@ -27,6 +27,7 @@ export default function GamePage() {
       'room:playerJoined': (d) => dispatch({ type: 'ROOM_PLAYER_JOINED', ...d }),
       'game:started':      (d) => dispatch({ type: 'GAME_STARTED', ...d }),
       'hand:dealt':        (d) => dispatch({ type: 'HAND_DEALT', ...d }),
+      'talon:held':        (d) => dispatch({ type: 'TALON_HELD', ...d }),
       'bid:state':         (d) => dispatch({ type: 'BID_STATE', ...d }),
       'bid:resolved':      (d) => dispatch({ type: 'BID_RESOLVED', ...d }),
       'opening:info':      (d) => dispatch({ type: 'OPENING_INFO', ...d }),

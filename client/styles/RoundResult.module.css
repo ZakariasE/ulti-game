@@ -39,6 +39,12 @@
 
 .scoreTable th { color: #aaa; font-weight: normal; }
 
+.totalRow td {
+  font-weight: 700;
+  border-top: 2px solid rgba(255,255,255,0.25);
+  border-bottom: none;
+}
+
 .pos { color: #2ecc71; }
 .neg { color: #e74c3c; }
 

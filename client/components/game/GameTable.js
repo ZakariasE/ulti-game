@@ -6,7 +6,6 @@ import TrickArea from './TrickArea'
 import TrickPile from './TrickPile'
 import PlayerHand from './PlayerHand'
 import BidPanel from './BidPanel'
-import TalonView from './TalonView'
 import OpeningLead from './OpeningLead'
 import RoundResult from './RoundResult'
 import KontraBar from './KontraBar'
@@ -39,10 +38,11 @@ export default function GameTable({ roomCode }) {
   const winnerPlayer = players.find((p) => p.id === lastTrickWinnerId)
   let banner, bannerClass
   if (lastTrickWinnerId) {
-    banner = `${winnerPlayer?.id === myPlayerId ? 'You' : winnerPlayer?.name} won the trick`
+    banner = winnerPlayer?.id === myPlayerId
+      ? 'Vitted az ütést' : `${winnerPlayer?.name} vitte az ütést`
     bannerClass = styles.bannerWin
   } else if (phase === 'PLAYING' || phase === 'BIDDING') {
-    banner = myTurn ? 'Your turn' : `Waiting for ${turnPlayer?.name || '...'}`
+    banner = myTurn ? 'Te jössz' : `${turnPlayer?.name || '...'} következik`
     bannerClass = myTurn ? styles.bannerMe : styles.bannerWait
   }
 
@@ -69,17 +69,17 @@ export default function GameTable({ roomCode }) {
       <div className={styles.infoBar}>
         {declaration ? (
           <span className={styles.goal}>
-            <span className={styles.goalLabel}>Goal:</span>
+            <span className={styles.goalLabel}>Bemondás:</span>
             <strong className={styles.goalContract}>{declarationLabel(declaration)}</strong>
             <span className={styles.goalMeta}>
-              {trumpSuit ? `trump ${SUIT_NAMES[trumpSuit]}` : 'trump hidden'}
-              {' · by '}<strong>{declarerPlayer?.id === myPlayerId ? 'you' : declarerPlayer?.name}</strong>
+              {trumpSuit ? `adu: ${SUIT_NAMES[trumpSuit]}` : 'adu rejtve'}
+              {' · felvevő: '}<strong>{declarerPlayer?.id === myPlayerId ? 'te' : declarerPlayer?.name}</strong>
             </span>
           </span>
         ) : (
-          <span>Bidding in progress...</span>
+          <span>Licit folyamatban...</span>
         )}
-        <span className={styles.room}>Room: {roomCode}</span>
+        <span className={styles.room}>Szoba: {roomCode}</span>
       </div>
 
       {banner && <div className={`${styles.banner} ${bannerClass}`}>{banner}</div>}
@@ -91,20 +91,19 @@ export default function GameTable({ roomCode }) {
       <TrickArea />
 
       {phase === 'BIDDING' && <BidPanel roomCode={roomCode} />}
-      <TalonView roomCode={roomCode} />
       <OpeningLead roomCode={roomCode} />
       <RoundResult roomCode={roomCode} />
 
       <div className={`${styles.myArea} ${myTurn ? styles.myAreaActive : ''}`}>
         <div className={styles.myInfo}>
           <span>
-            {me?.name} (you){declarerId === myPlayerId ? ' 👑 Declarer' : ''}
+            {me?.name} (te){declarerId === myPlayerId ? ' 👑 Felvevő' : ''}
             {marriagesByPlayer[myPlayerId]?.length
               ? <span className={styles.marriageTag}>💍 {fmtMarriages(marriagesByPlayer[myPlayerId])}</span>
               : null}
           </span>
           <span className={styles.myPile}><TrickPile ownerId={myPlayerId} revealable align="left" /></span>
-          <span>Score: {scores[myPlayerId] ?? 0}</span>
+          <span>Pont: {scores[myPlayerId] ?? 0}</span>
         </div>
         <PlayerHand roomCode={roomCode} />
       </div>

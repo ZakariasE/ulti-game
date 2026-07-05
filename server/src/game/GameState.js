@@ -21,6 +21,7 @@ function createGameState(roomCode, players = []) {
     play: null,
     scores: {},
     roundResult: null,
+    talonInHand: null, // { playerId, cardIds } while a player holds the picked-up talon
   }
 }
 
@@ -44,6 +45,7 @@ function applyDeal(state) {
   const firstBidderSeat = getInitialBidderSeat(state.dealerIndex, n)
   const firstBidder = _seatToPlayer(state, firstBidderSeat)
   state.hands[firstBidder.id] = [...state.hands[firstBidder.id], ...talon]
+  state.talonInHand = { playerId: firstBidder.id, cardIds: talon.map((c) => c.id) }
   state.talon = []
 
   state.bidding = {
@@ -76,6 +78,7 @@ function applyBidDiscard(state, playerId, cardIds) {
 
   state.talon = hand.filter((c) => cardIds.includes(c.id))
   state.hands[playerId] = hand.filter((c) => !cardIds.includes(c.id))
+  state.talonInHand = null // the talon is set aside again
   state.bidding.phase = 'DECLARE'
 }
 
@@ -113,6 +116,7 @@ function applyRob(state, playerId) {
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
   if (state.bidding.phase !== 'ROB_OFFER') throw new Error('Cannot rob now')
 
+  state.talonInHand = { playerId, cardIds: state.talon.map((c) => c.id) }
   state.hands[playerId] = [...state.hands[playerId], ...state.talon]
   state.talon = []
   state.bidding.phase = 'DISCARD'
@@ -379,6 +383,7 @@ function prepareNextRound(state) {
   state.round++
   state.dealerIndex = (state.dealerIndex + 1) % state.players.length
   state.talon = []
+  state.talonInHand = null
   state.hands = {}
   state.bidding = null
   state.play = null

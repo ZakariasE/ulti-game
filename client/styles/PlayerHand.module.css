@@ -1,3 +1,9 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .hand {
   display: flex;
   flex-wrap: wrap;
@@ -5,3 +11,28 @@
   justify-content: center;
   padding: 4px 0;
 }
+
+.discardBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #eee;
+}
+
+.discardBtn {
+  background: #c0392b;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+
+.discardBtn:disabled { opacity: 0.5; }
+.discardBtn:not(:disabled):hover { background: #e74c3c; }

@@ -45,16 +45,16 @@ export default function Lobby() {
   }, [socket, playerName, dispatch, router])
 
   function handleCreate() {
-    if (!connected) return setError('Not connected to server. Is it running?')
-    if (!playerName.trim()) return setError('Enter your name first')
+    if (!connected) return setError('Nincs kapcsolat a szerverrel. Fut a szerver?')
+    if (!playerName.trim()) return setError('Előbb add meg a neved')
     setError('')
     emit('room:create', { playerName: playerName.trim() })
   }
 
   function handleJoin() {
-    if (!connected) return setError('Not connected to server. Is it running?')
-    if (!playerName.trim()) return setError('Enter your name first')
-    if (!joinCode.trim()) return setError('Enter a room code')
+    if (!connected) return setError('Nincs kapcsolat a szerverrel. Fut a szerver?')
+    if (!playerName.trim()) return setError('Előbb add meg a neved')
+    if (!joinCode.trim()) return setError('Add meg a szobakódot')
     setError('')
     emit('room:join', { roomCode: joinCode.trim().toUpperCase(), playerName: playerName.trim() })
   }
@@ -64,28 +64,28 @@ export default function Lobby() {
       <Head><title>Ulti</title></Head>
       <div className={styles.page}>
         <h1 className={styles.title}>Ulti</h1>
-        <p className={styles.subtitle}>Hungarian Card Game</p>
+        <p className={styles.subtitle}>Magyar kártyajáték</p>
         <p className={styles.status}>
-          {connected ? '● Connected' : '○ Connecting to server...'}
+          {connected ? '● Csatlakozva' : '○ Csatlakozás a szerverhez...'}
         </p>
 
         <div className={styles.card}>
-          <label className={styles.label}>Your name</label>
+          <label className={styles.label}>Neved</label>
           <input
             className={styles.input}
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Enter your name"
+            placeholder="Add meg a neved"
             maxLength={20}
           />
 
           <button className={styles.btnPrimary} onClick={handleCreate}>
-            Create New Room
+            Új szoba létrehozása
           </button>
 
-          <div className={styles.divider}>or</div>
+          <div className={styles.divider}>vagy</div>
 
-          <label className={styles.label}>Room code</label>
+          <label className={styles.label}>Szobakód</label>
           <input
             className={styles.input}
             value={joinCode}
@@ -94,7 +94,7 @@ export default function Lobby() {
             maxLength={6}
           />
           <button className={styles.btnSecondary} onClick={handleJoin}>
-            Join Game
+            Csatlakozás
           </button>
 
           {error && <p className={styles.error}>{error}</p>}

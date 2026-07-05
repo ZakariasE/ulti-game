@@ -37,11 +37,11 @@ export default function OpeningLead({ roomCode }) {
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
-        <h2>Opening lead</h2>
+        <h2>Nyitó hívás</h2>
 
         {needTrump && (
           <div className={styles.block}>
-            <div className={styles.label}>Choose trump suit</div>
+            <div className={styles.label}>Válaszd ki az adu színt</div>
             <div className={styles.row}>
               {MINOR_SUITS.map((s) => (
                 <button
@@ -58,7 +58,7 @@ export default function OpeningLead({ roomCode }) {
 
         {available.length > 0 && (
           <div className={styles.block}>
-            <div className={styles.label}>Announce marriages (optional)</div>
+            <div className={styles.label}>Házasság bemondása (opcionális)</div>
             <div className={styles.row}>
               {available.map((s) => {
                 const value = s === effectiveTrump ? 40 : 20
@@ -77,7 +77,7 @@ export default function OpeningLead({ roomCode }) {
         )}
 
         <div className={styles.label}>
-          {canLead ? 'Click a card to lead it' : 'Pick a trump suit first'}
+          {canLead ? 'Kattints egy lapra a híváshoz' : 'Előbb válassz adu színt'}
         </div>
         <div className={styles.hand}>
           {sorted.map((card) => (

@@ -11,14 +11,14 @@ export default function OpponentArea({ player, cardCount, score, isDeclarer, isA
       <div className={styles.name}>
         {player.name}{isDeclarer ? ' 👑' : ''}{isActive ? ' ⏳' : ''}
       </div>
-      <div className={styles.score}>Score: {score ?? 0}</div>
+      <div className={styles.score}>Pont: {score ?? 0}</div>
       {marriages ? <div className={styles.marriage}>💍 {marriages}</div> : null}
       <div className={styles.cards}>
         {Array.from({ length: Math.min(cardCount, 12) }).map((_, i) => (
           <CardComponent key={i} faceDown size="small" />
         ))}
       </div>
-      {wonTrick && <div className={styles.wonLabel}>won trick</div>}
+      {wonTrick && <div className={styles.wonLabel}>vitte az ütést</div>}
       <TrickPile ownerId={player.id} revealable={revealable} align="center" />
     </div>
   )

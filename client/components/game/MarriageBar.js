@@ -10,7 +10,7 @@ export default function MarriageBar() {
 
   return (
     <div className={styles.bar}>
-      <span className={styles.label}>Announce marriage?</span>
+      <span className={styles.label}>Házasság bemondása?</span>
       {marriageOptions.map((suit) => {
         const value = suit === trumpSuit ? 40 : 20
         const on = pendingMarriages.includes(suit)
@@ -24,7 +24,7 @@ export default function MarriageBar() {
           </button>
         )
       })}
-      <span className={styles.hint}>then play a card to confirm</span>
+      <span className={styles.hint}>majd tegyél le egy lapot a megerősítéshez</span>
     </div>
   )
 }

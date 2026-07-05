@@ -3,7 +3,7 @@
 export const TRUMP_COMPONENTS = {
   parti:          { base: 1, label: 'Parti' },
   ulti:           { base: 4, label: 'Ulti' },
-  four_aces:      { base: 4, label: '4 Aces' },
+  four_aces:      { base: 4, label: 'Négy ász' },
   forty_hundred:  { base: 4, label: '40-100' },
   twenty_hundred: { base: 8, label: '20-100' },
   durchmars:      { base: 6, label: 'Durchmars' },
@@ -14,11 +14,11 @@ const PARTI_BEARERS = new Set(['ulti', 'four_aces'])
 
 export const NO_TRUMP_CONTRACTS = {
   betli:           { base: 5,  label: 'Betli' },
-  heart_betli:     { base: 10, label: 'Heart Betli' },
-  open_betli:      { base: 20, label: 'Open Betli' },
+  heart_betli:     { base: 10, label: 'Piros betli' },
+  open_betli:      { base: 20, label: 'Terített betli' },
   durchmars_nt:    { base: 6,  label: 'Durchmars' },
-  heart_durchmars: { base: 12, label: 'Heart Durchmars' },
-  open_durchmars:  { base: 24, label: 'Open Durchmars' },
+  heart_durchmars: { base: 12, label: 'Piros durchmars' },
+  open_durchmars:  { base: 24, label: 'Terített durchmars' },
 }
 
 export function componentLabel(component) {
@@ -42,12 +42,12 @@ function componentBasePoints(component, color) {
 // Validate a chosen trump bundle. Returns { ok, error, scoring, hasParti }.
 export function validateBundle(components) {
   const comps = [...new Set(components)]
-  if (comps.length === 0) return { ok: false, error: 'Pick at least one contract' }
+  if (comps.length === 0) return { ok: false, error: 'Válassz legalább egy bemondást' }
   if (comps.includes('forty_hundred') && comps.includes('twenty_hundred')) {
-    return { ok: false, error: 'Only one of 40-100 / 20-100' }
+    return { ok: false, error: 'Csak a 40-100 vagy a 20-100 egyike' }
   }
   if (comps.includes('durchmars') && comps.length === 1) {
-    return { ok: false, error: 'Durchmars must combine with another' }
+    return { ok: false, error: 'A Durchmarsot mással kell kombinálni' }
   }
   const hasParti = comps.every((c) => PARTI_BEARERS.has(c))
   const scoring = hasParti ? [...comps, 'parti'] : [...comps]
@@ -105,7 +105,7 @@ export function declarationLabel(decl) {
   if (!decl || decl.invalid) return '—'
   if (decl.isNoTrump) return componentLabel(decl.components[0])
   const base = decl.components.map(componentLabel).join(' + ')
-  return decl.color === 'red' ? `${base} (red)` : base
+  return decl.color === 'red' ? `${base} (piros)` : base
 }
 
 export function declarationMode(decl) {

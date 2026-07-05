@@ -15,26 +15,26 @@ export default function WaitingRoom({ roomCode }) {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Waiting for players...</h1>
+      <h1 className={styles.title}>Várakozás játékosokra...</h1>
 
       <div className={styles.roomCode}>
         <span className={styles.code}>{roomCode}</span>
-        <button className={styles.copyBtn} onClick={copyCode}>Copy</button>
+        <button className={styles.copyBtn} onClick={copyCode}>Másolás</button>
       </div>
-      <p className={styles.hint}>Share this code with 2 friends</p>
+      <p className={styles.hint}>Oszd meg ezt a kódot 2 baráttal</p>
 
       <div className={styles.playerList}>
-        <h3>Players ({players.length} / 3)</h3>
+        <h3>Játékosok ({players.length} / 3)</h3>
         {players.map((p) => (
           <div key={p.id} className={styles.player}>
             <span className={styles.dot}>●</span>
-            {p.name} {p.id === myPlayerId ? '(you)' : ''}
+            {p.name} {p.id === myPlayerId ? '(te)' : ''}
           </div>
         ))}
         {Array.from({ length: 3 - players.length }).map((_, i) => (
           <div key={`empty-${i}`} className={`${styles.player} ${styles.empty}`}>
             <span className={styles.dot}>○</span>
-            waiting...
+            várakozás...
           </div>
         ))}
       </div>
@@ -45,10 +45,10 @@ export default function WaitingRoom({ roomCode }) {
           disabled={!canStart}
           onClick={() => emit('game:start', { roomCode })}
         >
-          {canStart ? 'Start Game' : `Waiting for ${3 - players.length} more...`}
+          {canStart ? 'Játék indítása' : `Még ${3 - players.length} játékos kell...`}
         </button>
       )}
-      {!isHost && <p className={styles.hint}>Waiting for host to start...</p>}
+      {!isHost && <p className={styles.hint}>Várakozás, míg a házigazda elindítja...</p>}
     </div>
   )
 }

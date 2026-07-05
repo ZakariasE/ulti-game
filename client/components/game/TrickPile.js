@@ -27,11 +27,11 @@ export default function TrickPile({ ownerId, revealable, align = 'center' }) {
           <div key={i} className={styles.stackCard} style={{ left: i * 4, top: i * 2 }} />
         ))}
       </div>
-      <div className={styles.count}>{tricks.length} {tricks.length === 1 ? 'trick' : 'tricks'}</div>
+      <div className={styles.count}>{tricks.length} ütés</div>
 
       {open && revealable && (
         <div className={`${styles.popover} ${styles[align]}`}>
-          <div className={styles.popTitle}>Tricks won</div>
+          <div className={styles.popTitle}>Megnyert ütések</div>
           <div className={styles.groups}>
             {tricks.map((t) => (
               <div key={t.num} className={styles.group}>

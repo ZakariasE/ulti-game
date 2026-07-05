@@ -4,7 +4,7 @@
 const TRUMP_COMPONENTS = {
   parti:          { base: 1, label: 'Parti' },
   ulti:           { base: 4, label: 'Ulti' },
-  four_aces:      { base: 4, label: '4 Aces' },
+  four_aces:      { base: 4, label: 'Négy ász' },
   forty_hundred:  { base: 4, label: '40-100' },
   twenty_hundred: { base: 8, label: '20-100' },
   durchmars:      { base: 6, label: 'Durchmars' },
@@ -17,11 +17,11 @@ const PARTI_BEARERS = new Set(['ulti', 'four_aces'])
 // No-trump standalone contracts (cannot combine with anything).
 const NO_TRUMP_CONTRACTS = {
   betli:           { base: 5,  label: 'Betli' },
-  heart_betli:     { base: 10, label: 'Heart Betli' },
-  open_betli:      { base: 20, label: 'Open Betli' },
+  heart_betli:     { base: 10, label: 'Piros betli' },
+  open_betli:      { base: 20, label: 'Terített betli' },
   durchmars_nt:    { base: 6,  label: 'Durchmars' },
-  heart_durchmars: { base: 12, label: 'Heart Durchmars' },
-  open_durchmars:  { base: 24, label: 'Open Durchmars' },
+  heart_durchmars: { base: 12, label: 'Piros durchmars' },
+  open_durchmars:  { base: 24, label: 'Terített durchmars' },
 }
 
 function isNoTrumpContract(key) {
@@ -135,7 +135,7 @@ function declarationLabel(decl) {
   if (decl.isNoTrump) return componentLabel(decl.components[0])
   const parts = decl.components.map(componentLabel)
   const base = parts.join(' + ')
-  return decl.color === 'red' ? `${base} (red)` : base
+  return decl.color === 'red' ? `${base} (piros)` : base
 }
 
 function getInitialBidderSeat(dealerSeat, numPlayers) {

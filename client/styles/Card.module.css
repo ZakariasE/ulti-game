@@ -49,3 +49,10 @@
 .disabled {
   opacity: 0.5;
 }
+
+/* Cards that just came from the talon (visible only to the holder). */
+.fromTalon {
+  outline: 3px dashed #3498db;
+  outline-offset: 2px;
+  box-shadow: 0 0 12px rgba(52,152,219,0.7);
+}

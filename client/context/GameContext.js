@@ -4,10 +4,10 @@ import { SUIT_NAMES } from '../lib/cards'
 
 const GameContext = createContext(null)
 
-// Resolve a player's display name from state ("You" for the local player).
+// Resolve a player's display name from state ("Te" for the local player).
 function nameOf(state, id) {
-  if (id === state.myPlayerId) return 'You'
-  return state.players.find((p) => p.id === id)?.name || 'Someone'
+  if (id === state.myPlayerId) return 'Te'
+  return state.players.find((p) => p.id === id)?.name || 'Valaki'
 }
 
 function marriageText(marriages) {
@@ -30,6 +30,7 @@ const initialState = {
   phase: 'LOBBY',
   dealerIndex: null,
   handCounts: {},
+  talonCardIds: [], // ids of the two cards I just picked up from the talon
   // Bidding
   currentTurnId: null,
   biddingPhase: null, // 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'DONE'
@@ -85,6 +86,7 @@ function resetForNewRound(state) {
     revealedHand: null,
     readyState: null,
     announcements: [],
+    talonCardIds: [],
   }
 }
 
@@ -110,6 +112,9 @@ function gameReducer(state, action) {
     case 'HAND_DEALT':
       return { ...state, myHand: action.hand }
 
+    case 'TALON_HELD':
+      return { ...state, talonCardIds: action.cardIds || [] }
+
     case 'BID_STATE':
       return {
         ...state,
@@ -129,7 +134,7 @@ function gameReducer(state, action) {
         trumpSuit: action.declaration?.trumpSuit || null,
         ...announce(
           state,
-          `${nameOf(state, action.declarerId)} declared ${declarationLabel(action.declaration)}`,
+          `${nameOf(state, action.declarerId)} bemondta: ${declarationLabel(action.declaration)}`,
           'contract',
         ),
       }
@@ -143,7 +148,7 @@ function gameReducer(state, action) {
       return {
         ...state,
         trumpSuit: action.trumpSuit,
-        ...(reveal ? announce(state, `Trump is ${SUIT_NAMES[action.trumpSuit]}`, 'trump') : {}),
+        ...(reveal ? announce(state, `Adu: ${SUIT_NAMES[action.trumpSuit]}`, 'trump') : {}),
       }
     }
 
@@ -153,7 +158,7 @@ function gameReducer(state, action) {
         announcedMarriages: action.announcedMarriages,
         marriagesByPlayer: { ...state.marriagesByPlayer, [state.declarerId]: action.announcedMarriages },
         ...(action.announcedMarriages?.length
-          ? announce(state, `${nameOf(state, state.declarerId)} announced marriage: ${marriageText(action.announcedMarriages)}`, 'marriage')
+          ? announce(state, `${nameOf(state, state.declarerId)} házasságot jelentett: ${marriageText(action.announcedMarriages)}`, 'marriage')
           : {}),
       }
 
@@ -162,7 +167,7 @@ function gameReducer(state, action) {
         ...state,
         marriagesByPlayer: { ...state.marriagesByPlayer, [action.playerId]: action.marriages },
         ...(action.marriages?.length
-          ? announce(state, `${nameOf(state, action.playerId)} announced marriage: ${marriageText(action.marriages)}`, 'marriage')
+          ? announce(state, `${nameOf(state, action.playerId)} házasságot jelentett: ${marriageText(action.marriages)}`, 'marriage')
           : {}),
       }
 
@@ -180,7 +185,7 @@ function gameReducer(state, action) {
       if (raised.length) {
         const level = action.kontra?.[raised[0]]?.level || 2
         const comps = raised.map(componentLabel).join(', ')
-        toast = announce(state, `${nameOf(state, action.byId)} called ${kontraLevelName(level)} on ${comps}`, 'kontra')
+        toast = announce(state, `${nameOf(state, action.byId)} — ${kontraLevelName(level)}: ${comps}`, 'kontra')
       }
       return { ...state, kontra: action.kontra, ...toast }
     }

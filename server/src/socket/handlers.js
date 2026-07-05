@@ -76,6 +76,7 @@ function registerHandlers(io, socket) {
       const state = rooms.getRoom(roomCode)
       applyRob(state, socket.id)
       _sendHand(io, state, socket.id)
+      io.to(socket.id).emit('talon:held', { cardIds: state.talonInHand.cardIds })
       io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
@@ -179,6 +180,10 @@ function registerHandlers(io, socket) {
 function _dealAndAnnounce(io, roomCode, state) {
   io.to(roomCode).emit('game:started', { dealerIndex: state.dealerIndex, players: state.players })
   state.players.forEach((p) => _sendHand(io, state, p.id))
+  // Tell the first bidder which two of their cards came from the talon.
+  if (state.talonInHand) {
+    io.to(state.talonInHand.playerId).emit('talon:held', { cardIds: state.talonInHand.cardIds })
+  }
   io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
 }
 

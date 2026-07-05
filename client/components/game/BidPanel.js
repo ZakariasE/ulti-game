@@ -18,16 +18,16 @@ export default function BidPanel({ roomCode }) {
   const isMyTurn = currentTurnId === myPlayerId
   const currentDecl = currentHighBid?.declaration
   const highBidText = currentDecl
-    ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl)}) by ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
+    ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl)}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
   if (!isMyTurn) {
     const bidder = players.find((p) => p.id === currentTurnId)
     return (
       <div className={styles.panel}>
-        <h3>Bidding</h3>
-        {highBidText && <p>Current bid: <strong>{highBidText}</strong></p>}
-        <p className={styles.waiting}>Waiting for {bidder?.name || '...'}...</p>
+        <h3>Licit</h3>
+        {highBidText && <p>Jelenlegi bemondás: <strong>{highBidText}</strong></p>}
+        <p className={styles.waiting}>{bidder?.name || '...'} következik...</p>
       </div>
     )
   }
@@ -35,8 +35,8 @@ export default function BidPanel({ roomCode }) {
   if (biddingPhase === 'DISCARD') {
     return (
       <div className={styles.panel}>
-        <h3>Your turn</h3>
-        <p className={styles.waiting}>Select 2 cards from your hand to discard.</p>
+        <h3>Te jössz</h3>
+        <p className={styles.waiting}>Válassz 2 lapot a kezedből (lent), amit eldobsz.</p>
       </div>
     )
   }
@@ -44,14 +44,14 @@ export default function BidPanel({ roomCode }) {
   if (biddingPhase === 'ROB_OFFER') {
     return (
       <div className={styles.panel}>
-        <h3>Your turn to bid</h3>
-        {highBidText && <p>Current bid: <strong>{highBidText}</strong></p>}
+        <h3>Te licitálsz</h3>
+        {highBidText && <p>Jelenlegi bemondás: <strong>{highBidText}</strong></p>}
         <div className={styles.actions}>
           <button className={styles.btnPrimary} onClick={() => emit('bid:rob', { roomCode })}>
-            Take talon &amp; raise
+            Talon felvétele
           </button>
           <button className={styles.btnSecondary} onClick={() => emit('bid:pass', { roomCode })}>
-            Pass
+            Passz
           </button>
         </div>
       </div>
@@ -83,11 +83,11 @@ export default function BidPanel({ roomCode }) {
 
   return (
     <div className={styles.panel}>
-      <h3>Name your contract</h3>
-      {highBidText && <p>Must beat: <strong>{highBidText}</strong></p>}
+      <h3>Mondd be a játékod</h3>
+      {highBidText && <p>Ezt kell überelni: <strong>{highBidText}</strong></p>}
 
       <div className={styles.section}>
-        <div className={styles.sectionTitle}>Trump declaration</div>
+        <div className={styles.sectionTitle}>Adus bemondás</div>
         <div className={styles.chips}>
           {CHOOSABLE.map((comp) => (
             <button
@@ -100,22 +100,22 @@ export default function BidPanel({ roomCode }) {
           ))}
         </div>
         <div className={styles.colorRow}>
-          <button className={`${styles.chip} ${color === 'normal' ? styles.chipOn : ''}`} onClick={() => setColor('normal')}>Normal</button>
-          <button className={`${styles.chip} ${styles.red} ${color === 'red' ? styles.chipOn : ''}`} onClick={() => setColor('red')}>Red ♥ (×2)</button>
+          <button className={`${styles.chip} ${color === 'normal' ? styles.chipOn : ''}`} onClick={() => setColor('normal')}>Sima</button>
+          <button className={`${styles.chip} ${styles.red} ${color === 'red' ? styles.chipOn : ''}`} onClick={() => setColor('red')}>Piros ♥ (×2)</button>
         </div>
         <div className={styles.preview}>
           {candValid
-            ? <>Bid: <strong>{picked.length === 0 ? (color === 'red' ? 'Simple (red)' : 'Simple') : declarationLabel(candidate)}</strong> — {declarationValue(candidate)}pt</>
+            ? <>Bemondás: <strong>{picked.length === 0 ? (color === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate)}</strong> — {declarationValue(candidate)} pont</>
             : <span className={styles.invalid}>{candidate.error}</span>}
         </div>
         <button className={styles.btnPrimary} disabled={!candHigher} onClick={declareTrump}>
-          {candValid && !candHigher ? 'Must bid higher' : 'Declare'}
+          {candValid && !candHigher ? 'Magasabbat kell mondani' : 'Bemondom'}
         </button>
-        <p className={styles.hint}>You pick the trump suit when you lead your first card. Red = Hearts.</p>
+        <p className={styles.hint}>Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu.</p>
       </div>
 
       <div className={styles.section}>
-        <div className={styles.sectionTitle}>Or a no-trump contract</div>
+        <div className={styles.sectionTitle}>Vagy adu nélküli játék</div>
         <div className={styles.chips}>
           {Object.entries(NO_TRUMP_CONTRACTS).map(([key, info]) => {
             const d = makeDeclaration('notrump', { contract: key })

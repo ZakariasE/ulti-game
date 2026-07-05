@@ -14,13 +14,13 @@ export default function TrickArea() {
           <div key={playerId} className={styles.playedCard}>
             <CardComponent card={card} />
             <div className={styles.playerName}>
-              {player?.name || '?'}{playerId === myPlayerId ? ' (you)' : ''}
+              {player?.name || '?'}{playerId === myPlayerId ? ' (te)' : ''}
             </div>
           </div>
         )
       })}
       {currentTrick.length === 0 && (
-        <p className={styles.empty}>Waiting for first card...</p>
+        <p className={styles.empty}>Várakozás az első lapra...</p>
       )}
     </div>
   )

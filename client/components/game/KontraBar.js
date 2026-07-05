@@ -46,7 +46,7 @@ export default function KontraBar({ roomCode }) {
               className={styles.btnAll}
               onClick={() => emit('kontra:call', { roomCode, components: options })}
             >
-              Kontra all
+              Összes kontra
             </button>
           )}
         </span>

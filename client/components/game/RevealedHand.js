@@ -19,7 +19,7 @@ export default function RevealedHand() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.label}>{declarerName}'s hand (open)</div>
+      <div className={styles.label}>{declarerName} lapjai (terített)</div>
       <div className={styles.cards}>
         {sorted.map((card) => (
           <CardComponent key={card.id} card={card} />

@@ -21,15 +21,15 @@ export default function RoundResult({ roomCode }) {
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
-        <h2>Round Over</h2>
+        <h2>Leosztás vége</h2>
         <p>
-          Declarer: <strong>{declarer?.name}</strong> — card points {roundResult.cardTotal}
+          Felvevő: <strong>{declarer?.name}</strong> — pont: {roundResult.cardTotal}
         </p>
 
         {roundResult.partiDetail && (
           <div className={styles.parti}>
-            <div className={styles.partiTitle}>Parti breakdown</div>
-            {[['declarer', 'Declarer'], ['defenders', 'Defenders']].map(([key, label]) => {
+            <div className={styles.partiTitle}>Parti részletezés</div>
+            {[['declarer', 'Felvevő'], ['defenders', 'Ellenfelek']].map(([key, label]) => {
               const d = roundResult.partiDetail[key]
               return (
                 <div key={key} className={styles.partiLine}>
@@ -47,22 +47,34 @@ export default function RoundResult({ roomCode }) {
 
         <table className={styles.scoreTable}>
           <thead>
-            <tr><th>Component</th><th>Result</th><th>Stake</th></tr>
+            <tr><th>Bemondás</th><th>Eredmény</th><th>Tét</th></tr>
           </thead>
           <tbody>
             {roundResult.components.map((c) => (
               <tr key={c.key}>
                 <td>{c.label}</td>
-                <td className={c.won ? styles.win : styles.loss}>{c.won ? 'won' : 'lost'}</td>
+                <td className={c.won ? styles.win : styles.loss}>{c.won ? 'nyert' : 'vesztett'}</td>
                 <td>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}</td>
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            {(() => {
+              const net = roundResult.deltas[roundResult.declarerId] || 0
+              return (
+                <tr className={styles.totalRow}>
+                  <td>Összesen (felvevő)</td>
+                  <td className={net >= 0 ? styles.win : styles.loss}>{net >= 0 ? 'nyert' : 'vesztett'}</td>
+                  <td className={net >= 0 ? styles.pos : styles.neg}>{net >= 0 ? '+' : ''}{net}</td>
+                </tr>
+              )
+            })()}
+          </tfoot>
         </table>
 
         <table className={styles.scoreTable}>
           <thead>
-            <tr><th>Player</th><th>Change</th><th>Total</th></tr>
+            <tr><th>Játékos</th><th>Változás</th><th>Egyenleg</th></tr>
           </thead>
           <tbody>
             {players.map((p) => {
@@ -82,12 +94,12 @@ export default function RoundResult({ roomCode }) {
 
         {clicked ? (
           <p className={styles.waiting}>
-            Waiting for other players
-            {readyState ? ` (${readyState.readyCount}/${readyState.total} ready)` : '...'}
+            Várakozás a többi játékosra
+            {readyState ? ` (${readyState.readyCount}/${readyState.total} kész)` : '...'}
           </p>
         ) : (
           <button className={styles.btn} onClick={nextRound}>
-            Next Round
+            Következő leosztás
           </button>
         )}
       </div>
