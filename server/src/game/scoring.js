@@ -1,88 +1,88 @@
-const { getBasePoints } = require('./bidding')
+const { componentBasePoints, componentLabel } = require('./bidding')
 const { isUltiWinCondition } = require('./rules')
-
-const ALL_SUITS = ['makk', 'zold', 'tok', 'piros']
 
 function countCardPoints(cards, trumpSuit) {
   if (!trumpSuit) return 0
   return cards.reduce((sum, c) => sum + (c.rank === 'asz' || c.rank === '10' ? 10 : 0), 0)
 }
 
-// True if the given cards contain both the King and Over of `suit`.
-function hasMarriage(cards, suit) {
-  const hasKing = cards.some((c) => c.suit === suit && c.rank === 'kiraly')
-  const hasOver = cards.some((c) => c.suit === suit && c.rank === 'felso')
-  return hasKing && hasOver
-}
-
 function declarerTrickCount(completedTricks, declarerId) {
   return completedTricks.filter((t) => t.winnerId === declarerId).length
 }
 
-// Returns { won, contract, trumpSuit, declarerId, basePoints, kontraLevel, deltas }
-function calculateRoundScore({ contract, trumpSuit, declarerId, defenderIds,
-                               completedTricks, talon, declarerPoints,
-                               declarerCards = [], kontraLevel = 1 }) {
-  const basePoints = getBasePoints(contract, trumpSuit)
-  let won = false
+function acesWonByDeclarer(completedTricks, declarerId) {
+  let aces = 0
+  for (const t of completedTricks) {
+    if (t.winnerId !== declarerId) continue
+    aces += t.cards.filter((c) => c.card.rank === 'asz').length
+  }
+  return aces
+}
 
-  switch (contract) {
-    case 'simple': {
-      const total = declarerPoints + countCardPoints(talon, trumpSuit)
-      won = total >= 50
-      break
-    }
+// Decide whether one scoring component was fulfilled.
+function componentWon(component, ctx) {
+  const { declaration, declarerId, completedTricks, cardTotal, announced } = ctx
+  const trumpSuit = declaration.trumpSuit
+  const declTricks = declarerTrickCount(completedTricks, declarerId)
 
-    case 'ulti': {
-      const total = declarerPoints + countCardPoints(talon, trumpSuit)
-      won = total >= 50 && isUltiWinCondition(completedTricks, declarerId, trumpSuit)
-      break
-    }
-
-    case 'forty_hundred': {
-      // Need 100+ points, including a 40-point marriage in the trump suit.
-      const marriage = hasMarriage(declarerCards, trumpSuit) ? 40 : 0
-      const total = declarerPoints + countCardPoints(talon, trumpSuit) + marriage
-      won = marriage > 0 && total >= 100
-      break
-    }
-
-    case 'twenty_hundred': {
-      // Need 100+ points, including a 20-point marriage in a non-trump suit.
-      const hasNonTrumpMarriage = ALL_SUITS.some((s) => s !== trumpSuit && hasMarriage(declarerCards, s))
-      const marriage = hasNonTrumpMarriage ? 20 : 0
-      const total = declarerPoints + countCardPoints(talon, trumpSuit) + marriage
-      won = marriage > 0 && total >= 100
-      break
-    }
-
+  switch (component) {
+    case 'parti':
+      return cardTotal >= 50
+    case 'ulti':
+      return isUltiWinCondition(completedTricks, declarerId, trumpSuit)
+    case 'four_aces':
+      return acesWonByDeclarer(completedTricks, declarerId) === 4
+    case 'forty_hundred':
+      return announced.some((m) => m.value === 40) && cardTotal >= 100
+    case 'twenty_hundred':
+      return announced.some((m) => m.value === 20) && cardTotal >= 100
+    case 'durchmars': // trump component
+      return declTricks === completedTricks.length
     case 'betli':
     case 'heart_betli':
     case 'open_betli':
-      won = declarerTrickCount(completedTricks, declarerId) === 0
-      break
-
-    case 'durchmars':
+      return declTricks === 0
+    case 'durchmars_nt':
     case 'heart_durchmars':
     case 'open_durchmars':
-      won = declarerTrickCount(completedTricks, declarerId) === completedTricks.length
-      break
-
+      return declTricks === completedTricks.length
     default:
-      throw new Error(`Unknown contract: ${contract}`)
+      throw new Error(`Unknown scoring component: ${component}`)
   }
+}
 
-  const payout = basePoints * kontraLevel
+// Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
+function calculateRoundScore({ declaration, declarerId, defenderIds,
+                               completedTricks, talon, declarerPoints, kontra = {} }) {
+  const trumpSuit = declaration.trumpSuit
+  const announced = declaration.announcedMarriages || []
+  const wonATrick = declarerTrickCount(completedTricks, declarerId) > 0
+  const marriagePoints = wonATrick ? announced.reduce((s, m) => s + m.value, 0) : 0
+  const cardTotal = declarerPoints + countCardPoints(talon, trumpSuit) + marriagePoints
+
+  const ctx = { declaration, declarerId, completedTricks, cardTotal, announced }
   const deltas = {}
-  if (won) {
-    deltas[declarerId] = payout * defenderIds.length
-    defenderIds.forEach((id) => { deltas[id] = -payout })
-  } else {
-    deltas[declarerId] = -payout * defenderIds.length
-    defenderIds.forEach((id) => { deltas[id] = payout })
-  }
+  const setup = (id) => { if (deltas[id] === undefined) deltas[id] = 0 }
+  setup(declarerId)
+  defenderIds.forEach(setup)
 
-  return { won, contract, trumpSuit, declarerId, basePoints, kontraLevel, deltas }
+  const components = declaration.scoring.map((key) => {
+    const won = componentWon(key, ctx)
+    const basePoints = componentBasePoints(key, declaration.color)
+    const kontraLevel = (kontra[key] && kontra[key].level) || 1
+    const payout = basePoints * kontraLevel
+
+    if (won) {
+      deltas[declarerId] += payout * defenderIds.length
+      defenderIds.forEach((id) => { deltas[id] -= payout })
+    } else {
+      deltas[declarerId] -= payout * defenderIds.length
+      defenderIds.forEach((id) => { deltas[id] += payout })
+    }
+    return { key, label: componentLabel(key), won, basePoints, kontraLevel, delta: won ? payout : -payout }
+  })
+
+  return { components, deltas, cardTotal, declarerId, color: declaration.color }
 }
 
 module.exports = { calculateRoundScore }

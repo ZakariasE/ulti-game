@@ -1,9 +1,10 @@
 const rooms = require('../rooms/RoomManager')
 const {
-  applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass, applyKontra,
-  applyPlayCard, prepareNextRound, biddingSnapshot, handCounts, _getLegalCardIds,
+  applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
+  applyFirstLead, applyKontra, applyPlayCard, prepareNextRound,
+  availableMarriages, eligibleKontra, biddingSnapshot, publicDeclaration,
+  handCounts, _getLegalCardIds,
 } = require('../game/GameState')
-const { isOpenContract } = require('../game/bidding')
 
 function registerHandlers(io, socket) {
   // ── Lobby ──────────────────────────────────────────────────────────────────
@@ -39,7 +40,6 @@ function registerHandlers(io, socket) {
       if (!state) throw new Error('Room not found')
       if (state.players.length !== 3) throw new Error('Need exactly 3 players')
       if (state.phase !== 'LOBBY') throw new Error('Game already started')
-
       applyDeal(state)
       _dealAndAnnounce(io, roomCode, state)
     } catch (err) {
@@ -53,17 +53,18 @@ function registerHandlers(io, socket) {
     try {
       const state = rooms.getRoom(roomCode)
       applyBidDiscard(state, socket.id, cardIds)
-      _sendHand(io, state, socket.id) // hand went 12 → 10
+      _sendHand(io, state, socket.id)
       io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
   })
 
-  socket.on('bid:declare', ({ roomCode, contract, suit }) => {
+  // payload: { type:'simple'|'trump'|'notrump', components?, color?, contract? }
+  socket.on('bid:declare', ({ roomCode, ...payload }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      applyDeclare(state, socket.id, contract, suit)
+      applyDeclare(state, socket.id, payload)
       io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
@@ -74,7 +75,7 @@ function registerHandlers(io, socket) {
     try {
       const state = rooms.getRoom(roomCode)
       applyRob(state, socket.id)
-      _sendHand(io, state, socket.id) // hand went 10 → 12
+      _sendHand(io, state, socket.id)
       io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
@@ -87,7 +88,14 @@ function registerHandlers(io, socket) {
       const result = applyBidPass(state, socket.id)
       if (result.biddingComplete) {
         io.to(roomCode).emit('bid:resolved', {
-          declarerId: result.declarerId, contract: result.contract, suit: result.suit,
+          declarerId: result.declarerId,
+          declaration: publicDeclaration(result.declaration),
+        })
+        // Privately tell the declarer what they can announce at the opening lead.
+        const decl = state.play.declaration
+        io.to(result.declarerId).emit('opening:info', {
+          needTrump: !decl.isNoTrump && decl.color === 'normal',
+          availableMarriages: availableMarriages(state.hands[result.declarerId]),
         })
         _promptNextTurn(io, roomCode, state)
       } else {
@@ -98,13 +106,14 @@ function registerHandlers(io, socket) {
     }
   })
 
-  // ── Kontra ────────────────────────────────────────────────────────────────
+  // ── Kontra (per component, at the player's card-play window) ──────────────────
 
-  socket.on('kontra:call', ({ roomCode }) => {
+  socket.on('kontra:call', ({ roomCode, components }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      const { level, party } = applyKontra(state, socket.id)
-      io.to(roomCode).emit('kontra:updated', { level, party, byId: socket.id })
+      const { kontra, raised } = applyKontra(state, socket.id, components)
+      io.to(roomCode).emit('kontra:updated', { kontra, raised, byId: socket.id })
+      _promptNextTurn(io, roomCode, state) // refresh the current player's kontra options
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -112,37 +121,23 @@ function registerHandlers(io, socket) {
 
   // ── Card play ────────────────────────────────────────────────────────────────
 
+  socket.on('play:firstLead', ({ roomCode, cardId, trumpSuit, announcedMarriages }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const result = applyFirstLead(state, socket.id, cardId, trumpSuit, announcedMarriages)
+      io.to(roomCode).emit('declarer:trump', { trumpSuit: state.play.declaration.trumpSuit })
+      io.to(roomCode).emit('declarer:marriages', { announcedMarriages: state.play.declaration.announcedMarriages })
+      _afterPlay(io, roomCode, state, socket.id, result)
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
   socket.on('card:play', ({ roomCode, cardId }) => {
     try {
       const state = rooms.getRoom(roomCode)
       const result = applyPlayCard(state, socket.id, cardId)
-
-      io.to(roomCode).emit('card:played', {
-        playerId: socket.id,
-        card: result.playedCard,
-        trickSoFar: state.play.currentTrick.cards,
-        handCounts: handCounts(state),
-      })
-
-      if (result.trickComplete) {
-        io.to(roomCode).emit('trick:completed', { winnerId: result.winnerId, points: result.points })
-
-        // For "open" contracts, reveal the declarer's hand after the first trick.
-        if (isOpenContract(state.play.contract) && state.play.trickCount === 1) {
-          io.to(roomCode).emit('declarer:revealed', {
-            declarerId: state.play.declarerId,
-            hand: state.hands[state.play.declarerId],
-          })
-        }
-
-        if (result.roundComplete) {
-          io.to(roomCode).emit('round:completed', { result: state.roundResult, scores: state.scores })
-        } else {
-          setTimeout(() => _promptNextTurn(io, roomCode, state), 1200) // brief pause to view the trick
-        }
-      } else {
-        _promptNextTurn(io, roomCode, state)
-      }
+      _afterPlay(io, roomCode, state, socket.id, result)
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -155,10 +150,7 @@ function registerHandlers(io, socket) {
       state._readyForNext.add(socket.id)
 
       const connected = state.players.filter((p) => p.isConnected).length
-      io.to(roomCode).emit('round:ready', {
-        readyCount: state._readyForNext.size,
-        total: connected,
-      })
+      io.to(roomCode).emit('round:ready', { readyCount: state._readyForNext.size, total: connected })
 
       if (state._readyForNext.size >= connected) {
         state._readyForNext = null
@@ -180,10 +172,7 @@ function registerHandlers(io, socket) {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function _dealAndAnnounce(io, roomCode, state) {
-  io.to(roomCode).emit('game:started', {
-    dealerIndex: state.dealerIndex,
-    players: state.players,
-  })
+  io.to(roomCode).emit('game:started', { dealerIndex: state.dealerIndex, players: state.players })
   state.players.forEach((p) => _sendHand(io, state, p.id))
   io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
 }
@@ -192,14 +181,46 @@ function _sendHand(io, state, playerId) {
   io.to(playerId).emit('hand:dealt', { hand: state.hands[playerId] })
 }
 
-// Prompt whoever is next to act in the current trick (the leader for the first
-// card, then each subsequent seat).
+function _afterPlay(io, roomCode, state, playerId, result) {
+  io.to(roomCode).emit('card:played', {
+    playerId,
+    card: result.playedCard,
+    trickSoFar: state.play.currentTrick.cards,
+    handCounts: handCounts(state),
+  })
+
+  if (result.trickComplete) {
+    io.to(roomCode).emit('trick:completed', { winnerId: result.winnerId, points: result.points })
+
+    if (state.play.declaration.open && state.play.trickCount === 1) {
+      io.to(roomCode).emit('declarer:revealed', {
+        declarerId: state.play.declarerId,
+        hand: state.hands[state.play.declarerId],
+      })
+    }
+
+    if (result.roundComplete) {
+      io.to(roomCode).emit('round:completed', { result: state.roundResult, scores: state.scores })
+    } else {
+      setTimeout(() => _promptNextTurn(io, roomCode, state), 1200)
+    }
+  } else {
+    _promptNextTurn(io, roomCode, state)
+  }
+}
+
 function _promptNextTurn(io, roomCode, state) {
   const { currentTrick } = state.play
   const turnSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
   const player = state.players.find((p) => p.seatIndex === turnSeat)
-  const legalCardIds = _getLegalCardIds(state, player.id)
-  io.to(roomCode).emit('play:turnStart', { currentPlayerId: player.id, legalCardIds })
+  io.to(roomCode).emit('play:turnStart', {
+    currentPlayerId: player.id,
+    legalCardIds: _getLegalCardIds(state, player.id),
+    needsOpeningLead: !state.play.openingLeadDone && player.id === state.play.declarerId,
+    kontraOptions: eligibleKontra(state, player.id),
+    kontra: state.play.kontra,
+    trumpSuit: state.play.declaration.trumpSuit,
+  })
 }
 
 module.exports = { registerHandlers }

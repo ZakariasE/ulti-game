@@ -1,10 +1,12 @@
 const { createDeck, shuffle, deal } = require('./deck')
 const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rules')
 const {
-  getInitialBidderSeat, getNextBidderSeat, isHigherBid, getBidRank,
-  isTrumpContract, isOpenContract, MAX_BID_RANK,
+  getInitialBidderSeat, getNextBidderSeat, isHigherDeclaration,
+  buildDeclaration, simpleDeclaration, noTrumpDeclaration, declarationLabel,
 } = require('./bidding')
 const { calculateRoundScore } = require('./scoring')
+
+const MINOR_SUITS = ['makk', 'zold', 'tok']
 
 function createGameState(roomCode, players = []) {
   return {
@@ -39,17 +41,16 @@ function applyDeal(state) {
     if (state.scores[p.id] === undefined) state.scores[p.id] = 0
   })
 
-  // First bidder (dealer's right) is dealt 12 cards — the talon merges into their hand.
   const firstBidderSeat = getInitialBidderSeat(state.dealerIndex, n)
   const firstBidder = _seatToPlayer(state, firstBidderSeat)
   state.hands[firstBidder.id] = [...state.hands[firstBidder.id], ...talon]
-  state.talon = [] // repopulated when the first bidder discards
+  state.talon = []
 
   state.bidding = {
     currentBidderSeat: firstBidderSeat,
-    phase: 'DISCARD', // first bidder must discard 2, then declare
+    phase: 'DISCARD',
     consecutivePasses: 0,
-    currentHighBid: null,
+    currentHighBid: null, // { playerId, declaration }
     history: [],
   }
   state.play = null
@@ -78,21 +79,29 @@ function applyBidDiscard(state, playerId, cardIds) {
   state.bidding.phase = 'DECLARE'
 }
 
-function applyDeclare(state, playerId, contract, suit) {
+// payload: { type:'simple', color } | { type:'trump', components, color } | { type:'notrump', contract }
+function _declarationFromPayload(payload) {
+  if (payload.type === 'simple') return simpleDeclaration(payload.color)
+  if (payload.type === 'notrump') return noTrumpDeclaration(payload.contract)
+  if (payload.type === 'trump') return buildDeclaration(payload.components, payload.color)
+  throw new Error('Invalid declaration')
+}
+
+function applyDeclare(state, playerId, payload) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
   if (state.bidding.phase !== 'DECLARE') throw new Error('Not in declare phase')
 
-  const newBid = { contract, suit }
-  if (getBidRank(contract, suit) < 0) throw new Error('Invalid contract')
-  if (state.bidding.currentHighBid && !isHigherBid(newBid, state.bidding.currentHighBid)) {
-    throw new Error('Bid must be higher than current bid')
+  const declaration = _declarationFromPayload(payload)
+  const current = state.bidding.currentHighBid
+  if (current && !isHigherDeclaration(declaration, current.declaration)) {
+    throw new Error('Declaration must out-rank the current bid')
   }
 
-  state.bidding.currentHighBid = { playerId, contract, suit }
+  state.bidding.currentHighBid = { playerId, declaration }
   state.bidding.consecutivePasses = 0
-  state.bidding.history.push({ playerId, action: 'declare', contract, suit })
+  state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
   state.bidding.phase = 'ROB_OFFER'
@@ -103,10 +112,6 @@ function applyRob(state, playerId) {
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
   if (state.bidding.phase !== 'ROB_OFFER') throw new Error('Cannot rob now')
-
-  // Must be able to bid higher than the current high bid
-  const highRank = getBidRank(state.bidding.currentHighBid.contract, state.bidding.currentHighBid.suit)
-  if (highRank >= MAX_BID_RANK) throw new Error('Already at the highest bid')
 
   state.hands[playerId] = [...state.hands[playerId], ...state.talon]
   state.talon = []
@@ -123,9 +128,6 @@ function applyBidPass(state, playerId) {
   state.bidding.consecutivePasses++
   state.bidding.history.push({ playerId, action: 'pass' })
 
-  // Bidding ends only when all players pass in succession after the last bid —
-  // including the high bidder, who gets a final chance to rob their own talon
-  // and raise. So the two other players pass, then the high bidder passes too.
   if (state.bidding.consecutivePasses >= state.players.length && state.bidding.currentHighBid) {
     return _resolveBidding(state)
   }
@@ -135,59 +137,93 @@ function applyBidPass(state, playerId) {
 }
 
 function _resolveBidding(state) {
-  const { playerId: declarerId, contract, suit } = state.bidding.currentHighBid
+  const { playerId: declarerId, declaration } = state.bidding.currentHighBid
   const defenderIds = state.players.filter((p) => p.id !== declarerId).map((p) => p.id)
   const declarer = state.players.find((p) => p.id === declarerId)
+
+  // Per-component kontra state.
+  const kontra = {}
+  for (const c of declaration.scoring) kontra[c] = { level: 1, lastParty: null }
+
+  const cardsPlayed = {}
+  state.players.forEach((p) => { cardsPlayed[p.id] = 0 })
 
   state.bidding.phase = 'DONE'
   state.play = {
     declarerId,
     defenderIds,
-    contract,
-    suit: isTrumpContract(contract) ? suit : null,
+    declaration: { ...declaration, announcedMarriages: [] },
+    openingLeadDone: false,
     currentTrick: { ledSuit: null, leaderSeat: declarer.seatIndex, cards: [] },
     completedTricks: [],
     declarerPoints: 0,
     trickCount: 0,
-    kontra: { level: 1, lastParty: null }, // multiplier from kontra/rekontra
+    kontra,
+    cardsPlayed,
   }
   state.phase = 'PLAYING'
-  return { biddingComplete: true, declarerId, contract, suit: state.play.suit }
+  return { biddingComplete: true, declarerId, declaration }
 }
 
-// ── Kontra ────────────────────────────────────────────────────────────────────
+// ── Marriages ─────────────────────────────────────────────────────────────────
 
-// Defenders may call kontra (doubles the stakes); the declarer answers with
-// rekontra, then defenders szubkontra, and so on — each doubling again. Only
-// allowed before the first trick is completed.
-function applyKontra(state, playerId) {
-  if (state.phase !== 'PLAYING') throw new Error('Not in play')
-  if (state.play.completedTricks.length > 0) throw new Error('Kontra only before the first trick finishes')
-
-  const isDeclarer = playerId === state.play.declarerId
-  const isDefender = state.play.defenderIds.includes(playerId)
-  if (!isDeclarer && !isDefender) throw new Error('Player not in game')
-
-  const k = state.play.kontra
-  const party = isDeclarer ? 'declarer' : 'defenders'
-  if (k.level === 1 && isDeclarer) throw new Error('Only the defenders can call the first kontra')
-  if (k.lastParty === party) throw new Error('Waiting for the other side to answer')
-
-  k.level *= 2
-  k.lastParty = party
-  return { level: k.level, party }
+// Suits where the hand holds both King and Over.
+function availableMarriages(hand) {
+  return ['makk', 'zold', 'tok', 'piros'].filter((suit) => {
+    const hasKing = hand.some((c) => c.suit === suit && c.rank === 'kiraly')
+    const hasOver = hand.some((c) => c.suit === suit && c.rank === 'felso')
+    return hasKing && hasOver
+  })
 }
 
 // ── Card play ────────────────────────────────────────────────────────────────
 
+function _trumpSuit(state) {
+  return state.play.declaration.trumpSuit // null for no-trump / not-yet-chosen
+}
+
 function _getLegalCardIds(state, playerId) {
   const hand = state.hands[playerId]
-  const { currentTrick, suit: trumpSuit, contract } = state.play
-  const legal = getLegalPlays(hand, currentTrick.cards, trumpSuit, contract)
+  const { currentTrick } = state.play
+  const legal = getLegalPlays(hand, currentTrick.cards, _trumpSuit(state))
   return legal.map((c) => c.id)
 }
 
+// The declarer's opening lead: pick trump (if a normal trump declaration),
+// announce marriages, then play the first card.
+function applyFirstLead(state, playerId, cardId, trumpSuit, announcedSuits = []) {
+  const decl = state.play.declaration
+  if (playerId !== state.play.declarerId) throw new Error('Only the declarer leads first')
+  if (state.play.openingLeadDone) throw new Error('Opening lead already played')
+
+  // Choose trump for a normal trump declaration.
+  if (!decl.isNoTrump && decl.color === 'normal') {
+    if (!MINOR_SUITS.includes(trumpSuit)) throw new Error('Pick a trump suit (Makk, Zöld or Tök)')
+    decl.trumpSuit = trumpSuit
+  }
+
+  // Validate & record announced marriages.
+  const available = availableMarriages(state.hands[playerId])
+  const marriages = []
+  for (const suit of announcedSuits || []) {
+    if (!available.includes(suit)) throw new Error('You do not hold that marriage')
+    marriages.push({ suit, value: suit === decl.trumpSuit ? 40 : 20 })
+  }
+  decl.announcedMarriages = marriages
+  state.play.openingLeadDone = true
+
+  return _playCardCore(state, playerId, cardId)
+}
+
 function applyPlayCard(state, playerId, cardId) {
+  // The declarer's very first card must go through applyFirstLead.
+  if (!state.play.openingLeadDone && playerId === state.play.declarerId) {
+    throw new Error('Declarer must make the opening lead')
+  }
+  return _playCardCore(state, playerId, cardId)
+}
+
+function _playCardCore(state, playerId, cardId) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
 
@@ -200,6 +236,7 @@ function applyPlayCard(state, playerId, cardId) {
 
   const card = state.hands[playerId].find((c) => c.id === cardId)
   state.hands[playerId] = state.hands[playerId].filter((c) => c.id !== cardId)
+  state.play.cardsPlayed[playerId]++
 
   if (currentTrick.cards.length === 0) currentTrick.ledSuit = card.suit
   currentTrick.cards.push({ playerId, card })
@@ -211,7 +248,8 @@ function applyPlayCard(state, playerId, cardId) {
 }
 
 function applyTrickEnd(state) {
-  const { currentTrick, suit: trumpSuit } = state.play
+  const { currentTrick } = state.play
+  const trumpSuit = _trumpSuit(state)
   const winner = determineTrickWinner(currentTrick.cards, trumpSuit)
   const points = countTrickPoints(currentTrick.cards, trumpSuit)
 
@@ -233,25 +271,14 @@ function applyTrickEnd(state) {
 }
 
 function applyRoundEnd(state) {
-  // All cards the declarer played this round (their original 10) — used to
-  // detect marriages (King + Over of a suit) for the 40-100 / 20-100 contracts.
-  const declarerCards = []
-  for (const t of state.play.completedTricks) {
-    for (const c of t.cards) {
-      if (c.playerId === state.play.declarerId) declarerCards.push(c.card)
-    }
-  }
-
   const result = calculateRoundScore({
-    contract: state.play.contract,
-    trumpSuit: state.play.suit,
+    declaration: state.play.declaration,
     declarerId: state.play.declarerId,
     defenderIds: state.play.defenderIds,
     completedTricks: state.play.completedTricks,
     talon: state.talon,
     declarerPoints: state.play.declarerPoints,
-    declarerCards,
-    kontraLevel: state.play.kontra.level,
+    kontra: state.play.kontra,
   })
 
   for (const [playerId, delta] of Object.entries(result.deltas)) {
@@ -261,6 +288,67 @@ function applyRoundEnd(state) {
   state.roundResult = result
   state.phase = 'SCORING'
   return { roundResult: result }
+}
+
+// ── Kontra (per component, tied to card-play timing) ───────────────────────────
+
+// The escalation step `d` (number of doublings so far) is raised by:
+//   defenders when d is even, on their (d/2 + 1)-th card
+//   declarer  when d is odd,  on their ((d+1)/2 + 1)-th card
+function _kontraStep(level) {
+  return Math.round(Math.log2(level)) // 1->0, 2->1, 4->2, ...
+}
+function _kontraExpectation(level) {
+  const d = _kontraStep(level)
+  if (d % 2 === 0) return { party: 'defenders', cardNum: d / 2 + 1 }
+  return { party: 'declarer', cardNum: (d + 1) / 2 + 1 }
+}
+
+function applyKontra(state, playerId, components) {
+  if (state.phase !== 'PLAYING') throw new Error('Not in play')
+  const player = state.players.find((p) => p.id === playerId)
+  if (!player) throw new Error('Player not in game')
+
+  // Kontra is declared at the player's own turn, as they are about to play.
+  const { currentTrick } = state.play
+  const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
+  if (player.seatIndex !== expectedSeat) throw new Error('You can only kontra on your turn')
+
+  const isDeclarer = playerId === state.play.declarerId
+  const party = isDeclarer ? 'declarer' : 'defenders'
+  const myCardNum = state.play.cardsPlayed[playerId] + 1 // the card they are about to play
+
+  const list = components && components.length ? components : Object.keys(state.play.kontra)
+  const raised = []
+  for (const c of list) {
+    const k = state.play.kontra[c]
+    if (!k) throw new Error(`Not part of this declaration: ${c}`)
+    const exp = _kontraExpectation(k.level)
+    if (exp.party !== party) throw new Error('Not your side to double this now')
+    if (exp.cardNum !== myCardNum) throw new Error('Not the right moment to double')
+    if (k.lastParty === party) throw new Error('Waiting for the other side')
+    k.level *= 2
+    k.lastParty = party
+    raised.push(c)
+  }
+  return { raised, kontra: state.play.kontra }
+}
+
+// True if the given player currently has any component they may double.
+function eligibleKontra(state, playerId) {
+  if (!state.play || state.phase !== 'PLAYING') return []
+  const player = state.players.find((p) => p.id === playerId)
+  const { currentTrick } = state.play
+  const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
+  if (!player || player.seatIndex !== expectedSeat) return []
+  const party = playerId === state.play.declarerId ? 'declarer' : 'defenders'
+  const myCardNum = state.play.cardsPlayed[playerId] + 1
+  return Object.entries(state.play.kontra)
+    .filter(([, k]) => {
+      const exp = _kontraExpectation(k.level)
+      return exp.party === party && exp.cardNum === myCardNum && k.lastParty !== party
+    })
+    .map(([c]) => c)
 }
 
 function prepareNextRound(state) {
@@ -274,14 +362,32 @@ function prepareNextRound(state) {
   state.phase = 'DEALING'
 }
 
-// Public snapshot of bidding state (safe to broadcast — no private cards)
+// ── Snapshots ──────────────────────────────────────────────────────────────────
+
+// Bidding info safe to broadcast — the concrete minor trump stays hidden.
 function biddingSnapshot(state) {
   const b = state.bidding
   const currentBidder = _seatToPlayer(state, b.currentBidderSeat)
   return {
     currentBidderId: currentBidder ? currentBidder.id : null,
     phase: b.phase,
-    currentHighBid: b.currentHighBid,
+    currentHighBid: b.currentHighBid
+      ? { playerId: b.currentHighBid.playerId, declaration: publicDeclaration(b.currentHighBid.declaration) }
+      : null,
+  }
+}
+
+// A declaration without the concrete minor trump (still hidden during bidding).
+function publicDeclaration(decl) {
+  return {
+    components: decl.components,
+    scoring: decl.scoring,
+    hasParti: decl.hasParti,
+    color: decl.color,
+    isNoTrump: decl.isNoTrump,
+    open: decl.open,
+    trumpSuit: decl.color === 'red' ? 'piros' : null,
+    label: declarationLabel(decl),
   }
 }
 
@@ -298,11 +404,15 @@ module.exports = {
   applyDeclare,
   applyRob,
   applyBidPass,
+  applyFirstLead,
   applyKontra,
   applyPlayCard,
   applyRoundEnd,
   prepareNextRound,
+  availableMarriages,
+  eligibleKontra,
   biddingSnapshot,
+  publicDeclaration,
   handCounts,
   _getLegalCardIds,
 }
