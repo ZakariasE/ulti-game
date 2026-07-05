@@ -39,6 +39,19 @@
 
 .btn:hover { background: #e74c3c; }
 
+/* Staged (selected but not yet finalized) — commits when the card is played. */
+.btnOn {
+  background: #e74c3c;
+  outline: 2px solid #f1c40f;
+  box-shadow: 0 0 10px rgba(241,196,15,0.55);
+}
+
+.hint {
+  font-size: 11px;
+  color: #d7a59f;
+  font-style: italic;
+}
+
 .btnAll {
   background: #8e2b20;
   color: #fff;

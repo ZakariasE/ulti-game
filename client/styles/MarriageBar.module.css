@@ -30,6 +30,14 @@
   outline: 2px solid #42a5f5;
 }
 
+/* Opted out — dimmed and struck through. */
+.off {
+  background: #263238;
+  color: #90a4ae;
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
 .hint {
   font-size: 11px;
   color: #9fb4c7;

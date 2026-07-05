@@ -1,14 +1,12 @@
 import { useGame } from '../../context/GameContext'
-import { useSocket } from '../../context/SocketContext'
 import { componentLabel, kontraLevelName } from '../../lib/bids'
 import styles from '../../styles/KontraBar.module.css'
 
 function nextName(level) { return kontraLevelName(level * 2) }
 
-export default function KontraBar({ roomCode }) {
-  const { state } = useGame()
-  const { emit } = useSocket()
-  const { phase, declaration, kontra, kontraOptions, currentTurnId, myPlayerId } = state
+export default function KontraBar() {
+  const { state, dispatch } = useGame()
+  const { phase, declaration, kontra, kontraOptions, pendingKontra, currentTurnId, myPlayerId } = state
 
   if (phase !== 'PLAYING' || !declaration) return null
 
@@ -18,6 +16,12 @@ export default function KontraBar({ roomCode }) {
   const options = myTurn ? (kontraOptions || []) : []
 
   if (doubled.length === 0 && options.length === 0) return null
+
+  const toggle = (c) => dispatch({ type: 'TOGGLE_KONTRA', component: c })
+  const allStaged = options.length > 0 && options.every((c) => pendingKontra.includes(c))
+  const toggleAll = () => options.forEach((c) => {
+    if (pendingKontra.includes(c) === allStaged) toggle(c)
+  })
 
   return (
     <div className={styles.bar}>
@@ -32,23 +36,24 @@ export default function KontraBar({ roomCode }) {
       )}
       {options.length > 0 && (
         <span className={styles.actions}>
-          {options.map((c) => (
-            <button
-              key={c}
-              className={styles.btn}
-              onClick={() => emit('kontra:call', { roomCode, components: [c] })}
-            >
-              {nextName(kontra[c]?.level || 1)} {componentLabel(c)}
-            </button>
-          ))}
+          {options.map((c) => {
+            const on = pendingKontra.includes(c)
+            return (
+              <button
+                key={c}
+                className={`${styles.btn} ${on ? styles.btnOn : ''}`}
+                onClick={() => toggle(c)}
+              >
+                {nextName(kontra[c]?.level || 1)} {componentLabel(c)}
+              </button>
+            )
+          })}
           {options.length > 1 && (
-            <button
-              className={styles.btnAll}
-              onClick={() => emit('kontra:call', { roomCode, components: options })}
-            >
-              Összes kontra
+            <button className={styles.btnAll} onClick={toggleAll}>
+              {allStaged ? 'Mégse' : 'Összes kontra'}
             </button>
           )}
+          <span className={styles.hint}>kártya lerakásakor véglegesül</span>
         </span>
       )}
     </div>

@@ -10,8 +10,9 @@ function nameOf(state, id) {
   return state.players.find((p) => p.id === id)?.name || 'Valaki'
 }
 
+// Public marriage text hides the suit — only the value is announced.
 function marriageText(marriages) {
-  return (marriages || []).map((m) => `${SUIT_NAMES[m.suit]} +${m.value}`).join(', ')
+  return (marriages || []).map((m) => `+${m.value}`).join(', ')
 }
 
 // Append a transient toast to the announcement queue. Returns the fields to
@@ -42,6 +43,7 @@ const initialState = {
   announcedMarriages: [],
   kontra: {}, // component -> { level, lastParty }
   kontraOptions: [], // components I may double right now
+  pendingKontra: [], // components I've staged to double with my next card
   marriageOptions: [], // suits I may announce right now (my first card)
   pendingMarriages: [], // suits I've toggled to announce with my next card
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
@@ -78,6 +80,7 @@ function resetForNewRound(state) {
     announcedMarriages: [],
     kontra: {},
     kontraOptions: [],
+    pendingKontra: [],
     marriageOptions: [],
     pendingMarriages: [],
     marriagesByPlayer: {},
@@ -179,6 +182,14 @@ function gameReducer(state, action) {
           : [...state.pendingMarriages, action.suit],
       }
 
+    case 'TOGGLE_KONTRA':
+      return {
+        ...state,
+        pendingKontra: state.pendingKontra.includes(action.component)
+          ? state.pendingKontra.filter((c) => c !== action.component)
+          : [...state.pendingKontra, action.component],
+      }
+
     case 'KONTRA_UPDATED': {
       const raised = action.raised || []
       let toast = {}
@@ -200,8 +211,10 @@ function gameReducer(state, action) {
         lastTrickWinnerId: null,
         needsOpeningLead: action.currentPlayerId === state.myPlayerId ? !!action.needsOpeningLead : false,
         kontraOptions: action.currentPlayerId === state.myPlayerId ? (action.kontraOptions || []) : [],
+        pendingKontra: [],
         marriageOptions: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
-        pendingMarriages: [],
+        // Marriages are announced by default; the player opts out per suit.
+        pendingMarriages: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
         kontra: action.kontra || state.kontra,
         trumpSuit: action.trumpSuit ?? state.trumpSuit,
         legalCardIds: action.currentPlayerId === state.myPlayerId ? action.legalCardIds : [],
@@ -218,6 +231,7 @@ function gameReducer(state, action) {
             : state.myHand,
         legalCardIds: [],
         kontraOptions: [],
+        pendingKontra: [],
         marriageOptions: [],
         pendingMarriages: [],
         needsOpeningLead: false,

@@ -10,7 +10,7 @@ export default function PlayerHand({ roomCode }) {
   const { emit } = useSocket()
   const { state } = useGame()
   const { myHand, legalCardIds, phase, biddingPhase, currentTurnId, myPlayerId,
-    declaration, needsOpeningLead, pendingMarriages, talonCardIds } = state
+    declaration, needsOpeningLead, pendingMarriages, pendingKontra, talonCardIds } = state
 
   const [discardSel, setDiscardSel] = useState([])
 
@@ -26,8 +26,9 @@ export default function PlayerHand({ roomCode }) {
   )
 
   function playCard(cardId) {
-    // Include any marriages the player toggled (only recorded on their first card).
-    emit('card:play', { roomCode, cardId, announcedMarriages: pendingMarriages })
+    // Include any marriages announced (first card) and kontra staged this turn;
+    // both are finalized only now, when the card is actually played.
+    emit('card:play', { roomCode, cardId, announcedMarriages: pendingMarriages, kontra: pendingKontra })
   }
 
   function toggleDiscard(cardId) {

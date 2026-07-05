@@ -20,8 +20,9 @@ export default function GameTable({ roomCode }) {
     currentTurnId, lastTrickWinnerId } = state
   const handCounts = state.handCounts || {}
   const marriagesByPlayer = state.marriagesByPlayer || {}
+  // Public marriage display hides the suit — only the value is announced.
   const fmtMarriages = (list) =>
-    (list || []).map((m) => `${SUIT_NAMES[m.suit]} +${m.value}`).join(', ')
+    (list || []).map((m) => `+${m.value}`).join(', ')
 
   const me = players.find((p) => p.id === myPlayerId)
   const opponents = players.filter((p) => p.id !== myPlayerId)

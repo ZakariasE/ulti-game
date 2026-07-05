@@ -11,10 +11,10 @@ const MINOR_SUITS = ['makk', 'zold', 'tok']
 export default function OpeningLead({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { needsOpeningLead, currentTurnId, myPlayerId, declaration, myHand, openingInfo } = state
+  const { needsOpeningLead, currentTurnId, myPlayerId, declaration, myHand, openingInfo, pendingKontra } = state
 
   const [trump, setTrump] = useState(declaration?.color === 'red' ? 'piros' : null)
-  const [marriages, setMarriages] = useState([])
+  const [skip, setSkip] = useState([]) // marriages opted OUT (announced by default)
 
   const show = needsOpeningLead && currentTurnId === myPlayerId
   const sorted = useMemo(() => sortHand(myHand, declarationMode(declaration)), [myHand, declaration])
@@ -24,14 +24,15 @@ export default function OpeningLead({ roomCode }) {
   const available = openingInfo?.availableMarriages || []
   const effectiveTrump = declaration?.color === 'red' ? 'piros' : trump
   const canLead = !needTrump || !!trump
+  const announcedMarriages = available.filter((s) => !skip.includes(s))
 
   function toggleMarriage(suit) {
-    setMarriages((prev) => (prev.includes(suit) ? prev.filter((s) => s !== suit) : [...prev, suit]))
+    setSkip((prev) => (prev.includes(suit) ? prev.filter((s) => s !== suit) : [...prev, suit]))
   }
 
   function lead(cardId) {
     if (!canLead) return
-    emit('play:firstLead', { roomCode, cardId, trumpSuit: effectiveTrump, announcedMarriages: marriages })
+    emit('play:firstLead', { roomCode, cardId, trumpSuit: effectiveTrump, announcedMarriages, kontra: pendingKontra })
   }
 
   return (
@@ -58,14 +59,15 @@ export default function OpeningLead({ roomCode }) {
 
         {available.length > 0 && (
           <div className={styles.block}>
-            <div className={styles.label}>Házasság bemondása (opcionális)</div>
+            <div className={styles.label}>Bemondott házasságok (kattints a kihagyáshoz)</div>
             <div className={styles.row}>
               {available.map((s) => {
                 const value = s === effectiveTrump ? 40 : 20
+                const on = !skip.includes(s)
                 return (
                   <button
                     key={s}
-                    className={`${styles.pick} ${marriages.includes(s) ? styles.on : ''}`}
+                    className={`${styles.pick} ${on ? styles.on : styles.off}`}
                     onClick={() => toggleMarriage(s)}
                   >
                     {SUIT_NAMES[s]} +{value}

@@ -107,24 +107,14 @@ function registerHandlers(io, socket) {
     }
   })
 
-  // ── Kontra (per component, at the player's card-play window) ──────────────────
-
-  socket.on('kontra:call', ({ roomCode, components }) => {
-    try {
-      const state = rooms.getRoom(roomCode)
-      const { kontra, raised } = applyKontra(state, socket.id, components)
-      io.to(roomCode).emit('kontra:updated', { kontra, raised, byId: socket.id })
-      _promptNextTurn(io, roomCode, state) // refresh the current player's kontra options
-    } catch (err) {
-      socket.emit('game:error', { message: err.message })
-    }
-  })
-
   // ── Card play ────────────────────────────────────────────────────────────────
+  // Kontra is staged on the client and committed together with the card the
+  // player is about to lay down (so it can be freely toggled beforehand).
 
-  socket.on('play:firstLead', ({ roomCode, cardId, trumpSuit, announcedMarriages }) => {
+  socket.on('play:firstLead', ({ roomCode, cardId, trumpSuit, announcedMarriages, kontra }) => {
     try {
       const state = rooms.getRoom(roomCode)
+      _commitKontra(io, roomCode, state, socket.id, kontra)
       const result = applyFirstLead(state, socket.id, cardId, trumpSuit, announcedMarriages)
       io.to(roomCode).emit('declarer:trump', { trumpSuit: state.play.declaration.trumpSuit })
       io.to(roomCode).emit('declarer:marriages', { announcedMarriages: state.play.declaration.announcedMarriages })
@@ -134,9 +124,10 @@ function registerHandlers(io, socket) {
     }
   })
 
-  socket.on('card:play', ({ roomCode, cardId, announcedMarriages }) => {
+  socket.on('card:play', ({ roomCode, cardId, announcedMarriages, kontra }) => {
     try {
       const state = rooms.getRoom(roomCode)
+      _commitKontra(io, roomCode, state, socket.id, kontra)
       const wasFirstCard = state.play.cardsPlayed[socket.id] === 0
       const result = applyPlayCard(state, socket.id, cardId, announcedMarriages)
       const mine = state.play.marriages[socket.id]
@@ -176,6 +167,13 @@ function registerHandlers(io, socket) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+// Apply the kontra components a player staged, just before they play their card.
+function _commitKontra(io, roomCode, state, playerId, components) {
+  if (!components || !components.length) return
+  const { kontra, raised } = applyKontra(state, playerId, components)
+  if (raised.length) io.to(roomCode).emit('kontra:updated', { kontra, raised, byId: playerId })
+}
 
 function _dealAndAnnounce(io, roomCode, state) {
   io.to(roomCode).emit('game:started', { dealerIndex: state.dealerIndex, players: state.players })

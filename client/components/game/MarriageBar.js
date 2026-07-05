@@ -10,21 +10,21 @@ export default function MarriageBar() {
 
   return (
     <div className={styles.bar}>
-      <span className={styles.label}>Házasság bemondása?</span>
+      <span className={styles.label}>Bemondott házasságok:</span>
       {marriageOptions.map((suit) => {
         const value = suit === trumpSuit ? 40 : 20
         const on = pendingMarriages.includes(suit)
         return (
           <button
             key={suit}
-            className={`${styles.chip} ${on ? styles.on : ''}`}
+            className={`${styles.chip} ${on ? styles.on : styles.off}`}
             onClick={() => dispatch({ type: 'TOGGLE_MARRIAGE', suit })}
           >
             {SUIT_NAMES[suit]} +{value}
           </button>
         )
       })}
-      <span className={styles.hint}>majd tegyél le egy lapot a megerősítéshez</span>
+      <span className={styles.hint}>alapból bemondva — kattints egyre a kihagyáshoz</span>
     </div>
   )
 }
