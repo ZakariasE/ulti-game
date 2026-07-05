@@ -1,57 +1,97 @@
-// Client-side mirror of server/src/game/bidding.js — keep in sync.
-export const CONTRACT_INFO = {
-  simple:          { label: 'Simple',          base: 1,  trump: true },
-  forty_hundred:   { label: '40-100',          base: 4,  trump: true },
-  ulti:            { label: 'Ulti',            base: 4,  trump: true },
-  twenty_hundred:  { label: '20-100',          base: 8,  trump: true },
-  betli:           { label: 'Betli',           base: 5,  trump: false },
-  durchmars:       { label: 'Durchmars',       base: 6,  trump: false },
-  heart_betli:     { label: 'Heart Betli',     base: 10, trump: false },
-  heart_durchmars: { label: 'Heart Durchmars', base: 12, trump: false },
-  open_betli:      { label: 'Open Betli',      base: 20, trump: false },
-  open_durchmars:  { label: 'Open Durchmars',  base: 24, trump: false },
+// Client mirror of server/src/game/bidding.js — keep in sync.
+
+export const TRUMP_COMPONENTS = {
+  parti:          { base: 1, label: 'Parti' },
+  ulti:           { base: 4, label: 'Ulti' },
+  four_aces:      { base: 4, label: '4 Aces' },
+  forty_hundred:  { base: 4, label: '40-100' },
+  twenty_hundred: { base: 8, label: '20-100' },
+  durchmars:      { base: 6, label: 'Durchmars' },
 }
 
-const LADDER = [
-  ['simple', 'minor'], ['simple', 'hearts'], ['forty_hundred', 'minor'],
-  ['betli', null], ['ulti', 'minor'], ['durchmars', null],
-  ['forty_hundred', 'hearts'], ['twenty_hundred', 'minor'], ['ulti', 'hearts'],
-  ['heart_betli', null], ['heart_durchmars', null], ['twenty_hundred', 'hearts'],
-  ['open_betli', null], ['open_durchmars', null],
-]
+export const CHOOSABLE = ['ulti', 'four_aces', 'forty_hundred', 'twenty_hundred', 'durchmars']
+const PARTI_BEARERS = new Set(['ulti', 'four_aces'])
 
-const TRUMP_SUITS = ['makk', 'zold', 'tok', 'piros']
-
-function suitClass(contract, suit) {
-  if (!CONTRACT_INFO[contract]?.trump) return null
-  return suit === 'piros' ? 'hearts' : 'minor'
+export const NO_TRUMP_CONTRACTS = {
+  betli:           { base: 5,  label: 'Betli' },
+  heart_betli:     { base: 10, label: 'Heart Betli' },
+  open_betli:      { base: 20, label: 'Open Betli' },
+  durchmars_nt:    { base: 6,  label: 'Durchmars' },
+  heart_durchmars: { base: 12, label: 'Heart Durchmars' },
+  open_durchmars:  { base: 24, label: 'Open Durchmars' },
 }
 
-export function getBidRank(contract, suit) {
-  const sc = suitClass(contract, suit)
-  return LADDER.findIndex(([c, s]) => c === contract && s === sc)
+export function componentLabel(component) {
+  return (TRUMP_COMPONENTS[component] || NO_TRUMP_CONTRACTS[component] || {}).label || component
 }
 
-export function getBidPoints(contract, suit) {
-  const info = CONTRACT_INFO[contract]
-  return info.trump && suit === 'piros' ? info.base * 2 : info.base
+function componentBasePoints(component, color) {
+  if (NO_TRUMP_CONTRACTS[component]) return NO_TRUMP_CONTRACTS[component].base
+  const info = TRUMP_COMPONENTS[component]
+  return color === 'red' ? info.base * 2 : info.base
 }
 
-export function contractLabel(contract) {
-  return CONTRACT_INFO[contract]?.label || contract
+// Validate a chosen trump bundle. Returns { ok, error, scoring, hasParti }.
+export function validateBundle(components) {
+  const comps = [...new Set(components)]
+  if (comps.length === 0) return { ok: false, error: 'Pick at least one contract' }
+  if (comps.includes('forty_hundred') && comps.includes('twenty_hundred')) {
+    return { ok: false, error: 'Only one of 40-100 / 20-100' }
+  }
+  if (comps.includes('durchmars') && comps.length === 1) {
+    return { ok: false, error: 'Durchmars must combine with another' }
+  }
+  const hasParti = comps.every((c) => PARTI_BEARERS.has(c))
+  const scoring = hasParti ? [...comps, 'parti'] : [...comps]
+  return { ok: true, scoring, hasParti }
 }
 
-// Every concrete (contract, suit) bid, in ascending rank order.
-export function enumerateBids() {
-  const bids = []
-  for (const [contract, info] of Object.entries(CONTRACT_INFO)) {
-    if (info.trump) {
-      for (const suit of TRUMP_SUITS) bids.push({ contract, suit })
-    } else {
-      bids.push({ contract, suit: null })
+// Build a normalized declaration object (matches server's public shape).
+export function makeDeclaration(type, { components, color, contract } = {}) {
+  if (type === 'simple') {
+    return { components: ['parti'], scoring: ['parti'], hasParti: true, color, isNoTrump: false }
+  }
+  if (type === 'notrump') {
+    return {
+      components: [contract], scoring: [contract], hasParti: false, color: 'normal',
+      isNoTrump: true, open: contract === 'open_betli' || contract === 'open_durchmars',
     }
   }
-  return bids
-    .map((b) => ({ ...b, rank: getBidRank(b.contract, b.suit), points: getBidPoints(b.contract, b.suit) }))
-    .sort((a, b) => a.rank - b.rank)
+  const v = validateBundle(components)
+  if (!v.ok) return { invalid: true, error: v.error }
+  return { components: [...components], scoring: v.scoring, hasParti: v.hasParti, color, isNoTrump: false }
+}
+
+export function declarationValue(decl) {
+  if (!decl || decl.invalid) return -1
+  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+}
+
+const TIEBREAK = [
+  'parti', 'betli', 'ulti', 'four_aces', 'forty_hundred', 'durchmars_nt',
+  'durchmars', 'twenty_hundred', 'heart_betli', 'heart_durchmars', 'open_betli', 'open_durchmars',
+]
+function tiebreakKey(decl) {
+  return Math.min(...decl.scoring.map((c) => {
+    const i = TIEBREAK.indexOf(c)
+    return i < 0 ? TIEBREAK.length : i
+  }))
+}
+
+export function isHigherDeclaration(next, current) {
+  if (!current) return true
+  const dv = declarationValue(next) - declarationValue(current)
+  if (dv !== 0) return dv > 0
+  return tiebreakKey(next) > tiebreakKey(current)
+}
+
+export function declarationLabel(decl) {
+  if (!decl || decl.invalid) return '—'
+  if (decl.isNoTrump) return componentLabel(decl.components[0])
+  const base = decl.components.map(componentLabel).join(' + ')
+  return decl.color === 'red' ? `${base} (red)` : base
+}
+
+export function declarationMode(decl) {
+  return decl && decl.isNoTrump ? 'notrump' : 'trump'
 }

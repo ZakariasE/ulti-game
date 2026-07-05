@@ -1,0 +1,61 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #2d5a3d;
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 640px;
+  width: 92%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal h2 { color: #f1c40f; }
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  color: #cfe3d4;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pick {
+  background: #37474f;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.pick:hover { background: #546e7a; }
+
+.on {
+  background: #1565c0;
+  outline: 2px solid #42a5f5;
+}
+
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}

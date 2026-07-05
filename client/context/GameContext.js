@@ -14,19 +14,50 @@ const initialState = {
   // Bidding
   currentTurnId: null,
   biddingPhase: null, // 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'DONE'
-  currentHighBid: null,
-  declarer: null, // { id, contract, suit }
-  kontra: { level: 1, lastParty: null },
-  revealedHand: null, // declarer's open hand (open contracts)
+  currentHighBid: null, // { playerId, declaration }
   // Play
+  declaration: null, // public declaration once bidding resolves
+  declarerId: null,
+  trumpSuit: null, // revealed at the opening lead
+  announcedMarriages: [],
+  kontra: {}, // component -> { level, lastParty }
+  kontraOptions: [], // components I may double right now
+  needsOpeningLead: false,
+  openingInfo: null, // { needTrump, availableMarriages } (declarer only)
+  revealedHand: null,
   currentTrick: [],
   completedTricks: [],
   lastTrickWinnerId: null,
   legalCardIds: [],
   scores: {},
   roundResult: null,
-  readyState: null, // { readyCount, total }
+  readyState: null,
   error: null,
+}
+
+function resetForNewRound(state) {
+  return {
+    ...state,
+    phase: 'BIDDING',
+    currentTrick: [],
+    completedTricks: [],
+    lastTrickWinnerId: null,
+    roundResult: null,
+    legalCardIds: [],
+    currentTurnId: null,
+    biddingPhase: null,
+    currentHighBid: null,
+    declaration: null,
+    declarerId: null,
+    trumpSuit: null,
+    announcedMarriages: [],
+    kontra: {},
+    kontraOptions: [],
+    needsOpeningLead: false,
+    openingInfo: null,
+    revealedHand: null,
+    readyState: null,
+  }
 }
 
 function gameReducer(state, action) {
@@ -46,23 +77,7 @@ function gameReducer(state, action) {
       return { ...state, players: action.players }
 
     case 'GAME_STARTED':
-      return {
-        ...state,
-        phase: 'BIDDING',
-        dealerIndex: action.dealerIndex,
-        players: action.players || state.players,
-        currentTrick: [],
-        completedTricks: [],
-        roundResult: null,
-        legalCardIds: [],
-        currentTurnId: null,
-        biddingPhase: null,
-        currentHighBid: null,
-        declarer: null,
-        kontra: { level: 1, lastParty: null },
-        revealedHand: null,
-        readyState: null,
-      }
+      return { ...resetForNewRound(state), dealerIndex: action.dealerIndex, players: action.players || state.players }
 
     case 'HAND_DEALT':
       return { ...state, myHand: action.hand }
@@ -81,20 +96,32 @@ function gameReducer(state, action) {
         ...state,
         phase: 'PLAYING',
         biddingPhase: 'DONE',
-        declarer: { id: action.declarerId, contract: action.contract, suit: action.suit },
+        declaration: action.declaration,
+        declarerId: action.declarerId,
+        trumpSuit: action.declaration?.trumpSuit || null,
       }
 
-    case 'KONTRA_UPDATED':
-      return { ...state, kontra: { level: action.level, lastParty: action.party } }
+    case 'OPENING_INFO':
+      return { ...state, openingInfo: { needTrump: action.needTrump, availableMarriages: action.availableMarriages } }
 
-    case 'DECLARER_REVEALED':
-      return { ...state, revealedHand: action.hand }
+    case 'DECLARER_TRUMP':
+      return { ...state, trumpSuit: action.trumpSuit }
+
+    case 'DECLARER_MARRIAGES':
+      return { ...state, announcedMarriages: action.announcedMarriages }
+
+    case 'KONTRA_UPDATED':
+      return { ...state, kontra: action.kontra }
 
     case 'PLAY_TURN_START':
       return {
         ...state,
         currentTurnId: action.currentPlayerId,
-        lastTrickWinnerId: null, // clear the previous trick's winner banner
+        lastTrickWinnerId: null,
+        needsOpeningLead: action.currentPlayerId === state.myPlayerId ? !!action.needsOpeningLead : false,
+        kontraOptions: action.currentPlayerId === state.myPlayerId ? (action.kontraOptions || []) : [],
+        kontra: action.kontra || state.kontra,
+        trumpSuit: action.trumpSuit ?? state.trumpSuit,
         legalCardIds: action.currentPlayerId === state.myPlayerId ? action.legalCardIds : [],
       }
 
@@ -108,6 +135,8 @@ function gameReducer(state, action) {
             ? state.myHand.filter((c) => c.id !== action.card.id)
             : state.myHand,
         legalCardIds: [],
+        kontraOptions: [],
+        needsOpeningLead: false,
       }
 
     case 'TRICK_COMPLETED':
@@ -115,18 +144,13 @@ function gameReducer(state, action) {
         ...state,
         completedTricks: [...state.completedTricks, { winnerId: action.winnerId }],
         lastTrickWinnerId: action.winnerId,
-        // currentTrick stays briefly visible until the next turn starts
       }
 
+    case 'DECLARER_REVEALED':
+      return { ...state, revealedHand: action.hand }
+
     case 'ROUND_COMPLETED':
-      return {
-        ...state,
-        phase: 'SCORING',
-        roundResult: action.result,
-        scores: action.scores,
-        currentTrick: [],
-        readyState: null,
-      }
+      return { ...state, phase: 'SCORING', roundResult: action.result, scores: action.scores, currentTrick: [], readyState: null }
 
     case 'ROUND_READY':
       return { ...state, readyState: { readyCount: action.readyCount, total: action.total } }
@@ -144,11 +168,7 @@ function gameReducer(state, action) {
 
 export function GameProvider({ children }) {
   const [state, dispatch] = useReducer(gameReducer, initialState)
-  return (
-    <GameContext.Provider value={{ state, dispatch }}>
-      {children}
-    </GameContext.Provider>
-  )
+  return <GameContext.Provider value={{ state, dispatch }}>{children}</GameContext.Provider>
 }
 
 export function useGame() {

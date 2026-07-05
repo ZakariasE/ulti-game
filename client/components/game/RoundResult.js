@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
-import { SUIT_NAMES } from '../../lib/cards'
-import { contractLabel } from '../../lib/bids'
 import styles from '../../styles/RoundResult.module.css'
 
 export default function RoundResult({ roomCode }) {
@@ -25,16 +23,23 @@ export default function RoundResult({ roomCode }) {
       <div className={styles.modal}>
         <h2>Round Over</h2>
         <p>
-          Contract: <strong>{contractLabel(roundResult.contract)}</strong>
-          {roundResult.trumpSuit ? ` (${SUIT_NAMES[roundResult.trumpSuit] || roundResult.trumpSuit})` : ''}
-          {roundResult.kontraLevel > 1 ? ` — stakes ×${roundResult.kontraLevel}` : ''}
+          Declarer: <strong>{declarer?.name}</strong> — card points {roundResult.cardTotal}
         </p>
-        <p>
-          Declarer: <strong>{declarer?.name}</strong> —{' '}
-          <span className={roundResult.won ? styles.win : styles.loss}>
-            {roundResult.won ? 'WON' : 'LOST'}
-          </span>
-        </p>
+
+        <table className={styles.scoreTable}>
+          <thead>
+            <tr><th>Component</th><th>Result</th><th>Stake</th></tr>
+          </thead>
+          <tbody>
+            {roundResult.components.map((c) => (
+              <tr key={c.key}>
+                <td>{c.label}</td>
+                <td className={c.won ? styles.win : styles.loss}>{c.won ? 'won' : 'lost'}</td>
+                <td>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
         <table className={styles.scoreTable}>
           <thead>

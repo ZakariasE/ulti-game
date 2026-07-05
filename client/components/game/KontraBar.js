@@ -1,43 +1,56 @@
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
+import { componentLabel } from '../../lib/bids'
 import styles from '../../styles/KontraBar.module.css'
 
-// Names for each doubling level.
-const LEVEL_NAME = { 2: 'Kontra', 4: 'Rekontra', 8: 'Szubkontra', 16: 'Mordkontra', 32: 'Hirskontra' }
+const LEVEL_NAME = { 2: 'Kontra', 4: 'Rekontra', 8: 'Szubkontra', 16: 'Mordkontra', 32: 'Hirskontra', 64: 'Fedáksári' }
+function nextName(level) { return LEVEL_NAME[level * 2] || `×${level * 2}` }
 
 export default function KontraBar({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { phase, declarer, myPlayerId, completedTricks, kontra } = state
+  const { phase, declaration, kontra, kontraOptions, currentTurnId, myPlayerId } = state
 
-  if (phase !== 'PLAYING' || !declarer) return null
-  // Kontra is only allowed before the first trick is finished.
-  const open = completedTricks.length === 0
+  if (phase !== 'PLAYING' || !declaration) return null
 
-  const isDeclarer = declarer.id === myPlayerId
-  const party = isDeclarer ? 'declarer' : 'defenders'
-  const level = kontra?.level || 1
+  // Components currently above ×1, for display.
+  const doubled = Object.entries(kontra || {}).filter(([, k]) => k.level > 1)
+  const myTurn = currentTurnId === myPlayerId
+  const options = myTurn ? (kontraOptions || []) : []
 
-  // Whose turn to double: defenders open, then it alternates.
-  let canDouble = false
-  if (open) {
-    if (level === 1) canDouble = !isDeclarer // only defenders open
-    else canDouble = kontra.lastParty !== party // the other side may re-double
-  }
-
-  const nextName = LEVEL_NAME[level * 2] || `×${level * 2}`
+  if (doubled.length === 0 && options.length === 0) return null
 
   return (
     <div className={styles.bar}>
-      {level > 1 && (
-        <span className={styles.level}>
-          {LEVEL_NAME[level] || `×${level}`} (stakes ×{level})
+      {doubled.length > 0 && (
+        <span className={styles.levels}>
+          {doubled.map(([c, k]) => (
+            <span key={c} className={styles.levelTag}>
+              {componentLabel(c)} ×{k.level}
+            </span>
+          ))}
         </span>
       )}
-      {canDouble && (
-        <button className={styles.btn} onClick={() => emit('kontra:call', { roomCode })}>
-          {nextName}
-        </button>
+      {options.length > 0 && (
+        <span className={styles.actions}>
+          {options.map((c) => (
+            <button
+              key={c}
+              className={styles.btn}
+              onClick={() => emit('kontra:call', { roomCode, components: [c] })}
+            >
+              {nextName(kontra[c]?.level || 1)} {componentLabel(c)}
+            </button>
+          ))}
+          {options.length > 1 && (
+            <button
+              className={styles.btnAll}
+              onClick={() => emit('kontra:call', { roomCode, components: options })}
+            >
+              Kontra all
+            </button>
+          )}
+        </span>
       )}
     </div>
   )

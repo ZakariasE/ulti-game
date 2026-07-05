@@ -3,21 +3,49 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
+  flex-wrap: wrap;
   min-height: 30px;
 }
 
-.level {
+.levels {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.levelTag {
+  background: rgba(0,0,0,0.35);
   color: #ff8a65;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn {
   background: #c0392b;
   color: #fff;
   font-weight: 700;
-  padding: 6px 18px;
+  padding: 6px 14px;
   border-radius: 6px;
+  font-size: 13px;
 }
 
 .btn:hover { background: #e74c3c; }
+
+.btnAll {
+  background: #8e2b20;
+  color: #fff;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.btnAll:hover { background: #a5342a; }

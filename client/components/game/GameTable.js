@@ -1,11 +1,12 @@
 import { useGame } from '../../context/GameContext'
 import { SUIT_NAMES } from '../../lib/cards'
-import { contractLabel } from '../../lib/bids'
+import { declarationLabel } from '../../lib/bids'
 import OpponentArea from './OpponentArea'
 import TrickArea from './TrickArea'
 import PlayerHand from './PlayerHand'
 import BidPanel from './BidPanel'
 import TalonView from './TalonView'
+import OpeningLead from './OpeningLead'
 import RoundResult from './RoundResult'
 import KontraBar from './KontraBar'
 import RevealedHand from './RevealedHand'
@@ -13,16 +14,14 @@ import styles from '../../styles/GameTable.module.css'
 
 export default function GameTable({ roomCode }) {
   const { state } = useGame()
-  const { players, myPlayerId, scores, phase, declarer, currentTurnId, lastTrickWinnerId } = state
+  const { players, myPlayerId, scores, phase, declaration, declarerId, trumpSuit,
+    announcedMarriages, currentTurnId, lastTrickWinnerId } = state
   const handCounts = state.handCounts || {}
 
   const me = players.find((p) => p.id === myPlayerId)
   const opponents = players.filter((p) => p.id !== myPlayerId)
+  const declarerPlayer = declarerId ? players.find((p) => p.id === declarerId) : null
 
-  const declarerPlayer = declarer ? players.find((p) => p.id === declarer.id) : null
-  const trumpSuit = declarer?.suit
-
-  // Turn / winner banner text
   const myTurn = currentTurnId === myPlayerId
   const turnPlayer = players.find((p) => p.id === currentTurnId)
   const winnerPlayer = players.find((p) => p.id === lastTrickWinnerId)
@@ -35,6 +34,10 @@ export default function GameTable({ roomCode }) {
     bannerClass = myTurn ? styles.bannerMe : styles.bannerWait
   }
 
+  const marriageText = announcedMarriages?.length
+    ? ' · marriages: ' + announcedMarriages.map((m) => `${SUIT_NAMES[m.suit]} +${m.value}`).join(', ')
+    : ''
+
   return (
     <div className={styles.table}>
       <div className={styles.opponents}>
@@ -44,7 +47,7 @@ export default function GameTable({ roomCode }) {
             player={opp}
             cardCount={handCounts[opp.id] ?? 10}
             score={scores[opp.id]}
-            isDeclarer={declarer?.id === opp.id}
+            isDeclarer={declarerId === opp.id}
             isActive={currentTurnId === opp.id}
             wonTrick={lastTrickWinnerId === opp.id}
           />
@@ -52,11 +55,11 @@ export default function GameTable({ roomCode }) {
       </div>
 
       <div className={styles.infoBar}>
-        {declarer ? (
+        {declaration ? (
           <span>
-            Contract: <strong>{contractLabel(declarer.contract)}</strong>
-            {trumpSuit ? ` (${SUIT_NAMES[trumpSuit]})` : ''} — Declarer:{' '}
-            <strong>{declarerPlayer?.name}</strong>
+            <strong>{declarationLabel(declaration)}</strong>
+            {trumpSuit ? ` — trump ${SUIT_NAMES[trumpSuit]}` : ' — trump hidden'}
+            {' '}by <strong>{declarerPlayer?.name}</strong>{marriageText}
           </span>
         ) : (
           <span>Bidding in progress...</span>
@@ -73,11 +76,12 @@ export default function GameTable({ roomCode }) {
 
       {phase === 'BIDDING' && <BidPanel roomCode={roomCode} />}
       <TalonView roomCode={roomCode} />
+      <OpeningLead roomCode={roomCode} />
       <RoundResult roomCode={roomCode} />
 
       <div className={`${styles.myArea} ${myTurn ? styles.myAreaActive : ''}`}>
         <div className={styles.myInfo}>
-          <span>{me?.name} (you){declarer?.id === myPlayerId ? ' 👑 Declarer' : ''}</span>
+          <span>{me?.name} (you){declarerId === myPlayerId ? ' 👑 Declarer' : ''}</span>
           <span>Score: {scores[myPlayerId] ?? 0}</span>
         </div>
         <PlayerHand roomCode={roomCode} />

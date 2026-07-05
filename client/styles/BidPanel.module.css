@@ -57,3 +57,58 @@
 }
 
 .btnSecondary:hover { background: #546e7a; }
+
+.section {
+  border-top: 1px solid rgba(255,255,255,0.12);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9fb4c7;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  background: #37474f;
+  color: #fff;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 16px;
+}
+
+.chip:hover:not(:disabled) { background: #546e7a; }
+
+.chipOn {
+  background: #1565c0;
+  outline: 2px solid #42a5f5;
+}
+
+.chip.red { color: #ff8a80; }
+
+.colorRow {
+  display: flex;
+  gap: 8px;
+}
+
+.preview {
+  font-size: 13px;
+  color: #ddd;
+}
+
+.invalid { color: #ff8a65; }
+
+.hint {
+  font-size: 11px;
+  color: #8fa3b0;
+}
