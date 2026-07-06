@@ -20,6 +20,7 @@
 
 .pos { color: #2ecc71; font-weight: 700; }
 .neg { color: #e74c3c; font-weight: 700; }
+.total { color: #9fb4c7; font-size: 11px; }
 
 .badges { display: flex; gap: 3px; margin-left: 2px; }
 

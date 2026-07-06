@@ -124,6 +124,8 @@ function gameReducer(state, action) {
         dealerIndex: action.dealerIndex,
         players: action.players || state.players,
         options: action.options || state.options,
+        buli: action.buli !== undefined ? action.buli : state.buli,
+        declaredScores: action.declaredScores || state.declaredScores,
       }
 
     case 'HAND_DEALT':

@@ -464,6 +464,7 @@ function startBuli(state) {
   const points = {}
   const kotelezo = {}
   state.players.forEach((p) => { points[p.id] = 0; kotelezo[p.id] = { ulti: false, betli: false } })
+  state.round = 0 // hand counter restarts each buli
   state.buli = {
     index: state.buli ? state.buli.index + 1 : 1,
     handsPlayed: 0,

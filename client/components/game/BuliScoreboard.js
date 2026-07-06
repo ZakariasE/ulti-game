@@ -17,12 +17,14 @@ export default function BuliScoreboard() {
       </span>
       <div className={styles.players}>
         {players.map((p) => {
-          const score = declaredScores?.[p.id] ?? 0
+          const total = declaredScores?.[p.id] ?? 0
+          const buliPts = buli.points?.[p.id] ?? 0
           const k = buli.kotelezo?.[p.id] || { ulti: false, betli: false }
           return (
             <span key={p.id} className={styles.player}>
               <span className={styles.name}>{p.id === myPlayerId ? 'Te' : p.name}</span>
-              <span className={score >= 0 ? styles.pos : styles.neg}>{score >= 0 ? `+${score}` : score}</span>
+              <span className={buliPts >= 0 ? styles.pos : styles.neg}>{buliPts >= 0 ? `+${buliPts}` : buliPts}</span>
+              <span className={styles.total}>(össz {total >= 0 ? `+${total}` : total})</span>
               {kotelezoOn && (
                 <span className={styles.badges}>
                   <span className={k.ulti ? styles.done : styles.todo}>U</span>
