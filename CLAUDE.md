@@ -10,9 +10,9 @@ A web-based multiplayer implementation of **Ulti**, the Hungarian trick-taking c
 
 ---
 
-## Game Rules (Phase 1)
+## Base Game Rules
 
-These are the agreed rules for the current implementation. Edit this section whenever rules change.
+The core 3-player game (all house-rule options off). Edit this section whenever rules change; house-rule variants are in the **House Rules** section below.
 
 ### Deck
 
@@ -57,7 +57,7 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 
 | Component | Base | Win condition |
 |---|---|---|
-| Parti | 1 | Declarer's card points ≥ 50 (of 90 + announced marriages) |
+| Parti | 1 | Declarer's total (own tricks + own marriages) **exceeds** the defenders' total. **Reaching 100** doubles the Parti stake for whichever side wins it. |
 | Ulti | 4 | Win the last trick with the 7 of trumps |
 | 4 Aces (Négy Ász) | 4 | Declarer wins all four aces in tricks |
 | 40-100 | 4 | Card points ≥ 100 incl. an announced 40 (K+O in trump) |
@@ -92,6 +92,9 @@ Each component can be doubled **independently**. Timing follows each player's ow
 
 You may kontra all components or just individual ones.
 
+> Per-component play kontra applies to the **base game only**. Félkezes uses a
+> single hand-wide kontra chain declared at bidding time (see House Rules).
+
 ### Trick-Taking Rules
 
 1. Must follow the led suit if possible.
@@ -105,6 +108,76 @@ You may kontra all components or just individual ones.
 - Cumulative scores tracked across rounds.
 - Dealer rotates anticlockwise each round.
 - All score changes are applied at end of round.
+
+---
+
+## House Rules (options)
+
+When a room is **created**, the host picks options in a modal (`GameOptionsModal`).
+They are normalized in `createGameState` and stored on `state.options`
+(`felkezes`, `buli:{on,handsPerBuli,premium}`, `kotelezo:{on,ultiPenalty,betliPenalty}`,
+`stake`), echoed to all clients, and shown in the waiting room. All four toggles
+are independent, except **Kötelező** is only selectable when Félkezes **and** Buli
+are both on. Defaults: Félkezes off; Buli off, 18 hands/buli, premium 50; Kötelező
+on (Ulti 220 / Betli-40-100 110); stake 1. Base (non-house-rule) play is unchanged
+when everything is off.
+
+### Félkezes ("half-hand")
+
+A two-stage deal + bidding. Every bid is worth **×4** (a normal Parti = 4, red = 8).
+
+1. **Deal 5** cards to each player; the other 17 are held back (`state.reserve`).
+2. **First (5-card) bidding round** (`bidding.mode='felkezes'`, one `BID` phase):
+   - Each turn: **declare, pass, or kontra**. The opener may pass too.
+   - **Named trump:** in Félkezes every trump goal names its concrete suit
+     (Makk/Zöld/Tök/Piros) **at declaration** — no hidden trump. Piros = red (×2).
+   - **Pre-bid redeal:** if the bidding goes **two full go-arounds with no bid**
+     (2n passes), redeal and double the whole-hand value (`redealMultiplier`
+     ×2, compounding; resets when a hand is actually played).
+   - **Bidding-kontra:** a defender (even chain levels) or the declarer (odd)
+     escalates on their turn. Each level is **×4** in this round. The kontra
+     inflates the **value-to-beat** (to outbid, raw value must exceed
+     `rank(current) × kontra-multiplier`); a fresh outbid **clears** the kontra.
+   - **Required-ulti reveal:** announcing an Ulti reveals the announcer's 5 cards
+     to everyone until the second deal (kötelező games).
+3. **Second deal:** the winner gets +7 (→12), each defender +5 (→10); the winner
+   discards 2 (their talon).
+4. **Reopened bidding round** (`bidding.mode='normal'`): plays out **exactly like
+   the base 10-card game** — others may rob the talon and outbid, and the
+   **declarer can change**. The félkezes bid is the value-to-beat. Kontra here is
+   **×2** per level.
+5. **Play.** No per-component kontra. The kontra chain **continues into play** at
+   card-play timing (**×2**/level), shifted earlier by the levels already done in
+   bidding so the first play escalation lands on the actor's **1st card** (e.g. a
+   rekontra on the declarer's opening lead). Card for level L =
+   `max(1, ceil((L+1)/2) − biddingLevels)`.
+6. **Scoring** = component × 4 (félkezes) × 2^k (redeals) × kontra-chain multiplier.
+
+### Buli (a "party" of hands)
+
+A chain of `handsPerBuli` hands. Scoring differs:
+- Only a player's **own declared-hand** deltas are tracked (`declaredScores`);
+  defender results are **not** accumulated. Kept across chained bulis.
+- At buli end, rank the buli's declared points → **+premium to 1st, −premium to
+  last** (middle 0; skipped if all tied), added to `declaredScores`.
+- Then a **`BULI_OVER`** screen offers **Következő buli** (chain, keeping totals)
+  or **Elszámolás**.
+
+### Kötelező mondások (required sayings, per player, Félkezes + Buli)
+
+Each player must, during the buli, declare **one Ulti** and **one Betli or 40-100**.
+Unmet at buli end costs **−220** (Ulti) / **−110** (Betli/40-100), individually.
+
+- The **required Ulti only counts** if the declarer's original 5-card hand holds
+  **≤ 3 cards of the trump suit** (revealed). More than 3 → no credit.
+- Declared with **fewer than 3** trump cards (2 or 1) → the declarer earns a
+  **+10** bonus (**+20** if the Ulti is red) at hand end.
+
+### Elszámolás (settlement)
+
+From the `BULI_OVER` screen: a pure client computation from `declaredScores` and
+the lobby **stake** — each player's net = Σ_{j≠i}(Sᵢ − Sⱼ) × stake (zero-sum),
+plus a pairwise "who pays whom" breakdown.
 
 ---
 
