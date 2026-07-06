@@ -166,13 +166,14 @@ function applyDeclare(state, playerId, payload) {
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
   const felkezesRound = state.bidding.mode === 'felkezes' // 5-card round
-  const felkezesGame = state.options.felkezes
   // 5-card round: single BID phase (declare-or-pass). Normal round: after discard/rob.
   const canDeclare = felkezesRound ? state.bidding.phase === 'BID' : state.bidding.phase === 'DECLARE'
   if (!canDeclare) throw new Error('Not in declare phase')
 
-  // Félkezes game: a trump goal (anything but a no-trump contract) must name its suit.
-  if (felkezesGame && payload.type !== 'notrump' && !MINOR_SUITS.includes(payload.trumpSuit) && payload.trumpSuit !== 'piros') {
+  // Only the 5-card félkezes round names its concrete trump at declaration. The
+  // reopened (teljes kéz) round behaves like the base game: hidden trump, chosen
+  // at the opening lead.
+  if (felkezesRound && payload.type !== 'notrump' && !MINOR_SUITS.includes(payload.trumpSuit) && payload.trumpSuit !== 'piros') {
     throw new Error('Félkezesben meg kell mondani a színt')
   }
 

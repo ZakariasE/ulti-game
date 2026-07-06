@@ -26,8 +26,11 @@ export default function BidPanel({ roomCode }) {
   // A bid made in the 5-card round is ×4; a bid in the reopened round is ×1.
   // (redeal doublings apply to the whole hand regardless.)
   const mult = (biddingMode === 'felkezes' ? 4 : 1) * redeal
-  // In félkezes the concrete suit is named at declaration; it fixes the color.
-  const effColor = felkezes ? (felkTrump === 'piros' ? 'red' : 'normal') : color
+  // Only the 5-card félkezes round names the concrete trump at declaration; the
+  // reopened round works like the base game (color only, suit at first lead).
+  const namedTrump = felkezes && biddingMode === 'felkezes'
+  // In the 5-card round the named suit fixes the color; otherwise use the toggle.
+  const effColor = namedTrump ? (felkTrump === 'piros' ? 'red' : 'normal') : color
   const isMyTurn = currentTurnId === myPlayerId
   const currentDecl = currentHighBid?.declaration
   // The standing bid's value uses ITS round's ×4 factor.
@@ -95,8 +98,8 @@ export default function BidPanel({ roomCode }) {
   const candidate = picked.length === 0
     ? makeDeclaration('simple', { color: effColor })
     : makeDeclaration('trump', { components: picked, color: effColor })
-  // Félkezes requires a named trump suit before you can declare.
-  const suitReady = !felkezes || !!felkTrump
+  // The 5-card round requires a named trump suit before you can declare.
+  const suitReady = !namedTrump || !!felkTrump
   const candValid = !candidate.invalid && suitReady && discardReady
   const candHigher = candValid && isHigherDeclaration(candidate, currentDecl)
 
@@ -111,7 +114,7 @@ export default function BidPanel({ roomCode }) {
   }
 
   function declareTrump() {
-    const trumpSuit = felkezes ? felkTrump : undefined
+    const trumpSuit = namedTrump ? felkTrump : undefined
     commitDiscardIfNeeded()
     if (picked.length === 0) emit('bid:declare', { roomCode, type: 'simple', color: effColor, trumpSuit })
     else emit('bid:declare', { roomCode, type: 'trump', components: picked, color: effColor, trumpSuit })
@@ -142,7 +145,7 @@ export default function BidPanel({ roomCode }) {
             </button>
           ))}
         </div>
-        {felkezes ? (
+        {namedTrump ? (
           <div className={styles.colorRow}>
             {FELKEZES_SUITS.map((s) => (
               <button
@@ -163,11 +166,11 @@ export default function BidPanel({ roomCode }) {
         <div className={styles.preview}>
           {candidate.invalid
             ? <span className={styles.invalid}>{candidate.error}</span>
-            : felkezes && !felkTrump
+            : namedTrump && !felkTrump
               ? <span className={styles.invalid}>Válassz színt</span>
               : !discardReady
                 ? <span className={styles.invalid}>Válassz 2 eldobandó lapot (lent)</span>
-                : <>Bemondás: <strong>{picked.length === 0 ? (effColor === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate)}</strong>{felkezes ? ` — ${SUIT_NAMES[felkTrump]}` : ''} — {declarationValue(candidate) * mult} pont</>}
+                : <>Bemondás: <strong>{picked.length === 0 ? (effColor === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate)}</strong>{namedTrump ? ` — ${SUIT_NAMES[felkTrump]}` : ''} — {declarationValue(candidate) * mult} pont</>}
         </div>
         <div className={styles.actions}>
           <button className={styles.btnPrimary} disabled={!candHigher} onClick={declareTrump}>
@@ -179,7 +182,7 @@ export default function BidPanel({ roomCode }) {
           )}
         </div>
         <p className={styles.hint}>
-          {felkezes
+          {namedTrump
             ? 'Félkezesben azonnal meg kell mondani a színt (adut).'
             : 'Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu.'}
         </p>
