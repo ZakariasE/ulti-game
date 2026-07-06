@@ -745,26 +745,14 @@ function applyClaimAll(state) {
   return applyRoundEnd(state)
 }
 
-// ── Félkezes play-kontra (hand-wide chain continued from bidding) ──────────────
+// ── Félkezes play-kontra (retired — see below) ─────────────────────────────────
 
-// The card on which the escalation creating `nextLevel` may be played by its
-// party — the same timing as the base game's per-card kontra: a defender's
-// kontra on their 1st card, the declarer's rekontra on their 2nd card, etc.
-// (A kontra already made in the 5-card round does NOT shift this earlier.)
-function _felkezesKontraCard(nextLevel) {
-  return Math.ceil((nextLevel + 1) / 2)
-}
-
-// Which side raises the NEXT level, and whether `playerId` may do so right now.
-function felkezesKontraEligible(state, playerId) {
-  if (!state.options.felkezes || !state.play || state.phase !== 'PLAYING') return false
-  const bk = state.play.biddingKontra
-  if (!bk) return false
-  const party = bk.level % 2 === 0 ? 'defenders' : 'declarer'
-  const myParty = playerId === state.play.declarerId ? 'declarer' : 'defenders'
-  if (myParty !== party) return false
-  const myCardNum = state.play.cardsPlayed[playerId] + 1
-  return myCardNum === _felkezesKontraCard(bk.level + 1)
+// Hand-wide play kontra is retired: play-time kontra is now per-component in
+// every mode (see eligibleKontra). A kontra made during the 5-card félkezes
+// auction (applyBiddingKontra) stays as a frozen hand-wide multiplier; it is no
+// longer escalated during play.
+function felkezesKontraEligible() {
+  return false
 }
 
 // Escalate the hand-wide kontra as the player is about to play a card (×2/level).
@@ -833,8 +821,6 @@ function marriageOptionsFor(state, playerId) {
 // True if the given player currently has any component they may double.
 function eligibleKontra(state, playerId) {
   if (!state.play || state.phase !== 'PLAYING') return []
-  // Félkezes uses the hand-wide bidding/play kontra, not per-component doubling.
-  if (state.options.felkezes) return []
   const player = state.players.find((p) => p.id === playerId)
   const { currentTrick } = state.play
   const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
