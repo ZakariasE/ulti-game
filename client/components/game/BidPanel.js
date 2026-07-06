@@ -5,7 +5,10 @@ import {
   CHOOSABLE, NO_TRUMP_CONTRACTS, componentLabel, makeDeclaration,
   declarationValue, declarationLabel, isHigherDeclaration,
 } from '../../lib/bids'
+import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/BidPanel.module.css'
+
+const FELKEZES_SUITS = ['makk', 'zold', 'tok', 'piros']
 
 export default function BidPanel({ roomCode }) {
   const { state } = useGame()
@@ -14,9 +17,12 @@ export default function BidPanel({ roomCode }) {
 
   const [picked, setPicked] = useState([]) // chosen trump components
   const [color, setColor] = useState('normal')
+  const [felkTrump, setFelkTrump] = useState(null) // félkezes: concrete trump suit
 
   const felkezes = !!options?.felkezes
   const mult = felkezes ? 4 : 1 // félkezes: every bid is worth 4×
+  // In félkezes the concrete suit is named at declaration; it fixes the color.
+  const effColor = felkezes ? (felkTrump === 'piros' ? 'red' : 'normal') : color
   const isMyTurn = currentTurnId === myPlayerId
   const currentDecl = currentHighBid?.declaration
   const highBidText = currentDecl
@@ -64,9 +70,11 @@ export default function BidPanel({ roomCode }) {
 
   // Build the candidate trump declaration from the current picks.
   const candidate = picked.length === 0
-    ? makeDeclaration('simple', { color })
-    : makeDeclaration('trump', { components: picked, color })
-  const candValid = !candidate.invalid
+    ? makeDeclaration('simple', { color: effColor })
+    : makeDeclaration('trump', { components: picked, color: effColor })
+  // Félkezes requires a named trump suit before you can declare.
+  const suitReady = !felkezes || !!felkTrump
+  const candValid = !candidate.invalid && suitReady
   const candHigher = candValid && isHigherDeclaration(candidate, currentDecl)
 
   function toggle(comp) {
@@ -74,9 +82,11 @@ export default function BidPanel({ roomCode }) {
   }
 
   function declareTrump() {
-    if (picked.length === 0) emit('bid:declare', { roomCode, type: 'simple', color })
-    else emit('bid:declare', { roomCode, type: 'trump', components: picked, color })
+    const trumpSuit = felkezes ? felkTrump : undefined
+    if (picked.length === 0) emit('bid:declare', { roomCode, type: 'simple', color: effColor, trumpSuit })
+    else emit('bid:declare', { roomCode, type: 'trump', components: picked, color: effColor, trumpSuit })
     setPicked([])
+    setFelkTrump(null)
   }
 
   function declareNoTrump(contract) {
@@ -101,14 +111,30 @@ export default function BidPanel({ roomCode }) {
             </button>
           ))}
         </div>
-        <div className={styles.colorRow}>
-          <button className={`${styles.chip} ${color === 'normal' ? styles.chipOn : ''}`} onClick={() => setColor('normal')}>Sima</button>
-          <button className={`${styles.chip} ${styles.red} ${color === 'red' ? styles.chipOn : ''}`} onClick={() => setColor('red')}>Piros ♥ (×2)</button>
-        </div>
+        {felkezes ? (
+          <div className={styles.colorRow}>
+            {FELKEZES_SUITS.map((s) => (
+              <button
+                key={s}
+                className={`${styles.chip} ${s === 'piros' ? styles.red : ''} ${felkTrump === s ? styles.chipOn : ''}`}
+                onClick={() => setFelkTrump(s)}
+              >
+                {SUIT_NAMES[s]}{s === 'piros' ? ' ♥ (×2)' : ''}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.colorRow}>
+            <button className={`${styles.chip} ${color === 'normal' ? styles.chipOn : ''}`} onClick={() => setColor('normal')}>Sima</button>
+            <button className={`${styles.chip} ${styles.red} ${color === 'red' ? styles.chipOn : ''}`} onClick={() => setColor('red')}>Piros ♥ (×2)</button>
+          </div>
+        )}
         <div className={styles.preview}>
-          {candValid
-            ? <>Bemondás: <strong>{picked.length === 0 ? (color === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate)}</strong> — {declarationValue(candidate) * mult} pont</>
-            : <span className={styles.invalid}>{candidate.error}</span>}
+          {candidate.invalid
+            ? <span className={styles.invalid}>{candidate.error}</span>
+            : felkezes && !felkTrump
+              ? <span className={styles.invalid}>Válassz színt</span>
+              : <>Bemondás: <strong>{picked.length === 0 ? (effColor === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate)}</strong>{felkezes ? ` — ${SUIT_NAMES[felkTrump]}` : ''} — {declarationValue(candidate) * mult} pont</>}
         </div>
         <div className={styles.actions}>
           <button className={styles.btnPrimary} disabled={!candHigher} onClick={declareTrump}>
@@ -118,7 +144,11 @@ export default function BidPanel({ roomCode }) {
             <button className={styles.btnSecondary} onClick={() => emit('bid:pass', { roomCode })}>Passz</button>
           )}
         </div>
-        <p className={styles.hint}>Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu.</p>
+        <p className={styles.hint}>
+          {felkezes
+            ? 'Félkezesben azonnal meg kell mondani a színt (adut).'
+            : 'Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu.'}
+        </p>
       </div>
 
       <div className={styles.section}>

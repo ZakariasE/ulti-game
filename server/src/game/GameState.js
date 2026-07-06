@@ -132,11 +132,12 @@ function applyBidDiscard(state, playerId, cardIds) {
   return null
 }
 
-// payload: { type:'simple', color } | { type:'trump', components, color } | { type:'notrump', contract }
+// payload: { type:'simple', color, trumpSuit? } | { type:'trump', components, color, trumpSuit? }
+//        | { type:'notrump', contract }   (trumpSuit is the concrete suit in félkezes)
 function _declarationFromPayload(payload) {
-  if (payload.type === 'simple') return simpleDeclaration(payload.color)
+  if (payload.type === 'simple') return simpleDeclaration(payload.color, payload.trumpSuit)
   if (payload.type === 'notrump') return noTrumpDeclaration(payload.contract)
-  if (payload.type === 'trump') return buildDeclaration(payload.components, payload.color)
+  if (payload.type === 'trump') return buildDeclaration(payload.components, payload.color, payload.trumpSuit)
   throw new Error('Invalid declaration')
 }
 
@@ -151,6 +152,11 @@ function applyDeclare(state, playerId, payload) {
     ? (state.bidding.phase === 'DECLARE' || state.bidding.phase === 'BID')
     : state.bidding.phase === 'DECLARE'
   if (!canDeclare) throw new Error('Not in declare phase')
+
+  // Félkezes: a trump goal (anything but a no-trump contract) must name its suit.
+  if (felkezes && payload.type !== 'notrump' && !MINOR_SUITS.includes(payload.trumpSuit) && payload.trumpSuit !== 'piros') {
+    throw new Error('Félkezesben meg kell mondani a színt')
+  }
 
   const declaration = _declarationFromPayload(payload)
   const current = state.bidding.currentHighBid
@@ -306,8 +312,9 @@ function applyFirstLead(state, playerId, cardId, trumpSuit, announcedSuits = [])
   if (playerId !== state.play.declarerId) throw new Error('Only the declarer leads first')
   if (state.play.openingLeadDone) throw new Error('Opening lead already played')
 
-  // Choose trump for a normal trump declaration.
-  if (!decl.isNoTrump && decl.color === 'normal') {
+  // Choose trump for a hidden-trump declaration. In félkezes the suit was named
+  // at declaration (decl.trumpSuit already set), so nothing to choose here.
+  if (!decl.isNoTrump && !decl.trumpSuit) {
     if (!MINOR_SUITS.includes(trumpSuit)) throw new Error('Pick a trump suit (Makk, Zöld or Tök)')
     decl.trumpSuit = trumpSuit
   }
@@ -738,7 +745,9 @@ function publicDeclaration(decl) {
     color: decl.color,
     isNoTrump: decl.isNoTrump,
     open: decl.open,
-    trumpSuit: decl.color === 'red' ? 'piros' : null,
+    // Concrete in félkezes (named at declaration); null while a minor trump is
+    // still hidden in normal bidding; piros for red.
+    trumpSuit: decl.trumpSuit,
     label: declarationLabel(decl),
   }
 }

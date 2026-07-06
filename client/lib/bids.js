@@ -52,9 +52,11 @@ export function validateBundle(components) {
 }
 
 // Build a normalized declaration object (matches server's public shape).
-export function makeDeclaration(type, { components, color, contract } = {}) {
+// `trumpSuit` (félkezes) names the concrete suit and determines the color.
+export function makeDeclaration(type, { components, color, contract, trumpSuit } = {}) {
+  const c = trumpSuit ? (trumpSuit === 'piros' ? 'red' : 'normal') : color
   if (type === 'simple') {
-    return { components: ['parti'], scoring: ['parti'], hasParti: true, color, isNoTrump: false }
+    return { components: ['parti'], scoring: ['parti'], hasParti: true, color: c, trumpSuit: trumpSuit || null, isNoTrump: false }
   }
   if (type === 'notrump') {
     return {
@@ -64,7 +66,7 @@ export function makeDeclaration(type, { components, color, contract } = {}) {
   }
   const v = validateBundle(components)
   if (!v.ok) return { invalid: true, error: v.error }
-  return { components: [...components], scoring: v.scoring, hasParti: v.hasParti, color, isNoTrump: false }
+  return { components: [...components], scoring: v.scoring, hasParti: v.hasParti, color: c, trumpSuit: trumpSuit || null, isNoTrump: false }
 }
 
 export function declarationValue(decl) {

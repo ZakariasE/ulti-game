@@ -28,9 +28,22 @@ function isNoTrumpContract(key) {
   return Object.prototype.hasOwnProperty.call(NO_TRUMP_CONTRACTS, key)
 }
 
-// Build & validate a trump declaration from chosen components + color.
+const DECLARABLE_SUITS = ['makk', 'zold', 'tok', 'piros']
+
+// Resolve the color + concrete trump. When a concrete suit is given (félkezes,
+// where the trump is named at declaration), it fixes both; otherwise fall back
+// to the color (a minor is chosen at the first lead — hidden trump).
+function _resolveTrump(color, trumpSuit) {
+  if (trumpSuit) {
+    if (!DECLARABLE_SUITS.includes(trumpSuit)) throw new Error('Invalid trump suit')
+    return { color: trumpSuit === 'piros' ? 'red' : 'normal', trumpSuit }
+  }
+  return { color: color === 'red' ? 'red' : 'normal', trumpSuit: color === 'red' ? 'piros' : null }
+}
+
+// Build & validate a trump declaration from chosen components + color/trump.
 // Throws on an illegal combination. Returns a normalized declaration.
-function buildDeclaration(components, color) {
+function buildDeclaration(components, color, trumpSuit) {
   const comps = [...new Set(components)]
   if (comps.length === 0) throw new Error('Pick at least one contract')
   for (const c of comps) {
@@ -43,26 +56,28 @@ function buildDeclaration(components, color) {
   // Parti is bundled only when every chosen component is a parti-bearer.
   const hasParti = comps.every((c) => PARTI_BEARERS.has(c))
   const scoring = hasParti ? [...comps, 'parti'] : [...comps]
+  const t = _resolveTrump(color, trumpSuit)
 
   return {
     components: comps,
     scoring,               // components that actually score (incl. parti)
     hasParti,
-    color: color === 'red' ? 'red' : 'normal',
-    trumpSuit: color === 'red' ? 'piros' : null, // minor chosen at first lead
+    color: t.color,
+    trumpSuit: t.trumpSuit, // concrete in félkezes; minor chosen at first lead otherwise
     isNoTrump: false,
     open: false,
   }
 }
 
 // A "simple" (parti-only) declaration.
-function simpleDeclaration(color) {
+function simpleDeclaration(color, trumpSuit) {
+  const t = _resolveTrump(color, trumpSuit)
   return {
     components: ['parti'],
     scoring: ['parti'],
     hasParti: true,
-    color: color === 'red' ? 'red' : 'normal',
-    trumpSuit: color === 'red' ? 'piros' : null,
+    color: t.color,
+    trumpSuit: t.trumpSuit,
     isNoTrump: false,
     open: false,
   }
