@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { SUIT_NAMES } from '../../lib/cards'
 import { declarationLabel } from '../../lib/bids'
@@ -10,6 +11,7 @@ import TrumpChoice from './TrumpChoice'
 import RoundResult from './RoundResult'
 import BuliResult from './BuliResult'
 import BuliScoreboard from './BuliScoreboard'
+import Elszamolas from './Elszamolas'
 import KontraBar from './KontraBar'
 import MarriageBar from './MarriageBar'
 import ClaimBar from './ClaimBar'
@@ -20,6 +22,7 @@ import styles from '../../styles/GameTable.module.css'
 
 export default function GameTable({ roomCode }) {
   const { state } = useGame()
+  const [showElszamolas, setShowElszamolas] = useState(false)
   const { players, myPlayerId, scores, phase, declaration, declarerId, trumpSuit,
     currentTurnId, lastTrickWinnerId } = state
   const handCounts = state.handCounts || {}
@@ -105,7 +108,10 @@ export default function GameTable({ roomCode }) {
       {phase === 'BIDDING' && <BidPanel roomCode={roomCode} />}
       <TrumpChoice />
       <RoundResult roomCode={roomCode} />
-      <BuliResult roomCode={roomCode} />
+      <BuliResult roomCode={roomCode} onElszamolas={() => setShowElszamolas(true)} />
+      {showElszamolas && phase === 'BULI_OVER' && (
+        <Elszamolas onClose={() => setShowElszamolas(false)} />
+      )}
 
       <div className={`${styles.myArea} ${myTurn ? styles.myAreaActive : ''}`}>
         <div className={styles.myInfo}>
