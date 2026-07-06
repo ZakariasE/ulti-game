@@ -91,9 +91,10 @@ export default function RoundResult({ roomCode }) {
           </thead>
           <tbody>
             {players.map((p) => {
-              // In buli mode only the declarer's points are tracked.
+              // In buli mode only the declarer's own RAW points are tracked
+              // (pairwise is applied at Elszámolás).
               const delta = buliMode
-                ? (p.id === roundResult.declarerId ? (roundResult.deltas[p.id] || 0) : 0)
+                ? (p.id === roundResult.declarerId ? (roundResult.declarerRaw || 0) : 0)
                 : (roundResult.deltas[p.id] || 0)
               const total = buliMode ? (declaredScores[p.id] ?? 0) : (scores[p.id] ?? 0)
               return (

@@ -13,7 +13,7 @@ const FELKEZES_SUITS = ['makk', 'zold', 'tok', 'piros']
 export default function BidPanel({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { currentTurnId, biddingPhase, currentHighBid, myPlayerId, players, options,
+  const { currentTurnId, biddingPhase, biddingMode, currentHighBid, myPlayerId, players, options,
     redealMultiplier, biddingKontra } = state
 
   const [picked, setPicked] = useState([]) // chosen trump components
@@ -35,7 +35,8 @@ export default function BidPanel({ roomCode }) {
   // Can I escalate the kontra right now? (my turn, a bid exists, my side's step)
   const nextParty = kontra.level % 2 === 0 ? 'defenders' : 'declarer'
   const myParty = currentHighBid && currentHighBid.playerId === myPlayerId ? 'declarer' : 'defenders'
-  const canKontra = felkezes && isMyTurn && !!currentHighBid && nextParty === myParty
+  // Bidding-kontra is only in the 5-card round; in the reopened round it waits for play.
+  const canKontra = felkezes && biddingMode === 'felkezes' && isMyTurn && !!currentHighBid && nextParty === myParty
   const nextKontraName = kontraLevelName(2 ** (kontra.level + 1))
   const kontraBtn = canKontra
     ? <button className={styles.btnSecondary} onClick={() => emit('bid:kontra', { roomCode })}>{nextKontraName}</button>

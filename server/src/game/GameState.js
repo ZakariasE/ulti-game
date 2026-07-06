@@ -232,7 +232,11 @@ function applyBidPass(state, playerId) {
     return { biddingComplete: false }
   }
 
-  if (state.bidding.consecutivePasses >= n && state.bidding.currentHighBid) {
+  // In the 5-card round the last declarer/kontra-er gets no redundant final turn:
+  // once the other two pass (n-1), bidding closes. The base/reopened round keeps
+  // the high bidder's final turn (n passes).
+  const closeThreshold = felkezesRound ? n - 1 : n
+  if (state.bidding.consecutivePasses >= closeThreshold && state.bidding.currentHighBid) {
     return felkezesRound ? _felkezesSecondDeal(state) : _resolveBidding(state)
   }
 
@@ -248,9 +252,9 @@ function applyBiddingKontra(state, playerId) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  const felkezesRound = state.bidding.mode === 'felkezes'
-  const validPhase = felkezesRound ? state.bidding.phase === 'BID' : state.bidding.phase === 'ROB_OFFER'
-  if (!validPhase) throw new Error('Cannot kontra now')
+  // Bidding-kontra lives only in the 5-card round (×4). In the reopened round the
+  // kontra chain continues in play instead.
+  if (state.bidding.mode !== 'felkezes' || state.bidding.phase !== 'BID') throw new Error('Cannot kontra now')
   if (!state.bidding.currentHighBid) throw new Error('Nothing to kontra')
 
   const k = state.bidding.kontra
@@ -260,7 +264,7 @@ function applyBiddingKontra(state, playerId) {
   if (myParty !== nextParty) throw new Error('Not your side to double now')
 
   k.level += 1
-  k.multiplier *= felkezesRound ? 4 : 2
+  k.multiplier *= 4 // 5-card round levels are ×4
   k.lastParty = myParty
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'kontra', level: k.level })
@@ -527,8 +531,9 @@ function applyRoundEnd(state) {
   const declarerId = state.play.declarerId
   const buliOn = state.options.buli.on && state.buli
   if (buliOn) {
-    // Buli: track ONLY the declarer's own points; defender results are not accumulated.
-    let d = result.deltas[declarerId] || 0
+    // Buli: track ONLY the declarer's own RAW points (one unit, not the pairwise
+    // ×2 — the pairwise expansion is done at Elszámolás).
+    let d = result.declarerRaw || 0
     // Required-ulti bonus: a lean-trump (<3) 5-card ulti earns +10 (+20 red).
     const bonus = _requiredUltiBonus(state, state.play.declaration)
     if (bonus) {
@@ -725,10 +730,11 @@ function applyClaimAll(state) {
 // ── Félkezes play-kontra (hand-wide chain continued from bidding) ──────────────
 
 // The card on which the escalation creating `nextLevel` may be played by its
-// party — normal timing (ceil((L+1)/2)) shifted earlier by the levels already
-// done in bidding, so the first play escalation lands on the actor's 1st card.
-function _felkezesKontraCard(nextLevel, biddingLevels) {
-  return Math.max(1, Math.ceil((nextLevel + 1) / 2) - biddingLevels)
+// party — the same timing as the base game's per-card kontra: a defender's
+// kontra on their 1st card, the declarer's rekontra on their 2nd card, etc.
+// (A kontra already made in the 5-card round does NOT shift this earlier.)
+function _felkezesKontraCard(nextLevel) {
+  return Math.ceil((nextLevel + 1) / 2)
 }
 
 // Which side raises the NEXT level, and whether `playerId` may do so right now.
@@ -740,7 +746,7 @@ function felkezesKontraEligible(state, playerId) {
   const myParty = playerId === state.play.declarerId ? 'declarer' : 'defenders'
   if (myParty !== party) return false
   const myCardNum = state.play.cardsPlayed[playerId] + 1
-  return myCardNum === _felkezesKontraCard(bk.level + 1, bk.biddingLevels)
+  return myCardNum === _felkezesKontraCard(bk.level + 1)
 }
 
 // Escalate the hand-wide kontra as the player is about to play a card (×2/level).

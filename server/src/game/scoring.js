@@ -131,7 +131,11 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, delta: won ? payout : -payout }
   })
 
-  return { components, deltas, cardTotal, partiDetail, declarerId, color: declaration.color, stakeMultiplier }
+  // Raw per-defender total for the declarer (one "unit", not the pairwise ×2).
+  // Buli mode tracks this; the pairwise expansion happens only at settlement.
+  const declarerRaw = components.reduce((s, c) => s + c.delta, 0)
+
+  return { components, deltas, declarerRaw, cardTotal, partiDetail, declarerId, color: declaration.color, stakeMultiplier }
 }
 
 module.exports = { calculateRoundScore }

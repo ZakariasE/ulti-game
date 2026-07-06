@@ -5,15 +5,20 @@ import styles from '../../styles/BuliScoreboard.module.css'
 // player's running declaredScore, and their kötelező obligations.
 export default function BuliScoreboard() {
   const { state } = useGame()
-  const { options, buli, declaredScores, players, myPlayerId } = state
+  const { options, buli, declaredScores, players, myPlayerId, phase } = state
 
   if (!options?.buli?.on || !buli) return null
   const kotelezoOn = !!options?.kotelezo?.on
+  // Show the hand currently in progress (1-indexed); during scoring show the one
+  // just finished.
+  const handNo = phase === 'BIDDING' || phase === 'PLAYING'
+    ? Math.min(buli.handsPlayed + 1, buli.handsPerBuli)
+    : buli.handsPlayed
 
   return (
     <div className={styles.bar}>
       <span className={styles.label}>
-        Buli #{buli.index} · {buli.handsPlayed}/{buli.handsPerBuli} leosztás
+        Buli #{buli.index} · {handNo}/{buli.handsPerBuli} leosztás
       </span>
       <div className={styles.players}>
         {players.map((p) => {
