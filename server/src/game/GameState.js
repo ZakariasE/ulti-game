@@ -204,6 +204,8 @@ function _felkezesSecondDeal(state) {
   const { playerId: declarerId } = state.bidding.currentHighBid
   const declarer = state.players.find((p) => p.id === declarerId)
   const reserve = state.reserve
+  // Snapshot the original 5-card hand (for the required-ulti trump-count rule).
+  state.bidding.declarerFive = state.hands[declarerId].slice()
   state.hands[declarerId] = [...state.hands[declarerId], ...reserve.slice(0, 7)]
   let idx = 7
   state.players.filter((p) => p.id !== declarerId).forEach((p) => {
@@ -248,6 +250,7 @@ function _startPlay(state, declarerId, declaration) {
     cardsPlayed,
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
     claim: null, // { responses } while a "nincs több ütés" claim is pending
+    declarerFive: state.bidding.declarerFive || null, // félkezes original 5-card hand
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, declaration }
@@ -434,7 +437,13 @@ function applyRoundEnd(state) {
   const buliOn = state.options.buli.on && state.buli
   if (buliOn) {
     // Buli: track ONLY the declarer's own points; defender results are not accumulated.
-    const d = result.deltas[declarerId] || 0
+    let d = result.deltas[declarerId] || 0
+    // Required-ulti bonus: a lean-trump (<3) 5-card ulti earns +10 (+20 red).
+    const bonus = _requiredUltiBonus(state, state.play.declaration)
+    if (bonus) {
+      d += bonus
+      result.ultiBonus = { playerId: declarerId, amount: bonus }
+    }
     state.declaredScores[declarerId] = (state.declaredScores[declarerId] || 0) + d
     state.buli.points[declarerId] = (state.buli.points[declarerId] || 0) + d
     state.buli.handsPlayed++
@@ -476,10 +485,30 @@ function startBuli(state) {
   }
 }
 
+// Cards of the trump suit held in the declarer's original 5-card hand, or null
+// if unknown (non-félkezes / trump not chosen).
+function _ultiTrumpCount(state, declaration) {
+  const five = state.play.declarerFive
+  if (!five || !declaration.trumpSuit) return null
+  return five.filter((c) => c.suit === declaration.trumpSuit).length
+}
+
+// A required ulti with <3 trump cards in the 5-card hand pays +10 (+20 red).
+function _requiredUltiBonus(state, declaration) {
+  if (!state.options.kotelezo.on || !declaration.scoring.includes('ulti')) return 0
+  const count = _ultiTrumpCount(state, declaration)
+  if (count === null || count >= 3) return 0
+  return declaration.color === 'red' ? 20 : 10
+}
+
 // Kötelező mondások: record that the declarer said an Ulti / Betli-40-100.
+// The required Ulti only counts with ≤3 trump cards in the 5-card hand.
 function _markKotelezo(state, declarerId, declaration) {
   const k = state.buli.kotelezo[declarerId] || (state.buli.kotelezo[declarerId] = { ulti: false, betli: false })
-  if (declaration.scoring.includes('ulti')) k.ulti = true
+  if (declaration.scoring.includes('ulti')) {
+    const count = _ultiTrumpCount(state, declaration)
+    if (count === null || count <= 3) k.ulti = true
+  }
   if (declaration.scoring.some((s) => KOTELEZO_BETLI_KEYS.has(s))) k.betli = true
 }
 

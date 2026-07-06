@@ -241,6 +241,12 @@ function _announceResolved(io, roomCode, state, result) {
     needTrump: !decl.isNoTrump && decl.color === 'normal',
     availableMarriages: availableMarriages(state.hands[result.declarerId]),
   })
+  // Required ulti: reveal the declarer's original 5-card hand to everyone.
+  if (state.play.declarerFive && state.options.kotelezo.on && decl.scoring.includes('ulti')) {
+    io.to(roomCode).emit('felkezes:reveal', {
+      playerId: result.declarerId, cards: state.play.declarerFive,
+    })
+  }
   _promptNextTurn(io, roomCode, state)
 }
 

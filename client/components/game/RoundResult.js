@@ -32,6 +32,12 @@ export default function RoundResult({ roomCode }) {
           Felvevő: <strong>{declarer?.name}</strong> — pont: {roundResult.cardTotal}
         </p>
 
+        {roundResult.ultiBonus && (
+          <p className={styles.pos}>
+            Kötelező ulti bónusz (kevés adu): +{roundResult.ultiBonus.amount}
+          </p>
+        )}
+
         {roundResult.partiDetail && (
           <div className={styles.parti}>
             <div className={styles.partiTitle}>Parti részletezés</div>

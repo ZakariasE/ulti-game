@@ -54,6 +54,7 @@ const initialState = {
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
   needsOpeningLead: false,
   revealedHand: null,
+  felkezesReveal: null, // { playerId, cards } — required-ulti 5-card reveal
   claim: null, // { declarerId } while a "nincs több ütés" claim awaits defender votes
   claimVote: null, // this player's own vote ('yes' | 'no') on a pending claim
   currentTrick: [],
@@ -93,6 +94,7 @@ function resetForNewRound(state) {
     marriagesByPlayer: {},
     needsOpeningLead: false,
     revealedHand: null,
+    felkezesReveal: null,
     claim: null,
     claimVote: null,
     readyState: null,
@@ -262,6 +264,9 @@ function gameReducer(state, action) {
 
     case 'DECLARER_REVEALED':
       return { ...state, revealedHand: action.hand }
+
+    case 'FELKEZES_REVEAL':
+      return { ...state, felkezesReveal: { playerId: action.playerId, cards: action.cards } }
 
     case 'CLAIM_PENDING':
       return { ...state, claim: { declarerId: action.declarerId }, claimVote: null }

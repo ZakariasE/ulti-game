@@ -16,6 +16,7 @@ import KontraBar from './KontraBar'
 import MarriageBar from './MarriageBar'
 import ClaimBar from './ClaimBar'
 import RevealedHand from './RevealedHand'
+import FelkezesReveal from './FelkezesReveal'
 import Announcements from './Announcements'
 import ErrorToast from './ErrorToast'
 import styles from '../../styles/GameTable.module.css'
@@ -102,6 +103,7 @@ export default function GameTable({ roomCode }) {
       <MarriageBar />
       <ClaimBar roomCode={roomCode} />
       <RevealedHand />
+      <FelkezesReveal />
 
       <TrickArea />
 
