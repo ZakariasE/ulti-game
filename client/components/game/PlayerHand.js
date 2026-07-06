@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useSocket } from '../../context/SocketContext'
 import { useGame } from '../../context/GameContext'
 import { sortHand } from '../../lib/cards'
@@ -8,12 +8,12 @@ import styles from '../../styles/PlayerHand.module.css'
 
 export default function PlayerHand({ roomCode }) {
   const { emit } = useSocket()
-  const { state } = useGame()
+  const { state, dispatch } = useGame()
   const { myHand, legalCardIds, phase, biddingPhase, currentTurnId, myPlayerId,
     declaration, trumpSuit, pendingTrump, needsOpeningLead, pendingMarriages,
-    pendingKontra, pendingFelkezesKontra, talonCardIds } = state
+    pendingKontra, pendingFelkezesKontra, pendingDiscard, talonCardIds } = state
 
-  const [discardSel, setDiscardSel] = useState([])
+  const discardSel = pendingDiscard || []
 
   const myPlayTurn = phase === 'PLAYING' && currentTurnId === myPlayerId
   // The declarer's very first card is the opening lead (played inline now).
@@ -24,11 +24,12 @@ export default function PlayerHand({ roomCode }) {
   const effectiveTrump = trumpSuit || pendingTrump
   const trumpReady = !needTrump || !!effectiveTrump
   const canPlay = myPlayTurn && (!openingLead || trumpReady)
-  // Discarding: the talon holder (normal) or the declarer after the félkezes
-  // second deal picks 2 cards straight from the hand.
-  const isDiscarding = phase === 'BIDDING' &&
-    (biddingPhase === 'DISCARD' || biddingPhase === 'POST_DEAL_DISCARD') &&
-    currentTurnId === myPlayerId
+  const myBidTurn = phase === 'BIDDING' && currentTurnId === myPlayerId
+  // POST_DEAL_DISCARD (félkez winner) is discard-only — confirmed here. A normal
+  // DISCARD is combined with the declaration in the BidPanel (pick 2 + bid, one
+  // confirm), so we only collect the selection here.
+  const discardOnly = myBidTurn && biddingPhase === 'POST_DEAL_DISCARD'
+  const isDiscarding = myBidTurn && (biddingPhase === 'DISCARD' || biddingPhase === 'POST_DEAL_DISCARD')
 
   // Order by strength; the ranking differs for no-trump contracts (Betli/Durchmars).
   const sorted = useMemo(
@@ -53,21 +54,16 @@ export default function PlayerHand({ roomCode }) {
   }
 
   function toggleDiscard(cardId) {
-    setDiscardSel((prev) =>
-      prev.includes(cardId)
-        ? prev.filter((id) => id !== cardId)
-        : prev.length < 2 ? [...prev, cardId] : prev
-    )
+    dispatch({ type: 'TOGGLE_DISCARD', cardId })
   }
 
   function confirmDiscard() {
     emit('bid:discard', { roomCode, cardIds: discardSel })
-    setDiscardSel([])
   }
 
   return (
     <div className={styles.wrap}>
-      {isDiscarding && (
+      {discardOnly && (
         <div className={styles.discardBar}>
           <span>Válassz 2 lapot, amit eldobsz ({discardSel.length}/2)</span>
           <button
@@ -77,6 +73,11 @@ export default function PlayerHand({ roomCode }) {
           >
             Eldobom ezt a 2 lapot
           </button>
+        </div>
+      )}
+      {isDiscarding && !discardOnly && (
+        <div className={styles.discardBar}>
+          <span>Válassz 2 eldobandó lapot, majd mondj be ({discardSel.length}/2)</span>
         </div>
       )}
       <div className={styles.hand}>

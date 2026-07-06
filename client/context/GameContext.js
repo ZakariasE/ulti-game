@@ -54,6 +54,7 @@ const initialState = {
   pendingKontra: [], // components I've staged to double with my next card
   felkezesKontraOk: false, // félkezes: I may escalate the hand-wide kontra now
   pendingFelkezesKontra: false, // félkezes: staged escalation for my next card
+  pendingDiscard: [], // cards staged to discard (combined discard+declare)
   marriageOptions: [], // suits I may announce right now (my first card)
   pendingMarriages: [], // suits I've toggled to announce with my next card
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
@@ -94,6 +95,7 @@ function resetForNewRound(state) {
     kontra: {},
     kontraOptions: [],
     pendingKontra: [],
+    pendingDiscard: [],
     marriageOptions: [],
     pendingMarriages: [],
     marriagesByPlayer: {},
@@ -150,6 +152,8 @@ function gameReducer(state, action) {
         currentHighBid: action.currentHighBid,
         redealMultiplier: action.redealMultiplier || 1,
         biddingKontra: action.kontra || { level: 0, multiplier: 1, lastParty: null },
+        // Keep the discard selection only while a discard is in progress.
+        pendingDiscard: (action.phase === 'DISCARD' || action.phase === 'POST_DEAL_DISCARD') ? state.pendingDiscard : [],
         handCounts: action.handCounts || state.handCounts,
       }
 
@@ -217,6 +221,14 @@ function gameReducer(state, action) {
         pendingKontra: state.pendingKontra.includes(action.component)
           ? state.pendingKontra.filter((c) => c !== action.component)
           : [...state.pendingKontra, action.component],
+      }
+
+    case 'TOGGLE_DISCARD':
+      return {
+        ...state,
+        pendingDiscard: state.pendingDiscard.includes(action.cardId)
+          ? state.pendingDiscard.filter((id) => id !== action.cardId)
+          : state.pendingDiscard.length < 2 ? [...state.pendingDiscard, action.cardId] : state.pendingDiscard,
       }
 
     case 'KONTRA_UPDATED': {

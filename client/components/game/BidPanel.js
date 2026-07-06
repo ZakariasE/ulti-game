@@ -14,7 +14,7 @@ export default function BidPanel({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
   const { currentTurnId, biddingPhase, biddingMode, currentHighBid, myPlayerId, players, options,
-    redealMultiplier, biddingKontra } = state
+    redealMultiplier, biddingKontra, pendingDiscard } = state
 
   const [picked, setPicked] = useState([]) // chosen trump components
   const [color, setColor] = useState('normal')
@@ -57,7 +57,8 @@ export default function BidPanel({ roomCode }) {
     )
   }
 
-  if (biddingPhase === 'DISCARD' || biddingPhase === 'POST_DEAL_DISCARD') {
+  // POST_DEAL_DISCARD (félkez winner): discard only, no declaration.
+  if (biddingPhase === 'POST_DEAL_DISCARD') {
     return (
       <div className={styles.panel}>
         <h3>Te jössz</h3>
@@ -84,7 +85,11 @@ export default function BidPanel({ roomCode }) {
     )
   }
 
-  if (biddingPhase !== 'DECLARE' && biddingPhase !== 'BID') return null
+  // DISCARD is combined with the declaration here (pick 2 to discard + a bid,
+  // one confirm). BID (félkezes 5-card) and DECLARE (normal, after robbing) too.
+  if (biddingPhase !== 'DECLARE' && biddingPhase !== 'BID' && biddingPhase !== 'DISCARD') return null
+  const needDiscard = biddingPhase === 'DISCARD'
+  const discardReady = !needDiscard || (pendingDiscard || []).length === 2
 
   // Build the candidate trump declaration from the current picks.
   const candidate = picked.length === 0
@@ -92,15 +97,22 @@ export default function BidPanel({ roomCode }) {
     : makeDeclaration('trump', { components: picked, color: effColor })
   // Félkezes requires a named trump suit before you can declare.
   const suitReady = !felkezes || !!felkTrump
-  const candValid = !candidate.invalid && suitReady
+  const candValid = !candidate.invalid && suitReady && discardReady
   const candHigher = candValid && isHigherDeclaration(candidate, currentDecl)
 
   function toggle(comp) {
     setPicked((prev) => (prev.includes(comp) ? prev.filter((c) => c !== comp) : [...prev, comp]))
   }
 
+  // When robbing (DISCARD phase), put down the 2 selected cards and declare in
+  // one action (the discard is applied server-side just before the declaration).
+  function commitDiscardIfNeeded() {
+    if (needDiscard) emit('bid:discard', { roomCode, cardIds: pendingDiscard })
+  }
+
   function declareTrump() {
     const trumpSuit = felkezes ? felkTrump : undefined
+    commitDiscardIfNeeded()
     if (picked.length === 0) emit('bid:declare', { roomCode, type: 'simple', color: effColor, trumpSuit })
     else emit('bid:declare', { roomCode, type: 'trump', components: picked, color: effColor, trumpSuit })
     setPicked([])
@@ -108,6 +120,7 @@ export default function BidPanel({ roomCode }) {
   }
 
   function declareNoTrump(contract) {
+    commitDiscardIfNeeded()
     emit('bid:declare', { roomCode, type: 'notrump', contract })
   }
 
@@ -152,7 +165,9 @@ export default function BidPanel({ roomCode }) {
             ? <span className={styles.invalid}>{candidate.error}</span>
             : felkezes && !felkTrump
               ? <span className={styles.invalid}>Válassz színt</span>
-              : <>Bemondás: <strong>{picked.length === 0 ? (effColor === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate)}</strong>{felkezes ? ` — ${SUIT_NAMES[felkTrump]}` : ''} — {declarationValue(candidate) * mult} pont</>}
+              : !discardReady
+                ? <span className={styles.invalid}>Válassz 2 eldobandó lapot (lent)</span>
+                : <>Bemondás: <strong>{picked.length === 0 ? (effColor === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate)}</strong>{felkezes ? ` — ${SUIT_NAMES[felkTrump]}` : ''} — {declarationValue(candidate) * mult} pont</>}
         </div>
         <div className={styles.actions}>
           <button className={styles.btnPrimary} disabled={!candHigher} onClick={declareTrump}>
@@ -180,7 +195,7 @@ export default function BidPanel({ roomCode }) {
               <button
                 key={key}
                 className={styles.chip}
-                disabled={!higher}
+                disabled={!higher || !discardReady}
                 onClick={() => declareNoTrump(key)}
               >
                 {info.label} — {info.base * mult}
