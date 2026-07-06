@@ -15,6 +15,7 @@ function normalizeOptions(options = {}) {
   const kotelezo = o.kotelezo || {}
   return {
     felkezes: !!o.felkezes,
+    fourAces: o.fourAces !== false, // Négy ász bemondás available (default on)
     buli: {
       on: !!buli.on,
       handsPerBuli: Number(buli.handsPerBuli) > 0 ? Math.floor(Number(buli.handsPerBuli)) : 6,
@@ -176,6 +177,10 @@ function applyDeclare(state, playerId, payload) {
   }
 
   const declaration = _declarationFromPayload(payload)
+  // Négy ász is only biddable when the room enabled it.
+  if (!state.options.fourAces && declaration.components?.includes('four_aces')) {
+    throw new Error('A Négy ász nincs engedélyezve ebben a szobában')
+  }
   const current = state.bidding.currentHighBid
   if (current) {
     // Effective value = rank × 4 (only for a bid made in the 5-card félkezes

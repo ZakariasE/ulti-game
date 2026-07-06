@@ -3,6 +3,7 @@ import styles from '../../styles/GameOptionsModal.module.css'
 
 const DEFAULTS = {
   felkezes: false,
+  fourAces: true,
   buli: { on: false, handsPerBuli: 18, premium: 50},
   kotelezo: { on: true, ultiPenalty: 220, betliPenalty: 110 },
   stake: 1,
@@ -11,6 +12,7 @@ const DEFAULTS = {
 // House-rule chooser shown when creating a room. Calls onConfirm(options).
 export default function GameOptionsModal({ onConfirm, onCancel }) {
   const [felkezes, setFelkezes] = useState(DEFAULTS.felkezes)
+  const [fourAces, setFourAces] = useState(DEFAULTS.fourAces)
   const [buliOn, setBuliOn] = useState(DEFAULTS.buli.on)
   const [handsPerBuli, setHandsPerBuli] = useState(DEFAULTS.buli.handsPerBuli)
   const [premium, setPremium] = useState(DEFAULTS.buli.premium)
@@ -24,6 +26,7 @@ export default function GameOptionsModal({ onConfirm, onCancel }) {
   function confirm() {
     onConfirm({
       felkezes,
+      fourAces,
       buli: { on: buliOn, handsPerBuli: Number(handsPerBuli) || 6, premium: Number(premium) || 0 },
       kotelezo: {
         on: kotelezoAvailable && kotelezoOn,
@@ -48,6 +51,10 @@ export default function GameOptionsModal({ onConfirm, onCancel }) {
 
         <div className={styles.block}>
           <Toggle on={felkezes} set={setFelkezes} label="Félkezes (5 lap, 4× érték)" />
+        </div>
+
+        <div className={styles.block}>
+          <Toggle on={fourAces} set={setFourAces} label="Négy ász bemondás" />
         </div>
 
         <div className={styles.block}>

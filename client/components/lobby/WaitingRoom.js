@@ -13,6 +13,7 @@ export default function WaitingRoom({ roomCode }) {
 
   const rules = []
   if (options?.felkezes) rules.push('Félkezes (5 lap, 4×)')
+  if (options?.fourAces === false) rules.push('Négy ász kikapcsolva')
   if (options?.buli?.on) rules.push(`Buli — ${options.buli.handsPerBuli} leosztás, prémium ${options.buli.premium}`)
   if (options?.kotelezo?.on) rules.push(`Kötelező mondások (Ulti −${options.kotelezo.ultiPenalty}, Betli/40-100 −${options.kotelezo.betliPenalty})`)
   if (options?.stake != null) rules.push(`Tét: ${options.stake} / pont`)

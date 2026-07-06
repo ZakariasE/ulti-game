@@ -132,7 +132,7 @@ export default function BidPanel({ roomCode }) {
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Adus bemondás</div>
         <div className={styles.chips}>
-          {CHOOSABLE.map((comp) => (
+          {(options?.fourAces === false ? CHOOSABLE.filter((c) => c !== 'four_aces') : CHOOSABLE).map((comp) => (
             <button
               key={comp}
               className={`${styles.chip} ${picked.includes(comp) ? styles.chipOn : ''}`}
