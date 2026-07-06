@@ -19,8 +19,10 @@ export default function PlayerHand({ roomCode }) {
   // The declarer's very first card is the opening lead (played inline now).
   const openingLead = myPlayTurn && needsOpeningLead
   const needTrump = declaration && !declaration.isNoTrump && declaration.color === 'normal'
+  // In félkezes the trump is named at declaration (trumpSuit already set); in the
+  // base game the declarer picks it via TrumpChoice (pendingTrump).
   const effectiveTrump = trumpSuit || pendingTrump
-  const trumpReady = !needTrump || !!pendingTrump
+  const trumpReady = !needTrump || !!effectiveTrump
   const canPlay = myPlayTurn && (!openingLead || trumpReady)
   // Discarding: the talon holder (normal) or the declarer after the félkezes
   // second deal picks 2 cards straight from the hand.

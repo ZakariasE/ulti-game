@@ -232,11 +232,12 @@ function applyBidPass(state, playerId) {
     return { biddingComplete: false }
   }
 
-  // In the 5-card round the last declarer/kontra-er gets no redundant final turn:
-  // once the other two pass (n-1), bidding closes. The base/reopened round keeps
-  // the high bidder's final turn (n passes).
-  const closeThreshold = felkezesRound ? n - 1 : n
-  if (state.bidding.consecutivePasses >= closeThreshold && state.bidding.currentHighBid) {
+  // Bidding closes when the current high bidder (declarer) passes on their own
+  // turn — they always get the final say (can raise/rekontra their own bid), and
+  // the turn only returns to them once everyone else has passed since the last
+  // raise. This handles both the plain case (declare → pass → pass → declarer
+  // passes) and the kontra case (declare → kontra → pass → declarer passes).
+  if (state.bidding.currentHighBid && playerId === state.bidding.currentHighBid.playerId) {
     return felkezesRound ? _felkezesSecondDeal(state) : _resolveBidding(state)
   }
 

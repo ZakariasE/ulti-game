@@ -25,7 +25,7 @@ export default function GameTable({ roomCode }) {
   const { state } = useGame()
   const [showElszamolas, setShowElszamolas] = useState(false)
   const { players, myPlayerId, scores, phase, declaration, declarerId, trumpSuit,
-    currentTurnId, lastTrickWinnerId } = state
+    currentTurnId, lastTrickWinnerId, currentHighBid } = state
   const handCounts = state.handCounts || {}
   const marriagesByPlayer = state.marriagesByPlayer || {}
   // Public jelentés display hides the suit — only the value (20/40) is shown.
@@ -87,6 +87,16 @@ export default function GameTable({ roomCode }) {
             <span className={styles.goalMeta}>
               {trumpSuit ? `adu: ${SUIT_NAMES[trumpSuit]}` : 'adu rejtve'}
               {' · felvevő: '}<strong>{declarerPlayer?.id === myPlayerId ? 'te' : declarerPlayer?.name}</strong>
+            </span>
+          </span>
+        ) : currentHighBid ? (
+          // During bidding (incl. the reopened félkezes round) show the standing bid.
+          <span className={styles.goal}>
+            <span className={styles.goalLabel}>Licit:</span>
+            <strong className={styles.goalContract}>{declarationLabel(currentHighBid.declaration)}</strong>
+            <span className={styles.goalMeta}>
+              {currentHighBid.declaration.trumpSuit ? `adu: ${SUIT_NAMES[currentHighBid.declaration.trumpSuit]}` : ''}
+              {' · '}<strong>{players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}</strong>
             </span>
           </span>
         ) : (
