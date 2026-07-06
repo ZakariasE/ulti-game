@@ -78,6 +78,7 @@ function applyDeal(state) {
     state.bidding = {
       currentBidderSeat: firstBidderSeat,
       phase: 'BID', // félkezes: each turn is declare-or-pass (opener may pass)
+      mode: 'felkezes', // 5-card round (vs 'normal' reopened round)
       consecutivePasses: 0,
       currentHighBid: null,
       history: [],
@@ -90,6 +91,7 @@ function applyDeal(state) {
     state.bidding = {
       currentBidderSeat: firstBidderSeat,
       phase: 'DISCARD',
+      mode: 'normal',
       consecutivePasses: 0,
       currentHighBid: null,
       history: [],
@@ -128,8 +130,14 @@ function applyBidDiscard(state, playerId, cardIds) {
   state.talonInHand = null // the talon is set aside again
 
   if (phase === 'POST_DEAL_DISCARD') {
-    // Félkezes: the declaration is already locked; play starts now.
-    return _startPlay(state, playerId, state.bidding.currentHighBid.declaration)
+    // Félkezes: the winner has set their talon. REOPEN normal bidding — the
+    // others (full 10-card hands) may rob the talon and outbid; the félkezes
+    // bid stands as the value to beat.
+    state.bidding.mode = 'normal'
+    state.bidding.phase = 'ROB_OFFER'
+    state.bidding.consecutivePasses = 0
+    state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
+    return { reopened: true }
   }
   state.bidding.phase = 'DECLARE'
   return null
@@ -148,16 +156,14 @@ function applyDeclare(state, playerId, payload) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  const felkezes = state.options.felkezes
-  // Félkezes turns are declare-or-pass (phase DECLARE for the opener, BID after);
-  // normal bidding declares only in the DECLARE phase (after discarding/robbing).
-  const canDeclare = felkezes
-    ? (state.bidding.phase === 'DECLARE' || state.bidding.phase === 'BID')
-    : state.bidding.phase === 'DECLARE'
+  const felkezesRound = state.bidding.mode === 'felkezes' // 5-card round
+  const felkezesGame = state.options.felkezes
+  // 5-card round: single BID phase (declare-or-pass). Normal round: after discard/rob.
+  const canDeclare = felkezesRound ? state.bidding.phase === 'BID' : state.bidding.phase === 'DECLARE'
   if (!canDeclare) throw new Error('Not in declare phase')
 
-  // Félkezes: a trump goal (anything but a no-trump contract) must name its suit.
-  if (felkezes && payload.type !== 'notrump' && !MINOR_SUITS.includes(payload.trumpSuit) && payload.trumpSuit !== 'piros') {
+  // Félkezes game: a trump goal (anything but a no-trump contract) must name its suit.
+  if (felkezesGame && payload.type !== 'notrump' && !MINOR_SUITS.includes(payload.trumpSuit) && payload.trumpSuit !== 'piros') {
     throw new Error('Félkezesben meg kell mondani a színt')
   }
 
@@ -171,15 +177,16 @@ function applyDeclare(state, playerId, payload) {
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
-  // Required ulti: reveal the announcer's 5-card hand until the second deal.
+  // Required ulti: reveal the announcer's 5-card hand until the second deal
+  // (only in the 5-card round).
   let revealed = false
-  if (felkezes && state.options.kotelezo.on && declaration.scoring.includes('ulti')) {
+  if (felkezesRound && state.options.kotelezo.on && declaration.scoring.includes('ulti')) {
     state.felkezesReveal = { playerId, cards: state.hands[playerId].slice() }
     revealed = true
   }
 
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
-  state.bidding.phase = felkezes ? 'BID' : 'ROB_OFFER'
+  state.bidding.phase = felkezesRound ? 'BID' : 'ROB_OFFER'
   return { revealed }
 }
 
@@ -200,8 +207,8 @@ function applyBidPass(state, playerId) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  const felkezes = state.options.felkezes
-  const passPhase = felkezes ? 'BID' : 'ROB_OFFER'
+  const felkezesRound = state.bidding.mode === 'felkezes'
+  const passPhase = felkezesRound ? 'BID' : 'ROB_OFFER'
   if (state.bidding.phase !== passPhase) throw new Error('Cannot pass now')
 
   state.bidding.consecutivePasses++
@@ -210,14 +217,14 @@ function applyBidPass(state, playerId) {
   const n = state.players.length
   // Félkezes pre-bid: nobody has declared yet. Two full go-arounds of passes
   // (2n) → redeal and double the whole-hand value.
-  if (felkezes && !state.bidding.currentHighBid) {
+  if (felkezesRound && !state.bidding.currentHighBid) {
     if (state.bidding.consecutivePasses >= 2 * n) return _redealFelkezes(state)
     state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, n)
     return { biddingComplete: false }
   }
 
   if (state.bidding.consecutivePasses >= n && state.bidding.currentHighBid) {
-    return felkezes ? _felkezesSecondDeal(state) : _resolveBidding(state)
+    return felkezesRound ? _felkezesSecondDeal(state) : _resolveBidding(state)
   }
 
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, n)
@@ -238,8 +245,10 @@ function _felkezesSecondDeal(state) {
   const { playerId: declarerId } = state.bidding.currentHighBid
   const declarer = state.players.find((p) => p.id === declarerId)
   const reserve = state.reserve
-  // Snapshot the original 5-card hand (for the required-ulti trump-count rule).
-  state.bidding.declarerFive = state.hands[declarerId].slice()
+  // Snapshot every player's original 5-card hand — the final declarer (who may
+  // change in the reopened round) needs theirs for the required-ulti trump count.
+  state.felkezesFives = {}
+  state.players.forEach((p) => { state.felkezesFives[p.id] = state.hands[p.id].slice() })
   state.hands[declarerId] = [...state.hands[declarerId], ...reserve.slice(0, 7)]
   let idx = 7
   state.players.filter((p) => p.id !== declarerId).forEach((p) => {
@@ -285,7 +294,7 @@ function _startPlay(state, declarerId, declaration) {
     cardsPlayed,
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
     claim: null, // { responses } while a "nincs több ütés" claim is pending
-    declarerFive: state.bidding.declarerFive || null, // félkezes original 5-card hand
+    declarerFive: (state.felkezesFives && state.felkezesFives[declarerId]) || null, // félkezes 5-card hand
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, declaration }
@@ -745,6 +754,7 @@ function prepareNextRound(state) {
   state.reserve = []
   state.redealMultiplier = 1
   state.felkezesReveal = null
+  state.felkezesFives = null
   state.talonInHand = null
   state.hands = {}
   state.bidding = null
