@@ -39,8 +39,10 @@ const initialState = {
   // Bidding
   currentTurnId: null,
   biddingPhase: null, // 'BID' | 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'POST_DEAL_DISCARD' | 'DONE'
+  biddingMode: null, // 'felkezes' | 'normal'
   currentHighBid: null, // { playerId, declaration }
   redealMultiplier: 1, // félkezes: ×2 per all-pass redeal
+  biddingKontra: { level: 0, multiplier: 1, lastParty: null }, // félkezes bidding-kontra chain
   // Play
   declaration: null, // public declaration once bidding resolves
   declarerId: null,
@@ -142,8 +144,10 @@ function gameReducer(state, action) {
         ...state,
         currentTurnId: action.currentBidderId,
         biddingPhase: action.phase,
+        biddingMode: action.mode || state.biddingMode,
         currentHighBid: action.currentHighBid,
         redealMultiplier: action.redealMultiplier || 1,
+        biddingKontra: action.kontra || { level: 0, multiplier: 1, lastParty: null },
         handCounts: action.handCounts || state.handCounts,
       }
 

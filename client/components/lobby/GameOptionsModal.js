@@ -3,7 +3,7 @@ import styles from '../../styles/GameOptionsModal.module.css'
 
 const DEFAULTS = {
   felkezes: false,
-  buli: { on: false, handsPerBuli: 6, premium: 100 },
+  buli: { on: false, handsPerBuli: 18, premium: 50},
   kotelezo: { on: true, ultiPenalty: 220, betliPenalty: 110 },
   stake: 1,
 }

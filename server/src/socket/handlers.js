@@ -1,7 +1,7 @@
 const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
-  applyFirstLead, applyKontra, applyPlayCard, startClaim, respondClaim, prepareNextRound,
+  applyFirstLead, applyKontra, applyBiddingKontra, applyPlayCard, startClaim, respondClaim, prepareNextRound,
   startBuli, buliSnapshot,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
@@ -78,6 +78,16 @@ function registerHandlers(io, socket) {
       if (res && res.revealed) {
         io.to(roomCode).emit('felkezes:reveal', state.felkezesReveal)
       }
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  socket.on('bid:kontra', ({ roomCode }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      applyBiddingKontra(state, socket.id)
+      io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }

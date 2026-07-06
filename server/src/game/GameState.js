@@ -1,7 +1,7 @@
 const { createDeck, shuffle, deal, dealFelkezes } = require('./deck')
 const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rules')
 const {
-  getInitialBidderSeat, getNextBidderSeat, isHigherDeclaration,
+  getInitialBidderSeat, getNextBidderSeat, isHigherDeclaration, rankValue,
   buildDeclaration, simpleDeclaration, noTrumpDeclaration, declarationLabel,
 } = require('./bidding')
 const { calculateRoundScore } = require('./scoring')
@@ -81,6 +81,7 @@ function applyDeal(state) {
       mode: 'felkezes', // 5-card round (vs 'normal' reopened round)
       consecutivePasses: 0,
       currentHighBid: null,
+      kontra: { level: 0, multiplier: 1, lastParty: null }, // bidding-time kontra chain
       history: [],
     }
   } else {
@@ -94,6 +95,7 @@ function applyDeal(state) {
       mode: 'normal',
       consecutivePasses: 0,
       currentHighBid: null,
+      kontra: { level: 0, multiplier: 1, lastParty: null },
       history: [],
     }
   }
@@ -169,11 +171,18 @@ function applyDeclare(state, playerId, payload) {
 
   const declaration = _declarationFromPayload(payload)
   const current = state.bidding.currentHighBid
-  if (current && !isHigherDeclaration(declaration, current.declaration)) {
-    throw new Error('Declaration must out-rank the current bid')
+  if (current) {
+    // To outbid, the raw value must exceed the standing value INCLUDING any
+    // kontra multiplier; a fresh bid then clears the kontra.
+    const km = state.bidding.kontra.multiplier
+    const beats = km > 1
+      ? rankValue(declaration) > rankValue(current.declaration) * km
+      : isHigherDeclaration(declaration, current.declaration)
+    if (!beats) throw new Error('Declaration must out-rank the current bid')
   }
 
   state.bidding.currentHighBid = { playerId, declaration }
+  state.bidding.kontra = { level: 0, multiplier: 1, lastParty: null } // outbid clears the kontra
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
@@ -229,6 +238,33 @@ function applyBidPass(state, playerId) {
 
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, n)
   return { biddingComplete: false }
+}
+
+// Félkezes bidding-kontra: a defender (even levels) or the declarer (odd levels)
+// escalates the standing bid on their turn. ×4 in the 5-card round, ×2 in the
+// reopened round. The kontra inflates the value-to-beat; outbidding clears it.
+function applyBiddingKontra(state, playerId) {
+  const player = state.players.find((p) => p.id === playerId)
+  if (!player) throw new Error('Player not in game')
+  if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
+  const felkezesRound = state.bidding.mode === 'felkezes'
+  const validPhase = felkezesRound ? state.bidding.phase === 'BID' : state.bidding.phase === 'ROB_OFFER'
+  if (!validPhase) throw new Error('Cannot kontra now')
+  if (!state.bidding.currentHighBid) throw new Error('Nothing to kontra')
+
+  const k = state.bidding.kontra
+  const declarerId = state.bidding.currentHighBid.playerId
+  const nextParty = k.level % 2 === 0 ? 'defenders' : 'declarer'
+  const myParty = playerId === declarerId ? 'declarer' : 'defenders'
+  if (myParty !== nextParty) throw new Error('Not your side to double now')
+
+  k.level += 1
+  k.multiplier *= felkezesRound ? 4 : 2
+  k.lastParty = myParty
+  state.bidding.consecutivePasses = 0
+  state.bidding.history.push({ playerId, action: 'kontra', level: k.level })
+  state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
+  return { kontra: { ...k } }
 }
 
 // Félkezes: everyone passed twice with no bid → redeal, whole-hand value ×2
@@ -295,6 +331,7 @@ function _startPlay(state, declarerId, declaration) {
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
     claim: null, // { responses } while a "nincs több ütés" claim is pending
     declarerFive: (state.felkezesFives && state.felkezesFives[declarerId]) || null, // félkezes 5-card hand
+    biddingKontra: state.bidding.kontra ? { ...state.bidding.kontra } : { level: 0, multiplier: 1, lastParty: null },
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, declaration }
@@ -772,7 +809,9 @@ function biddingSnapshot(state) {
   return {
     currentBidderId: currentBidder ? currentBidder.id : null,
     phase: b.phase,
+    mode: b.mode,
     redealMultiplier: state.redealMultiplier || 1,
+    kontra: b.kontra || { level: 0, multiplier: 1, lastParty: null },
     currentHighBid: b.currentHighBid
       ? { playerId: b.currentHighBid.playerId, declaration: publicDeclaration(b.currentHighBid.declaration) }
       : null,
@@ -810,6 +849,7 @@ module.exports = {
   applyBidPass,
   applyFirstLead,
   applyKontra,
+  applyBiddingKontra,
   applyPlayCard,
   startClaim,
   respondClaim,
