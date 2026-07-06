@@ -551,7 +551,11 @@ function applyRoundEnd(state) {
     }
     state.declaredScores[declarerId] = (state.declaredScores[declarerId] || 0) + d
     state.buli.points[declarerId] = (state.buli.points[declarerId] || 0) + d
-    state.buli.handsPlayed++
+    // "Üres" hand: the declarer's net is 0 (e.g. a won Ulti cancelling a
+    // kontrázott lost Parti). Nothing moved the ledger, so it does NOT count
+    // toward the buli's hand count — only the dealer shifts and it is replayed.
+    result.empty = d === 0
+    if (!result.empty) state.buli.handsPlayed++
     _markKotelezo(state, declarerId, state.play.declaration)
   } else {
     for (const [playerId, delta] of Object.entries(result.deltas)) {
