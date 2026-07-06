@@ -44,7 +44,7 @@ Eight ranks per suit: Ász (Ace), Király (King), Felső (Over), Alsó (Under), 
 
 1. The player to the dealer's right is dealt **12 cards** (their 10 + the 2-card talon).
 2. That player **must discard 2** (forming a new face-down talon) and **declare an opening contract** (at least Simple).
-3. Going anticlockwise, each other player may **pass**, or **"rob"** — pick up the 2-card talon, discard 2, and declare a **higher** contract.
+3. Going anticlockwise, each other player may **pass**, or **"rob"** — pick up the 2-card talon, then in one step choose the 2 to discard **and** declare a **higher** contract.
 4. Bidding ends only when **all three players pass in succession** after the last bid. The high bidder gets a final turn to rob their **own** talon and raise; if they pass too, bidding closes.
 5. The highest bidder is the **declarer**; the other two are **defenders**.
 6. The final talon on the table counts toward the **defenders'** card points when scoring (its Aces/Tens go to the defense).
@@ -124,7 +124,8 @@ when everything is off.
 
 ### Félkezes ("half-hand")
 
-A two-stage deal + bidding. Every bid is worth **×4** (a normal Parti = 4, red = 8).
+A two-stage deal + bidding. A bid **won in the 5-card round** is worth **×4** (a
+normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
 
 1. **Deal 5** cards to each player; the other 17 are held back (`state.reserve`).
 2. **First (5-card) bidding round** (`bidding.mode='felkezes'`, one `BID` phase):
@@ -136,26 +137,29 @@ A two-stage deal + bidding. Every bid is worth **×4** (a normal Parti = 4, red 
      ×2, compounding; resets when a hand is actually played).
    - **Bidding-kontra** (5-card round only): a defender (even chain levels) or the
      declarer (odd) escalates on their turn. Each level is **×4** here. The kontra
-     inflates the **value-to-beat** (to outbid, raw value must exceed
-     `rank(current) × kontra-multiplier`); a fresh outbid **clears** the kontra.
-   - **Closing:** the last declarer/kontra-er gets no redundant final turn — once
-     the other two pass (n−1), the round closes (so declare → kontra → pass → pass
-     ends the bidding and deals the cards).
+     inflates the **value-to-beat** — bids compare by **effective value** =
+     `rank × 4 (5-card only) × kontra`; a fresh outbid **clears** the kontra.
+   - **Closing:** bidding ends when the current **high bidder (declarer) passes**
+     on their own turn — they always get the final say. Plain: declare → pass →
+     pass → declarer passes. Kontra: declare → kontra → pass → declarer passes.
    - **Required-ulti reveal:** announcing an Ulti reveals the announcer's 5 cards
      to everyone until the second deal (kötelező games).
 3. **Second deal:** the winner gets +7 (→12), each defender +5 (→10); the winner
    discards 2 (their talon).
 4. **Reopened bidding round** (`bidding.mode='normal'`): plays out **exactly like
    the base 10-card game** — others may rob the talon and outbid, and the
-   **declarer can change** (with the high bidder's usual final turn). The félkezes
-   bid (with any standing kontra) is the value-to-beat. **No bidding-kontra here;**
-   the chain continues in play.
+   **declarer can change**. A bid made here is a **normal (×1)** bid, but it must
+   still exceed the standing bid's effective value (so a teljes red 40-100 [8]
+   beats a félkez Parti [4] but not a félkez Ulti [16]). **No bidding-kontra here;**
+   the chain continues in play. Robbing combines **discard + declaration** into one
+   step (pick 2 to put down + your bid, confirm once).
 5. **Play.** No per-component kontra — one hand-wide chain. It **continues into
    play** at the **normal per-card kontra timing** (×2/level): a fresh defender
    kontra on their 1st card, the declarer's rekontra on their **2nd** card,
    szubkontra on the defender's 2nd card, etc. A kontra already made in the 5-card
    round does **not** shift this earlier. Card for level L = `ceil((L+1)/2)`.
-6. **Scoring** = component × 4 (félkezes) × 2^k (redeals) × kontra-chain multiplier.
+6. **Scoring** = component × 4 (**only if won in the 5-card round**) × 2^k (redeals)
+   × kontra-chain multiplier.
 
 ### Buli (a "party" of hands)
 
