@@ -52,6 +52,8 @@ const initialState = {
   kontra: {}, // component -> { level, lastParty }
   kontraOptions: [], // components I may double right now
   pendingKontra: [], // components I've staged to double with my next card
+  felkezesKontraOk: false, // félkezes: I may escalate the hand-wide kontra now
+  pendingFelkezesKontra: false, // félkezes: staged escalation for my next card
   marriageOptions: [], // suits I may announce right now (my first card)
   pendingMarriages: [], // suits I've toggled to announce with my next card
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
@@ -239,12 +241,25 @@ function gameReducer(state, action) {
         needsOpeningLead: action.currentPlayerId === state.myPlayerId ? !!action.needsOpeningLead : false,
         kontraOptions: action.currentPlayerId === state.myPlayerId ? (action.kontraOptions || []) : [],
         pendingKontra: [],
+        felkezesKontraOk: action.currentPlayerId === state.myPlayerId ? !!action.felkezesKontra : false,
+        pendingFelkezesKontra: false,
+        biddingKontra: action.biddingKontra || state.biddingKontra,
         marriageOptions: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
         // Marriages are announced by default; the player opts out per suit.
         pendingMarriages: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
         kontra: action.kontra || state.kontra,
         trumpSuit: action.trumpSuit ?? state.trumpSuit,
         legalCardIds: action.currentPlayerId === state.myPlayerId ? action.legalCardIds : [],
+      }
+
+    case 'TOGGLE_FELKEZES_KONTRA':
+      return { ...state, pendingFelkezesKontra: !state.pendingFelkezesKontra }
+
+    case 'FELKEZES_PLAYKONTRA':
+      return {
+        ...state,
+        biddingKontra: { ...(state.biddingKontra || {}), level: action.level, multiplier: action.multiplier },
+        ...announce(state, `${nameOf(state, action.byId)} — ${kontraLevelName(2 ** action.level)} (×${action.multiplier})`, 'kontra'),
       }
 
     case 'CARD_PLAYED':
@@ -259,6 +274,8 @@ function gameReducer(state, action) {
         legalCardIds: [],
         kontraOptions: [],
         pendingKontra: [],
+        felkezesKontraOk: false,
+        pendingFelkezesKontra: false,
         marriageOptions: [],
         pendingMarriages: [],
         needsOpeningLead: false,

@@ -244,6 +244,7 @@ function applyBidPass(state, playerId) {
 // escalates the standing bid on their turn. ×4 in the 5-card round, ×2 in the
 // reopened round. The kontra inflates the value-to-beat; outbidding clears it.
 function applyBiddingKontra(state, playerId) {
+  if (!state.options.felkezes) throw new Error('Bidding kontra is félkezes only')
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
@@ -331,7 +332,12 @@ function _startPlay(state, declarerId, declaration) {
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
     claim: null, // { responses } while a "nincs több ütés" claim is pending
     declarerFive: (state.felkezesFives && state.felkezesFives[declarerId]) || null, // félkezes 5-card hand
-    biddingKontra: state.bidding.kontra ? { ...state.bidding.kontra } : { level: 0, multiplier: 1, lastParty: null },
+    // Hand-wide kontra chain (félkezes): carried from bidding, continues in play.
+    // biddingLevels = the level bidding closed at (used to shift play-card timing).
+    biddingKontra: {
+      ...(state.bidding.kontra || { level: 0, multiplier: 1, lastParty: null }),
+      biddingLevels: (state.bidding.kontra && state.bidding.kontra.level) || 0,
+    },
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, declaration }
@@ -512,8 +518,10 @@ function applyRoundEnd(state) {
     declarerPoints: state.play.declarerPoints,
     kontra: state.play.kontra,
     marriages: state.play.marriages,
-    // félkezes: every bid ×4; all-pass redeals double the whole hand.
-    stakeMultiplier: (state.options.felkezes ? 4 : 1) * (state.redealMultiplier || 1),
+    // félkezes: every bid ×4; all-pass redeals double the whole hand; plus the
+    // hand-wide kontra chain (bidding + play). Normal games use per-component kontra.
+    stakeMultiplier: (state.options.felkezes ? 4 : 1) * (state.redealMultiplier || 1) *
+      (state.options.felkezes ? (state.play.biddingKontra?.multiplier || 1) : 1),
   })
 
   const declarerId = state.play.declarerId
@@ -714,6 +722,37 @@ function applyClaimAll(state) {
   return applyRoundEnd(state)
 }
 
+// ── Félkezes play-kontra (hand-wide chain continued from bidding) ──────────────
+
+// The card on which the escalation creating `nextLevel` may be played by its
+// party — normal timing (ceil((L+1)/2)) shifted earlier by the levels already
+// done in bidding, so the first play escalation lands on the actor's 1st card.
+function _felkezesKontraCard(nextLevel, biddingLevels) {
+  return Math.max(1, Math.ceil((nextLevel + 1) / 2) - biddingLevels)
+}
+
+// Which side raises the NEXT level, and whether `playerId` may do so right now.
+function felkezesKontraEligible(state, playerId) {
+  if (!state.options.felkezes || !state.play || state.phase !== 'PLAYING') return false
+  const bk = state.play.biddingKontra
+  if (!bk) return false
+  const party = bk.level % 2 === 0 ? 'defenders' : 'declarer'
+  const myParty = playerId === state.play.declarerId ? 'declarer' : 'defenders'
+  if (myParty !== party) return false
+  const myCardNum = state.play.cardsPlayed[playerId] + 1
+  return myCardNum === _felkezesKontraCard(bk.level + 1, bk.biddingLevels)
+}
+
+// Escalate the hand-wide kontra as the player is about to play a card (×2/level).
+function applyFelkezesPlayKontra(state, playerId) {
+  if (!felkezesKontraEligible(state, playerId)) throw new Error('Cannot kontra now')
+  const bk = state.play.biddingKontra
+  bk.level += 1
+  bk.multiplier *= 2
+  bk.lastParty = playerId === state.play.declarerId ? 'declarer' : 'defenders'
+  return { level: bk.level, multiplier: bk.multiplier }
+}
+
 // ── Kontra (per component, tied to card-play timing) ───────────────────────────
 
 // The escalation step `d` (number of doublings so far) is raised by:
@@ -770,6 +809,8 @@ function marriageOptionsFor(state, playerId) {
 // True if the given player currently has any component they may double.
 function eligibleKontra(state, playerId) {
   if (!state.play || state.phase !== 'PLAYING') return []
+  // Félkezes uses the hand-wide bidding/play kontra, not per-component doubling.
+  if (state.options.felkezes) return []
   const player = state.players.find((p) => p.id === playerId)
   const { currentTrick } = state.play
   const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
@@ -850,6 +891,8 @@ module.exports = {
   applyFirstLead,
   applyKontra,
   applyBiddingKontra,
+  applyFelkezesPlayKontra,
+  felkezesKontraEligible,
   applyPlayCard,
   startClaim,
   respondClaim,

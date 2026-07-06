@@ -1,7 +1,8 @@
 const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
-  applyFirstLead, applyKontra, applyBiddingKontra, applyPlayCard, startClaim, respondClaim, prepareNextRound,
+  applyFirstLead, applyKontra, applyBiddingKontra, applyFelkezesPlayKontra, felkezesKontraEligible,
+  applyPlayCard, startClaim, respondClaim, prepareNextRound,
   startBuli, buliSnapshot,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
@@ -134,10 +135,11 @@ function registerHandlers(io, socket) {
   // Kontra is staged on the client and committed together with the card the
   // player is about to lay down (so it can be freely toggled beforehand).
 
-  socket.on('play:firstLead', ({ roomCode, cardId, trumpSuit, announcedMarriages, kontra }) => {
+  socket.on('play:firstLead', ({ roomCode, cardId, trumpSuit, announcedMarriages, kontra, kontraEscalate }) => {
     try {
       const state = rooms.getRoom(roomCode)
       _commitKontra(io, roomCode, state, socket.id, kontra)
+      _commitFelkezesKontra(io, roomCode, state, socket.id, kontraEscalate)
       const result = applyFirstLead(state, socket.id, cardId, trumpSuit, announcedMarriages)
       io.to(roomCode).emit('declarer:trump', { trumpSuit: state.play.declaration.trumpSuit })
       io.to(roomCode).emit('declarer:marriages', { announcedMarriages: state.play.declaration.announcedMarriages })
@@ -147,10 +149,11 @@ function registerHandlers(io, socket) {
     }
   })
 
-  socket.on('card:play', ({ roomCode, cardId, announcedMarriages, kontra }) => {
+  socket.on('card:play', ({ roomCode, cardId, announcedMarriages, kontra, kontraEscalate }) => {
     try {
       const state = rooms.getRoom(roomCode)
       _commitKontra(io, roomCode, state, socket.id, kontra)
+      _commitFelkezesKontra(io, roomCode, state, socket.id, kontraEscalate)
       const wasFirstCard = state.play.cardsPlayed[socket.id] === 0
       const result = applyPlayCard(state, socket.id, cardId, announcedMarriages)
       const mine = state.play.marriages[socket.id]
@@ -271,6 +274,13 @@ function _commitKontra(io, roomCode, state, playerId, components) {
   if (raised.length) io.to(roomCode).emit('kontra:updated', { kontra, raised, byId: playerId })
 }
 
+// Félkezes hand-wide kontra escalation staged with the card the player lays down.
+function _commitFelkezesKontra(io, roomCode, state, playerId, escalate) {
+  if (!escalate) return
+  const { level, multiplier } = applyFelkezesPlayKontra(state, playerId)
+  io.to(roomCode).emit('felkezes:playkontra', { level, multiplier, byId: playerId })
+}
+
 function _dealAndAnnounce(io, roomCode, state) {
   io.to(roomCode).emit('game:started', {
     dealerIndex: state.dealerIndex, players: state.players, options: state.options,
@@ -330,6 +340,8 @@ function _promptNextTurn(io, roomCode, state) {
     legalCardIds: _getLegalCardIds(state, player.id),
     needsOpeningLead: !state.play.openingLeadDone && player.id === state.play.declarerId,
     kontraOptions: eligibleKontra(state, player.id),
+    felkezesKontra: felkezesKontraEligible(state, player.id), // hand-wide (félkezes)
+    biddingKontra: state.play.biddingKontra || null,
     marriageOptions: marriageOptionsFor(state, player.id),
     kontra: state.play.kontra,
     trumpSuit: state.play.declaration.trumpSuit,

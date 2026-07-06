@@ -6,9 +6,38 @@ function nextName(level) { return kontraLevelName(level * 2) }
 
 export default function KontraBar() {
   const { state, dispatch } = useGame()
-  const { phase, declaration, kontra, kontraOptions, pendingKontra, currentTurnId, myPlayerId } = state
+  const { phase, declaration, kontra, kontraOptions, pendingKontra, currentTurnId, myPlayerId,
+    options: gameOptions, felkezesKontraOk, pendingFelkezesKontra, biddingKontra } = state
 
   if (phase !== 'PLAYING' || !declaration) return null
+
+  // Félkezes: a single hand-wide kontra chain (not per component).
+  if (gameOptions?.felkezes) {
+    const bk = biddingKontra || { level: 0 }
+    const showLevel = bk.level > 0
+    if (!showLevel && !felkezesKontraOk) return null
+    const nextK = kontraLevelName(2 ** ((bk.level || 0) + 1))
+    return (
+      <div className={styles.bar}>
+        {showLevel && (
+          <span className={styles.levels}>
+            <span className={styles.levelTag}>{kontraLevelName(2 ** bk.level)} ×{bk.multiplier}</span>
+          </span>
+        )}
+        {felkezesKontraOk && (
+          <span className={styles.actions}>
+            <button
+              className={`${styles.btn} ${pendingFelkezesKontra ? styles.btnOn : ''}`}
+              onClick={() => dispatch({ type: 'TOGGLE_FELKEZES_KONTRA' })}
+            >
+              {nextK}
+            </button>
+            <span className={styles.hint}>kártya lerakásakor véglegesül</span>
+          </span>
+        )}
+      </div>
+    )
+  }
 
   // Components currently above ×1, for display.
   const doubled = Object.entries(kontra || {}).filter(([, k]) => k.level > 1)
