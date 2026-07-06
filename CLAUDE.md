@@ -191,6 +191,94 @@ plus a pairwise "who pays whom" breakdown.
 
 ---
 
+## Architecture / Code Map
+
+### Layout
+- **Monorepo** (npm workspaces): `server/` (Node/Express/Socket.io) + `client/` (Next.js/React).
+- **Server** runs on **port 3001 via nodemon** — a reload **wipes in-memory games**, so
+  always start a **fresh room** to test. Games live only in memory (`RoomManager`).
+- **Client** sanity-check: `cd client && npx next build`. No DB, no auth.
+- **Testing approach:** node simulations that drive `GameState.js` directly (require the
+  module, build a state with `createGameState`, call the `apply*` functions, assert on
+  `state.*`). Fast and deterministic; use these before/after logic changes. The client is
+  verified with a build + live play.
+
+### Server (`server/src/`)
+- **`game/GameState.js`** — the whole engine (pure functions mutating a `state` object). Key fns:
+  - `createGameState(roomCode, players, options)` → `normalizeOptions`; sets top-level
+    `options`, `scores`, `declaredScores`, `buli`, `reserve`, `redealMultiplier`.
+  - `applyDeal` — base: 10 each + 2 talon (first bidder gets 12); félkezes: 5 each + 17 `reserve`.
+  - Bidding: `applyDeclare`, `applyBidPass`, `applyBidDiscard`, `applyRob`,
+    `applyBiddingKontra` (félkez 5-card round only), `_redealFelkezes`, `_felkezesSecondDeal`,
+    `_resolveBidding` → `_startPlay`. Helper `_felkezFactor(round)` = 4 for `'felkezes'` else 1.
+  - Play: `applyFirstLead` (opening lead names the trump), `applyPlayCard`, `_getLegalCardIds`,
+    `_autoRecordContractMarriage` (auto 40/20 for 40-100/20-100), claims (`startClaim`,
+    `respondClaim`, "nincs több ütés").
+  - Kontra — base per-component: `eligibleKontra`, `applyKontra`, `_kontraExpectation`;
+    félkez hand-wide: `felkezesKontraEligible`, `applyFelkezesPlayKontra`,
+    `_felkezesKontraCard(level)` = `ceil((level+1)/2)` (normal per-card timing, no shift).
+  - Round end: `applyRoundEnd` — **branches on buli**. Buli tracks only
+    `result.declarerRaw` (+ `_requiredUltiBonus`) into `declaredScores`/`buli.points`;
+    non-buli adds pairwise `result.deltas` to `scores`. `_markKotelezo`, `_settleBuli`
+    (premium ±, kötelező penalties), `startBuli`, `prepareNextRound` (clears round-scoped
+    fields, resets `redealMultiplier`/`felkezesReveal`/`felkezesFives`/`reserve`).
+  - Snapshots: `biddingSnapshot` (hides concrete minor trump; includes `currentHighBid.round`),
+    `buliSnapshot`, `publicDeclaration`, `handCounts`.
+- **`game/scoring.js`** — `calculateRoundScore({..., stakeMultiplier})` → `{ components[],
+  deltas{pid}, declarerRaw, cardTotal, partiDetail, declarerId, color, stakeMultiplier }`.
+  `payout = base × kontraLevel × (hundred?2:1) × stakeMultiplier`; `deltas[declarer] =
+  Σ payout × nDef`; **`declarerRaw = Σ component.delta`** (per-defender total — what buli uses).
+- **`game/bidding.js`** — declaration build/validate/rank (server mirror of `client/lib/bids.js`).
+- **`game/deck.js`** — deck + deal helpers. **`socket/handlers.js`** — all events (below).
+  **`rooms/RoomManager.js`** — room lifecycle.
+
+### State shape (server `state`, largely mirrored to clients)
+- `phase`: `LOBBY | DEALING | BIDDING | PLAYING | SCORING | BULI_OVER`.
+- `options`: `{ felkezes, buli:{on,handsPerBuli,premium}, kotelezo:{on,ultiPenalty,betliPenalty}, stake }`.
+- `bidding`: `{ mode:'felkezes'|'normal', phase:'BID'|'DISCARD'|'DECLARE'|'ROB_OFFER'|'POST_DEAL_DISCARD'|'DONE',
+  currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{level,multiplier,lastParty},
+  consecutivePasses, history }`. Closing = **the current high bidder passes on their turn**.
+- `play`: `{ declarerId, defenderIds, declaration, felkezesBid (bool → drives ×4),
+  biddingKontra:{level,multiplier,lastParty} (hand-wide), kontra{comp:{level,lastParty}} (per-component),
+  cardsPlayed{pid}, marriages, currentTrick, completedTricks, declarerFive, openingLeadDone, claim }`.
+- Top-level: `scores` (non-buli), `declaredScores` (buli, RAW), `buli:{index,handsPlayed,points,kotelezo,over,history}`,
+  `reserve`, `redealMultiplier`, `felkezesReveal`, `felkezesFives`, `talonInHand`, `roundResult`.
+
+### Socket events
+- **client→server:** `room:create` (w/ options), `room:join`, `game:start`, `bid:declare`,
+  `bid:pass`, `bid:discard`, `bid:rob`, `bid:kontra` (félkez bidding-kontra), `play:firstLead`,
+  `card:play`, `claim:start`, `claim:respond`, `round:continue`, `buli:next`.
+- **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
+  `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,
+  `marriage:announced`, `kontra:updated`, `opening:info` (declarer only), `play:turnStart`,
+  `card:played`, `trick:completed`, `round:completed`, `buli:completed`, `round:ready`, `claim:pending/result`,
+  `game:error`/`room:error`.
+- Robbing sends **`bid:discard` then `bid:declare` back-to-back** (combined discard+declare UI).
+
+### Client (`client/`)
+- **`context/GameContext.js`** — reducer + big `state`. Notable staging fields: `pendingKontra`
+  (per-component), `pendingFelkezesKontra` (hand-wide), `pendingDiscard` (combined discard+declare),
+  `pendingMarriages`. Bidding mirror: `biddingMode`, `biddingPhase`, `currentHighBid` (incl `round`),
+  `biddingKontra`, `redealMultiplier`. `declaredScores`, `buli`, `felkezesKontraOk`. Event→dispatch
+  wiring is in **`pages/game/[roomCode].js`**.
+- **Components (`components/game`):** `GameTable` (info bar shows the standing bid during bidding),
+  `BidPanel` (bidding + the combined discard+declare when phase is `DISCARD`; `mult` uses
+  `biddingMode`; standing bid value uses `currentHighBid.round`), `PlayerHand` (play + discard
+  selection via `TOGGLE_DISCARD`; opening-lead gate uses `effectiveTrump = trumpSuit||pendingTrump`),
+  `KontraBar` (per-component vs félkez hand-wide branch), `MarriageBar`, `TrumpChoice` (base-game
+  trump pick; hidden in félkezes), `RoundResult` (buli mode shows `declarerRaw`), `BuliScoreboard`,
+  `BuliResult`/`BULI_OVER`, `Elszamolas` (client-only settlement). Lobby: `GameOptionsModal`, `WaitingRoom`.
+- **`lib/bids.js`** — declaration helpers (mirror of `server/game/bidding.js`; keep in sync).
+  **`lib/cards.js`** — card id ↔ image mapping.
+
+### Key invariants (easy to break)
+- **×4 is tied to `currentHighBid.round === 'felkezes'`** → `state.play.felkezesBid`. A bid won in
+  the reopened (teljes kéz) round is a **normal ×1** bid. Cross-round outbids compare **effective
+  value** (`rank × _felkezFactor × kontra`).
+- **Buli scoring is RAW** (one unit per defender); the pairwise ×2 is applied **only in Elszámolás**.
+- **Félkezes opening lead:** trump is named at declaration, so the client must gate on
+  `effectiveTrump`, not `pendingTrump` (else the declarer can't lead → freeze).
+
 ## Tech Stack
 
 - **Frontend:** Next.js (React), Socket.io client
