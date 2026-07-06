@@ -38,8 +38,9 @@ const initialState = {
   declaredScores: {}, // pid -> declarer-only cumulative points (buli mode)
   // Bidding
   currentTurnId: null,
-  biddingPhase: null, // 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'DONE'
+  biddingPhase: null, // 'BID' | 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'POST_DEAL_DISCARD' | 'DONE'
   currentHighBid: null, // { playerId, declaration }
+  redealMultiplier: 1, // félkezes: ×2 per all-pass redeal
   // Play
   declaration: null, // public declaration once bidding resolves
   declarerId: null,
@@ -142,8 +143,12 @@ function gameReducer(state, action) {
         currentTurnId: action.currentBidderId,
         biddingPhase: action.phase,
         currentHighBid: action.currentHighBid,
+        redealMultiplier: action.redealMultiplier || 1,
         handCounts: action.handCounts || state.handCounts,
       }
+
+    case 'FELKEZES_REDEAL':
+      return { ...state, ...announce(state, `Új osztás — a lap értéke most ×${action.multiplier}`, 'contract') }
 
     case 'BID_RESOLVED':
       return {

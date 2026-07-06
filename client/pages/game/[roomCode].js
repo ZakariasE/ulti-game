@@ -29,6 +29,7 @@ export default function GamePage() {
       'hand:dealt':        (d) => dispatch({ type: 'HAND_DEALT', ...d }),
       'talon:held':        (d) => dispatch({ type: 'TALON_HELD', ...d }),
       'bid:state':         (d) => dispatch({ type: 'BID_STATE', ...d }),
+      'felkezes:redeal':   (d) => dispatch({ type: 'FELKEZES_REDEAL', ...d }),
       'bid:resolved':      (d) => dispatch({ type: 'BID_RESOLVED', ...d }),
       'declarer:trump':    (d) => dispatch({ type: 'DECLARER_TRUMP', ...d }),
       'declarer:marriages':(d) => dispatch({ type: 'DECLARER_MARRIAGES', ...d }),

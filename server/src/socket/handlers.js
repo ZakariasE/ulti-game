@@ -96,7 +96,12 @@ function registerHandlers(io, socket) {
     try {
       const state = rooms.getRoom(roomCode)
       const result = applyBidPass(state, socket.id)
-      if (result.secondDeal) {
+      if (result.redeal) {
+        // Félkezes: all passed → redealt, whole-hand value doubled.
+        state.players.forEach((p) => _sendHand(io, state, p.id))
+        io.to(roomCode).emit('felkezes:redeal', { multiplier: result.multiplier })
+        io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
+      } else if (result.secondDeal) {
         // Félkezes: reserve dealt; send everyone their new hands, declarer discards.
         state.players.forEach((p) => _sendHand(io, state, p.id))
         io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })

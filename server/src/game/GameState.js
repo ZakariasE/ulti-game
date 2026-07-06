@@ -39,6 +39,7 @@ function createGameState(roomCode, players = [], options = {}) {
     hands: {},
     talon: [],
     reserve: [], // félkezes: cards held back for the second deal
+    redealMultiplier: 1, // félkezes: ×2 per all-pass redeal (compounds within a hand)
     bidding: null,
     play: null,
     scores: {},
@@ -74,7 +75,7 @@ function applyDeal(state) {
     state.reserve = reserve
     state.bidding = {
       currentBidderSeat: firstBidderSeat,
-      phase: 'DECLARE', // opener must declare; no discard/rob during félkezes bidding
+      phase: 'BID', // félkezes: each turn is declare-or-pass (opener may pass)
       consecutivePasses: 0,
       currentHighBid: null,
       history: [],
@@ -196,12 +197,29 @@ function applyBidPass(state, playerId) {
   state.bidding.consecutivePasses++
   state.bidding.history.push({ playerId, action: 'pass' })
 
-  if (state.bidding.consecutivePasses >= state.players.length && state.bidding.currentHighBid) {
+  const n = state.players.length
+  // Félkezes pre-bid: nobody has declared yet. Two full go-arounds of passes
+  // (2n) → redeal and double the whole-hand value.
+  if (felkezes && !state.bidding.currentHighBid) {
+    if (state.bidding.consecutivePasses >= 2 * n) return _redealFelkezes(state)
+    state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, n)
+    return { biddingComplete: false }
+  }
+
+  if (state.bidding.consecutivePasses >= n && state.bidding.currentHighBid) {
     return felkezes ? _felkezesSecondDeal(state) : _resolveBidding(state)
   }
 
-  state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
+  state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, n)
   return { biddingComplete: false }
+}
+
+// Félkezes: everyone passed twice with no bid → redeal, whole-hand value ×2
+// (compounds). The dealer/first bidder are unchanged.
+function _redealFelkezes(state) {
+  state.redealMultiplier *= 2
+  applyDeal(state)
+  return { redeal: true, multiplier: state.redealMultiplier }
 }
 
 // Félkezes: once the winning bid is set, deal the 17-card reserve — declarer +7
@@ -437,7 +455,8 @@ function applyRoundEnd(state) {
     declarerPoints: state.play.declarerPoints,
     kontra: state.play.kontra,
     marriages: state.play.marriages,
-    stakeMultiplier: state.options.felkezes ? 4 : 1, // félkezes: every bid worth 4×
+    // félkezes: every bid ×4; all-pass redeals double the whole hand.
+    stakeMultiplier: (state.options.felkezes ? 4 : 1) * (state.redealMultiplier || 1),
   })
 
   const declarerId = state.play.declarerId
@@ -713,6 +732,7 @@ function prepareNextRound(state) {
   state.dealerIndex = (state.dealerIndex + 1) % state.players.length
   state.talon = []
   state.reserve = []
+  state.redealMultiplier = 1
   state.talonInHand = null
   state.hands = {}
   state.bidding = null
@@ -730,6 +750,7 @@ function biddingSnapshot(state) {
   return {
     currentBidderId: currentBidder ? currentBidder.id : null,
     phase: b.phase,
+    redealMultiplier: state.redealMultiplier || 1,
     currentHighBid: b.currentHighBid
       ? { playerId: b.currentHighBid.playerId, declaration: publicDeclaration(b.currentHighBid.declaration) }
       : null,

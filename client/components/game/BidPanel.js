@@ -13,14 +13,15 @@ const FELKEZES_SUITS = ['makk', 'zold', 'tok', 'piros']
 export default function BidPanel({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
-  const { currentTurnId, biddingPhase, currentHighBid, myPlayerId, players, options } = state
+  const { currentTurnId, biddingPhase, currentHighBid, myPlayerId, players, options, redealMultiplier } = state
 
   const [picked, setPicked] = useState([]) // chosen trump components
   const [color, setColor] = useState('normal')
   const [felkTrump, setFelkTrump] = useState(null) // félkezes: concrete trump suit
 
   const felkezes = !!options?.felkezes
-  const mult = felkezes ? 4 : 1 // félkezes: every bid is worth 4×
+  // félkezes: every bid ×4; all-pass redeals double the whole hand.
+  const mult = (felkezes ? 4 : 1) * (redealMultiplier || 1)
   // In félkezes the concrete suit is named at declaration; it fixes the color.
   const effColor = felkezes ? (felkTrump === 'piros' ? 'red' : 'normal') : color
   const isMyTurn = currentTurnId === myPlayerId
