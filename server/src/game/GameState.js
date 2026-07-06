@@ -56,6 +56,12 @@ function _seatToPlayer(state, seat) {
   return state.players.find((p) => p.seatIndex === seat)
 }
 
+// Félkezes value multiplier: a bid made in the 5-card round is worth ×4; a bid
+// made in the reopened (teljes kéz) round is a normal bid (×1).
+function _felkezFactor(round) {
+  return round === 'felkezes' ? 4 : 1
+}
+
 // ── Dealing ────────────────────────────────────────────────────────────────
 
 function applyDeal(state) {
@@ -172,16 +178,17 @@ function applyDeclare(state, playerId, payload) {
   const declaration = _declarationFromPayload(payload)
   const current = state.bidding.currentHighBid
   if (current) {
-    // To outbid, the raw value must exceed the standing value INCLUDING any
-    // kontra multiplier; a fresh bid then clears the kontra.
-    const km = state.bidding.kontra.multiplier
-    const beats = km > 1
-      ? rankValue(declaration) > rankValue(current.declaration) * km
-      : isHigherDeclaration(declaration, current.declaration)
+    // Effective value = rank × 4 (only for a bid made in the 5-card félkezes
+    // round) × any standing kontra. A fresh outbid clears the kontra and, if
+    // made in the reopened round, is a normal (teljes kéz) bid worth ×1.
+    const curVal = rankValue(current.declaration) * _felkezFactor(current.round) * state.bidding.kontra.multiplier
+    const newVal = rankValue(declaration) * _felkezFactor(state.bidding.mode)
+    const beats = newVal > curVal ||
+      (newVal === curVal && isHigherDeclaration(declaration, current.declaration))
     if (!beats) throw new Error('Declaration must out-rank the current bid')
   }
 
-  state.bidding.currentHighBid = { playerId, declaration }
+  state.bidding.currentHighBid = { playerId, declaration, round: state.bidding.mode }
   state.bidding.kontra = { level: 0, multiplier: 1, lastParty: null } // outbid clears the kontra
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
@@ -337,11 +344,12 @@ function _startPlay(state, declarerId, declaration) {
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
     claim: null, // { responses } while a "nincs több ütés" claim is pending
     declarerFive: (state.felkezesFives && state.felkezesFives[declarerId]) || null, // félkezes 5-card hand
+    // The winning bid gets the ×4 félkezes multiplier only if it was declared in
+    // the 5-card round; a bid won in the reopened round is a normal (teljes) bid.
+    felkezesBid: (state.bidding.currentHighBid && state.bidding.currentHighBid.round === 'felkezes'),
     // Hand-wide kontra chain (félkezes): carried from bidding, continues in play.
-    // biddingLevels = the level bidding closed at (used to shift play-card timing).
     biddingKontra: {
       ...(state.bidding.kontra || { level: 0, multiplier: 1, lastParty: null }),
-      biddingLevels: (state.bidding.kontra && state.bidding.kontra.level) || 0,
     },
   }
   state.phase = 'PLAYING'
@@ -523,9 +531,9 @@ function applyRoundEnd(state) {
     declarerPoints: state.play.declarerPoints,
     kontra: state.play.kontra,
     marriages: state.play.marriages,
-    // félkezes: every bid ×4; all-pass redeals double the whole hand; plus the
-    // hand-wide kontra chain (bidding + play). Normal games use per-component kontra.
-    stakeMultiplier: (state.options.felkezes ? 4 : 1) * (state.redealMultiplier || 1) *
+    // ×4 only if the winning bid was made in the 5-card félkezes round (a teljes
+    // kéz bid is normal); × redeal doublings; × the hand-wide kontra chain.
+    stakeMultiplier: (state.play.felkezesBid ? 4 : 1) * (state.redealMultiplier || 1) *
       (state.options.felkezes ? (state.play.biddingKontra?.multiplier || 1) : 1),
   })
 
@@ -861,7 +869,7 @@ function biddingSnapshot(state) {
     redealMultiplier: state.redealMultiplier || 1,
     kontra: b.kontra || { level: 0, multiplier: 1, lastParty: null },
     currentHighBid: b.currentHighBid
-      ? { playerId: b.currentHighBid.playerId, declaration: publicDeclaration(b.currentHighBid.declaration) }
+      ? { playerId: b.currentHighBid.playerId, round: b.currentHighBid.round, declaration: publicDeclaration(b.currentHighBid.declaration) }
       : null,
   }
 }

@@ -21,15 +21,19 @@ export default function BidPanel({ roomCode }) {
   const [felkTrump, setFelkTrump] = useState(null) // félkezes: concrete trump suit
 
   const felkezes = !!options?.felkezes
-  // félkezes: every bid ×4; all-pass redeals double the whole hand; plus any kontra.
   const kontra = biddingKontra || { level: 0, multiplier: 1 }
-  const mult = (felkezes ? 4 : 1) * (redealMultiplier || 1)
+  const redeal = redealMultiplier || 1
+  // A bid made in the 5-card round is ×4; a bid in the reopened round is ×1.
+  // (redeal doublings apply to the whole hand regardless.)
+  const mult = (biddingMode === 'felkezes' ? 4 : 1) * redeal
   // In félkezes the concrete suit is named at declaration; it fixes the color.
   const effColor = felkezes ? (felkTrump === 'piros' ? 'red' : 'normal') : color
   const isMyTurn = currentTurnId === myPlayerId
   const currentDecl = currentHighBid?.declaration
+  // The standing bid's value uses ITS round's ×4 factor.
+  const curMult = (currentHighBid?.round === 'felkezes' ? 4 : 1) * redeal
   const highBidText = currentDecl
-    ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl) * mult * kontra.multiplier})${kontra.level > 0 ? ` ${kontraLevelName(2 ** kontra.level)}` : ''} — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
+    ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl) * curMult * kontra.multiplier})${kontra.level > 0 ? ` ${kontraLevelName(2 ** kontra.level)}` : ''} — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
   // Can I escalate the kontra right now? (my turn, a bid exists, my side's step)
