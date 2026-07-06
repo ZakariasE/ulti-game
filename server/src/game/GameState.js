@@ -40,6 +40,7 @@ function createGameState(roomCode, players = [], options = {}) {
     talon: [],
     reserve: [], // félkezes: cards held back for the second deal
     redealMultiplier: 1, // félkezes: ×2 per all-pass redeal (compounds within a hand)
+    felkezesReveal: null, // { playerId, cards } — required-ulti 5-card reveal during bidding
     bidding: null,
     play: null,
     scores: {},
@@ -67,6 +68,7 @@ function applyDeal(state) {
   state.talonInHand = null
   state.talon = []
   state.reserve = []
+  state.felkezesReveal = null
 
   if (state.options.felkezes) {
     // Deal 5 each; hold the other 17 for the second deal. No talon during bidding.
@@ -169,8 +171,16 @@ function applyDeclare(state, playerId, payload) {
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
+  // Required ulti: reveal the announcer's 5-card hand until the second deal.
+  let revealed = false
+  if (felkezes && state.options.kotelezo.on && declaration.scoring.includes('ulti')) {
+    state.felkezesReveal = { playerId, cards: state.hands[playerId].slice() }
+    revealed = true
+  }
+
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
   state.bidding.phase = felkezes ? 'BID' : 'ROB_OFFER'
+  return { revealed }
 }
 
 function applyRob(state, playerId) {
@@ -237,6 +247,7 @@ function _felkezesSecondDeal(state) {
     idx += 5
   })
   state.reserve = []
+  state.felkezesReveal = null // hide the 5-card reveal now the cards are dealt
   state.bidding.phase = 'POST_DEAL_DISCARD'
   state.bidding.currentBidderSeat = declarer.seatIndex
   return { secondDeal: true, declarerId }
@@ -733,6 +744,7 @@ function prepareNextRound(state) {
   state.talon = []
   state.reserve = []
   state.redealMultiplier = 1
+  state.felkezesReveal = null
   state.talonInHand = null
   state.hands = {}
   state.bidding = null

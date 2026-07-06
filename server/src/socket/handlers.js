@@ -73,8 +73,11 @@ function registerHandlers(io, socket) {
   socket.on('bid:declare', ({ roomCode, ...payload }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      applyDeclare(state, socket.id, payload)
+      const res = applyDeclare(state, socket.id, payload)
       io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
+      if (res && res.revealed) {
+        io.to(roomCode).emit('felkezes:reveal', state.felkezesReveal)
+      }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -102,8 +105,10 @@ function registerHandlers(io, socket) {
         io.to(roomCode).emit('felkezes:redeal', { multiplier: result.multiplier })
         io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
       } else if (result.secondDeal) {
-        // Félkezes: reserve dealt; send everyone their new hands, declarer discards.
+        // Félkezes: reserve dealt; send everyone their new hands, hide the reveal,
+        // declarer discards.
         state.players.forEach((p) => _sendHand(io, state, p.id))
+        io.to(roomCode).emit('felkezes:reveal', null)
         io.to(roomCode).emit('bid:state', { ...biddingSnapshot(state), handCounts: handCounts(state) })
       } else if (result.biddingComplete) {
         _announceResolved(io, roomCode, state, result)
@@ -246,12 +251,6 @@ function _announceResolved(io, roomCode, state, result) {
     needTrump: !decl.isNoTrump && decl.color === 'normal',
     availableMarriages: availableMarriages(state.hands[result.declarerId]),
   })
-  // Required ulti: reveal the declarer's original 5-card hand to everyone.
-  if (state.play.declarerFive && state.options.kotelezo.on && decl.scoring.includes('ulti')) {
-    io.to(roomCode).emit('felkezes:reveal', {
-      playerId: result.declarerId, cards: state.play.declarerFive,
-    })
-  }
   _promptNextTurn(io, roomCode, state)
 }
 

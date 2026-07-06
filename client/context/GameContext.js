@@ -148,7 +148,7 @@ function gameReducer(state, action) {
       }
 
     case 'FELKEZES_REDEAL':
-      return { ...state, ...announce(state, `Új osztás — a lap értéke most ×${action.multiplier}`, 'contract') }
+      return { ...state, felkezesReveal: null, ...announce(state, `Új osztás — a lap értéke most ×${action.multiplier}`, 'contract') }
 
     case 'BID_RESOLVED':
       return {
@@ -271,7 +271,7 @@ function gameReducer(state, action) {
       return { ...state, revealedHand: action.hand }
 
     case 'FELKEZES_REVEAL':
-      return { ...state, felkezesReveal: { playerId: action.playerId, cards: action.cards } }
+      return { ...state, felkezesReveal: action.cards ? { playerId: action.playerId, cards: action.cards } : null }
 
     case 'CLAIM_PENDING':
       return { ...state, claim: { declarerId: action.declarerId }, claimVote: null }
