@@ -134,30 +134,36 @@ A two-stage deal + bidding. Every bid is worth **×4** (a normal Parti = 4, red 
    - **Pre-bid redeal:** if the bidding goes **two full go-arounds with no bid**
      (2n passes), redeal and double the whole-hand value (`redealMultiplier`
      ×2, compounding; resets when a hand is actually played).
-   - **Bidding-kontra:** a defender (even chain levels) or the declarer (odd)
-     escalates on their turn. Each level is **×4** in this round. The kontra
+   - **Bidding-kontra** (5-card round only): a defender (even chain levels) or the
+     declarer (odd) escalates on their turn. Each level is **×4** here. The kontra
      inflates the **value-to-beat** (to outbid, raw value must exceed
      `rank(current) × kontra-multiplier`); a fresh outbid **clears** the kontra.
+   - **Closing:** the last declarer/kontra-er gets no redundant final turn — once
+     the other two pass (n−1), the round closes (so declare → kontra → pass → pass
+     ends the bidding and deals the cards).
    - **Required-ulti reveal:** announcing an Ulti reveals the announcer's 5 cards
      to everyone until the second deal (kötelező games).
 3. **Second deal:** the winner gets +7 (→12), each defender +5 (→10); the winner
    discards 2 (their talon).
 4. **Reopened bidding round** (`bidding.mode='normal'`): plays out **exactly like
    the base 10-card game** — others may rob the talon and outbid, and the
-   **declarer can change**. The félkezes bid is the value-to-beat. Kontra here is
-   **×2** per level.
-5. **Play.** No per-component kontra. The kontra chain **continues into play** at
-   card-play timing (**×2**/level), shifted earlier by the levels already done in
-   bidding so the first play escalation lands on the actor's **1st card** (e.g. a
-   rekontra on the declarer's opening lead). Card for level L =
-   `max(1, ceil((L+1)/2) − biddingLevels)`.
+   **declarer can change** (with the high bidder's usual final turn). The félkezes
+   bid (with any standing kontra) is the value-to-beat. **No bidding-kontra here;**
+   the chain continues in play.
+5. **Play.** No per-component kontra — one hand-wide chain. It **continues into
+   play** at the **normal per-card kontra timing** (×2/level): a fresh defender
+   kontra on their 1st card, the declarer's rekontra on their **2nd** card,
+   szubkontra on the defender's 2nd card, etc. A kontra already made in the 5-card
+   round does **not** shift this earlier. Card for level L = `ceil((L+1)/2)`.
 6. **Scoring** = component × 4 (félkezes) × 2^k (redeals) × kontra-chain multiplier.
 
 ### Buli (a "party" of hands)
 
 A chain of `handsPerBuli` hands. Scoring differs:
-- Only a player's **own declared-hand** deltas are tracked (`declaredScores`);
-  defender results are **not** accumulated. Kept across chained bulis.
+- Only the **declarer's own RAW** result (one unit, per defender) is tracked per
+  hand in `declaredScores` — a won zöld parti in félkezes is **4, not 8**. The
+  pairwise ×2 is applied **only at Elszámolás**. Defender results are not
+  accumulated. Kept across chained bulis.
 - At buli end, rank the buli's declared points → **+premium to 1st, −premium to
   last** (middle 0; skipped if all tied), added to `declaredScores`.
 - Then a **`BULI_OVER`** screen offers **Következő buli** (chain, keeping totals)
