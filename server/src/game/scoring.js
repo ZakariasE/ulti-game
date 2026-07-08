@@ -1,4 +1,4 @@
-const { componentBasePoints, componentLabel } = require('./bidding')
+const { componentBasePoints, componentLabel, isIndividualKontra } = require('./bidding')
 const { isUltiWinCondition } = require('./rules')
 
 function countCardPoints(cards, trumpSuit) {
@@ -111,6 +111,44 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   const setup = (id) => { if (deltas[id] === undefined) deltas[id] = 0 }
   setup(declarerId)
   defenderIds.forEach(setup)
+
+  // Individual (per-defender) kontra: betli / no-trump durchmars. Each defender
+  // has their own kontra line, so `deltas` differ per defender (used directly in
+  // non-buli). The buli STANDING (declarerRaw) tracks only the base one-unit
+  // (kontra level 1); each defender's kontra EXTRA goes to `sidePairs`, a pairwise
+  // side-ledger that surfaces only at Elszámolás (never in the buli standing).
+  if (isIndividualKontra(declaration)) {
+    const key = declaration.scoring[0]
+    const won = componentWon(key, ctx)
+    const base = componentBasePoints(key, declaration.color, declaration.open)
+    const mult = (felkezesBid ? 4 : 1) * redealMultiplier
+    const baseUnit = base * mult
+    const sidePairs = {}
+    const addPair = (x, y, amt) => { // x owes y `amt`
+      const a = x < y ? x : y
+      const b = x < y ? y : x
+      sidePairs[`${a}|${b}`] = (sidePairs[`${a}|${b}`] || 0) + (x === a ? amt : -amt)
+    }
+    const perDefender = defenderIds.map((defId) => {
+      const level = (kontra[defId] && kontra[defId].level) || 1
+      const amount = baseUnit * level
+      if (won) { deltas[declarerId] += amount; deltas[defId] -= amount }
+      else { deltas[declarerId] -= amount; deltas[defId] += amount }
+      const extra = baseUnit * (level - 1)
+      if (extra) {
+        if (won) addPair(defId, declarerId, extra) // defender pays the declarer more
+        else addPair(declarerId, defId, extra)     // declarer pays that defender more
+      }
+      return { id: defId, level, amount }
+    })
+    const delta = won ? baseUnit : -baseUnit // one base unit — what the buli standing tracks
+    const components = [{
+      key, label: componentLabel(key), won, basePoints: base,
+      kontraLevel: 1, hundred: false, lossMult: 1, mult, hozam: false,
+      individual: true, perDefender, delta,
+    }]
+    return { components, deltas, declarerRaw: delta, cardTotal, partiDetail: null, declarerId, color: declaration.color, sidePairs }
+  }
 
   const hozamSet = new Set(declaration.hozam || [])
   const components = declaration.scoring.map((key) => {

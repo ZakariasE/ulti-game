@@ -1,29 +1,43 @@
 import { useGame } from '../../context/GameContext'
+import { sideNet } from '../../lib/bids'
 import styles from '../../styles/RoundResult.module.css'
 
 // Final settlement: turns the declaredScores standings into pairwise money owed,
-// using the lobby stake. net_i = Σ_{j≠i}(S_i − S_j) × stake (zero-sum).
+// using the lobby stake. net_i = Σ_{j≠i}(S_i − S_j) × stake, PLUS the individual-
+// kontra side-ledger (sidePairs — genuinely pairwise, added directly, not via the
+// all-pairs expansion). Both are ×stake. Zero-sum.
 export default function Elszamolas({ onClose }) {
   const { state } = useGame()
-  const { players, declaredScores, options, myPlayerId } = state
+  const { players, declaredScores, sidePairs, options, myPlayerId } = state
   const stake = options?.stake ?? 1
   const S = (id) => declaredScores?.[id] ?? 0
   const n = players.length
   const sum = players.reduce((s, p) => s + S(p.id), 0)
-  const net = (id) => (n * S(id) - sum) * stake
+  const sideOf = (id) => sideNet(sidePairs, id) // raw side balance (unscaled)
+  const net = (id) => (n * S(id) - sum + sideOf(id)) * stake
 
-  // Pairwise: the lower score pays the higher the difference × stake.
+  // Directed side amount a owes b (raw), from the sorted-key sidePairs map.
+  const sideAOwesB = (a, b) => {
+    const [k0, k1] = [a.id, b.id].sort()
+    const v = (sidePairs || {})[`${k0}|${k1}`] || 0
+    return a.id === k0 ? v : -v
+  }
+
+  // Pairwise: base standings difference (b pays a when a is higher) merged with
+  // the side-ledger, all × stake.
   const pairs = []
   for (let i = 0; i < players.length; i++) {
     for (let j = i + 1; j < players.length; j++) {
       const a = players[i]
       const b = players[j]
-      const diff = (S(a.id) - S(b.id)) * stake
-      if (diff > 0) pairs.push({ from: b, to: a, amount: diff })
-      else if (diff < 0) pairs.push({ from: a, to: b, amount: -diff })
+      // Positive → a pays b: base (S_b − S_a) plus side (a owes b).
+      const aToB = ((S(b.id) - S(a.id)) + sideAOwesB(a, b)) * stake
+      if (aToB > 0) pairs.push({ from: a, to: b, amount: aToB })
+      else if (aToB < 0) pairs.push({ from: b, to: a, amount: -aToB })
     }
   }
   const name = (p) => (p.id === myPlayerId ? 'Te' : p.name)
+  const anySide = players.some((p) => sideOf(p.id) !== 0)
 
   return (
     <div className={styles.overlay}>
@@ -33,15 +47,17 @@ export default function Elszamolas({ onClose }) {
 
         <table className={styles.scoreTable}>
           <thead>
-            <tr><th>Játékos</th><th>Pont</th><th>Egyenleg</th></tr>
+            <tr><th>Játékos</th><th>Pont</th>{anySide && <th>Kontra</th>}<th>Egyenleg</th></tr>
           </thead>
           <tbody>
             {players.map((p) => {
               const m = net(p.id)
+              const sd = sideOf(p.id)
               return (
                 <tr key={p.id}>
                   <td>{name(p)}</td>
                   <td>{S(p.id)}</td>
+                  {anySide && <td className={sd > 0 ? styles.pos : sd < 0 ? styles.neg : ''}>{sd ? (sd > 0 ? `+${sd}` : sd) : ''}</td>}
                   <td className={m >= 0 ? styles.pos : styles.neg}>{m >= 0 ? `+${m}` : m}</td>
                 </tr>
               )

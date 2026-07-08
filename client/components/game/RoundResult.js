@@ -59,7 +59,17 @@ export default function RoundResult({ roomCode }) {
           <tbody>
             {roundResult.components.map((c) => (
               <tr key={c.key}>
-                <td>{c.label}{c.hozam ? ' (hozám)' : ''}</td>
+                <td>
+                  {c.label}{c.hozam ? ' (hozám)' : ''}
+                  {c.individual && c.perDefender && (
+                    <span className={styles.hu}>
+                      {' '}— egyéni kontra: {c.perDefender.map((d) => {
+                        const nm = players.find((p) => p.id === d.id)?.name || '?'
+                        return `${nm} ×${d.level}`
+                      }).join(', ')}
+                    </span>
+                  )}
+                </td>
                 <td className={c.won ? styles.win : styles.loss}>
                   {c.flat ? 'bónusz' : (c.won ? 'nyert' : 'vesztett')}
                 </td>

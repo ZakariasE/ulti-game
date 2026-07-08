@@ -3,7 +3,7 @@ const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rul
 const {
   getInitialBidderSeat, getNextBidderSeat, fewerComponents,
   buildDeclaration, simpleDeclaration, noTrumpDeclaration, declarationLabel,
-  expandDeclaration, effectiveRankValue,
+  expandDeclaration, effectiveRankValue, isIndividualKontra,
 } = require('./bidding')
 const { calculateRoundScore } = require('./scoring')
 
@@ -47,6 +47,7 @@ function createGameState(roomCode, players = [], options = {}) {
     play: null,
     scores: {},
     declaredScores: {}, // buli: pid -> cumulative declarer-only points (+ premiums/penalties)
+    sidePairs: {}, // buli: individual-kontra side-ledger — "a|b" -> amount a owes b (persists all game)
     buli: null, // buli: { index, handsPlayed, points, kotelezo, history }
     roundResult: null,
     talonInHand: null, // { playerId, cardIds } while a player holds the picked-up talon
@@ -62,6 +63,14 @@ function _seatToPlayer(state, seat) {
 // made in the reopened (teljes kéz) round is a normal bid (×1).
 function _felkezFactor(round) {
   return round === 'felkezes' ? 4 : 1
+}
+
+// The kontra "lanes" for a declaration: for individual-kontra contracts (betli /
+// no-trump durchmars) each defender is their own lane (keyed by defender id);
+// otherwise the lanes are the scoring components. Both `bidding.kontra` and
+// `play.kontra` are keyed by lane, `{ [lane]: { level, step, lastParty } }`.
+function _kontraLanes(declaration, defenderIds) {
+  return isIndividualKontra(declaration) ? [...defenderIds] : [...declaration.scoring]
 }
 
 // ── Dealing ────────────────────────────────────────────────────────────────
@@ -219,9 +228,13 @@ function applyDeclare(state, playerId, payload) {
 
   state.bidding.currentHighBid = { playerId, declaration, round: state.bidding.mode }
   _recordKotelezoSaid(state, playerId, declaration) // kötelező: what this player now commits to
-  // A fresh (out)bid clears any kontra: reset to this declaration's components ×1.
+  // A fresh (out)bid clears any kontra: reset to this bid's kontra lanes ×1. For
+  // individual-kontra contracts (betli / nt-durchmars) the lanes are the two
+  // DEFENDERS (relative to this declarer); otherwise the scoring components.
   state.bidding.kontra = {}
-  for (const c of declaration.scoring) state.bidding.kontra[c] = { level: 1, step: 0, lastParty: null }
+  for (const lane of _kontraLanes(declaration, state.players.filter((p) => p.id !== playerId).map((p) => p.id))) {
+    state.bidding.kontra[lane] = { level: 1, step: 0, lastParty: null }
+  }
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
@@ -297,8 +310,16 @@ function _biddingKontraNextParty(k) {
   return k.lastParty === 'defenders' ? 'declarer' : 'defenders'
 }
 
-// Which components the given player may kontra right now (their turn, 5-card
-// round, a standing bid, and their side is the one to escalate that component).
+// A defender may only escalate their OWN lane in an individual-kontra contract;
+// the declarer may answer any lane. (For component lanes there is no such
+// restriction — either defender may double a shared component.)
+function _biddingLaneOk(current, playerId, lane, myParty) {
+  if (!isIndividualKontra(current.declaration)) return true
+  return myParty === 'defenders' ? lane === playerId : true
+}
+
+// Which kontra lanes the given player may kontra right now (their turn, 5-card
+// round, a standing bid, and their side is the one to escalate that lane).
 function biddingKontraOptions(state, playerId) {
   if (!state.options.felkezes || !state.bidding) return []
   if (state.bidding.mode !== 'felkezes' || state.bidding.phase !== 'BID') return []
@@ -307,17 +328,17 @@ function biddingKontraOptions(state, playerId) {
   const current = state.bidding.currentHighBid
   if (!current) return []
   const myParty = playerId === current.playerId ? 'declarer' : 'defenders'
-  return current.declaration.scoring.filter((c) => {
-    const k = state.bidding.kontra[c]
-    return k && _biddingKontraNextParty(k) === myParty
-  })
+  return Object.entries(state.bidding.kontra)
+    .filter(([lane, k]) => _biddingKontraNextParty(k) === myParty && _biddingLaneOk(current, playerId, lane, myParty))
+    .map(([lane]) => lane)
 }
 
-// Félkezes per-component bidding-kontra: on your turn (5-card round) you may
-// double any subset of the standing bid's components your side is due to
-// escalate. ×2 per level; alternates defenders → declarer → defenders. An outbid
-// clears it (see applyDeclare). The chain carries into play (see _startPlay).
-function applyBiddingKontra(state, playerId, components) {
+// Félkezes per-lane bidding-kontra: on your turn (5-card round) you may double any
+// subset of lanes your side is due to escalate (components, or your own defender
+// line for an individual-kontra betli/nt-durchmars). ×4 per level; alternates
+// defenders → declarer → defenders. An outbid clears it (see applyDeclare). The
+// chain carries into play (see _startPlay).
+function applyBiddingKontra(state, playerId, lanes) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
@@ -328,18 +349,19 @@ function applyBiddingKontra(state, playerId, components) {
   if (!current) throw new Error('Nothing to kontra')
 
   const myParty = playerId === current.playerId ? 'declarer' : 'defenders'
-  const list = components && components.length ? components : []
+  const list = lanes && lanes.length ? lanes : []
   if (!list.length) throw new Error('Pick at least one component to kontra')
 
   const raised = []
-  for (const c of list) {
-    const k = state.bidding.kontra[c]
-    if (!k) throw new Error(`Not part of this bid: ${c}`)
+  for (const lane of list) {
+    const k = state.bidding.kontra[lane]
+    if (!k) throw new Error(`Not part of this bid: ${lane}`)
     if (_biddingKontraNextParty(k) !== myParty) throw new Error('Not your side to double this now')
+    if (!_biddingLaneOk(current, playerId, lane, myParty)) throw new Error('Csak a saját kontrádat léptetheted')
     k.level *= 4 // 5-card félkezes round: a kontra quadruples
     k.step = (k.step || 0) + 1
     k.lastParty = myParty
-    raised.push(c)
+    raised.push(lane)
   }
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'kontra', components: raised })
@@ -389,12 +411,13 @@ function _startPlay(state, declarerId, declaration) {
   const defenderIds = state.players.filter((p) => p.id !== declarerId).map((p) => p.id)
   const declarer = state.players.find((p) => p.id === declarerId)
 
-  // Per-component kontra state — seeded from any kontra made during bidding
-  // (félkezes 5-card round); the chain continues in play from there.
+  // Per-lane kontra state — seeded from any kontra made during bidding (félkezes
+  // 5-card round); the chain continues in play from there. Lanes are per-defender
+  // for individual-kontra contracts, per-component otherwise.
   const kontra = {}
-  for (const c of declaration.scoring) {
-    const bk = state.bidding.kontra && state.bidding.kontra[c]
-    kontra[c] = {
+  for (const lane of _kontraLanes(declaration, defenderIds)) {
+    const bk = state.bidding.kontra && state.bidding.kontra[lane]
+    kontra[lane] = {
       level: bk ? bk.level : 1,
       step: bk ? (bk.step || 0) : 0,
       lastParty: bk ? bk.lastParty : null,
@@ -628,6 +651,13 @@ function applyRoundEnd(state) {
     // toward the buli's hand count — only the dealer shifts and it is replayed.
     result.empty = d === 0
     if (!result.empty) state.buli.handsPlayed++
+    // Individual-kontra extras (betli / nt-durchmars) go to the persistent side
+    // ledger — they surface only at Elszámolás, never in the buli standing.
+    if (result.sidePairs && !result.empty) {
+      for (const [pair, amt] of Object.entries(result.sidePairs)) {
+        if (amt) state.sidePairs[pair] = (state.sidePairs[pair] || 0) + amt
+      }
+    }
     _markKotelezo(state)
   } else {
     for (const [playerId, delta] of Object.entries(result.deltas)) {
@@ -885,7 +915,14 @@ function _kontraExpectation(step) {
   return { party: 'declarer', cardNum: (d + 1) / 2 + 1 }
 }
 
-function applyKontra(state, playerId, components) {
+// In an individual-kontra contract a defender may only escalate their OWN lane;
+// the declarer may answer any lane. Component lanes (uniform) have no such rule.
+function _playLaneOk(state, playerId, lane, party) {
+  if (!isIndividualKontra(state.play.declaration)) return true
+  return party === 'defenders' ? lane === playerId : true
+}
+
+function applyKontra(state, playerId, lanes) {
   if (state.phase !== 'PLAYING') throw new Error('Not in play')
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
@@ -899,19 +936,20 @@ function applyKontra(state, playerId, components) {
   const party = isDeclarer ? 'declarer' : 'defenders'
   const myCardNum = state.play.cardsPlayed[playerId] + 1 // the card they are about to play
 
-  const list = components && components.length ? components : Object.keys(state.play.kontra)
+  const list = lanes && lanes.length ? lanes : eligibleKontra(state, playerId)
   const raised = []
-  for (const c of list) {
-    const k = state.play.kontra[c]
-    if (!k) throw new Error(`Not part of this declaration: ${c}`)
+  for (const lane of list) {
+    const k = state.play.kontra[lane]
+    if (!k) throw new Error(`Not part of this declaration: ${lane}`)
     const exp = _kontraExpectation(k.step || 0)
     if (exp.party !== party) throw new Error('Not your side to double this now')
     if (exp.cardNum !== myCardNum) throw new Error('Not the right moment to double')
     if (k.lastParty === party) throw new Error('Waiting for the other side')
+    if (!_playLaneOk(state, playerId, lane, party)) throw new Error('Csak a saját kontrádat léptetheted')
     k.level *= 2 // teljes kéz (10 cards): a play kontra doubles
     k.step = (k.step || 0) + 1
     k.lastParty = party
-    raised.push(c)
+    raised.push(lane)
   }
   return { raised, kontra: state.play.kontra }
 }
@@ -925,7 +963,8 @@ function marriageOptionsFor(state, playerId) {
   return availableMarriages(state.hands[playerId])
 }
 
-// True if the given player currently has any component they may double.
+// The kontra lanes the given player may double right now (component keys, or
+// their own defender line for an individual-kontra contract).
 function eligibleKontra(state, playerId) {
   if (!state.play || state.phase !== 'PLAYING') return []
   const player = state.players.find((p) => p.id === playerId)
@@ -935,11 +974,12 @@ function eligibleKontra(state, playerId) {
   const party = playerId === state.play.declarerId ? 'declarer' : 'defenders'
   const myCardNum = state.play.cardsPlayed[playerId] + 1
   return Object.entries(state.play.kontra)
-    .filter(([, k]) => {
+    .filter(([lane, k]) => {
       const exp = _kontraExpectation(k.step || 0)
-      return exp.party === party && exp.cardNum === myCardNum && k.lastParty !== party
+      return exp.party === party && exp.cardNum === myCardNum && k.lastParty !== party &&
+        _playLaneOk(state, playerId, lane, party)
     })
-    .map(([c]) => c)
+    .map(([lane]) => lane)
 }
 
 function prepareNextRound(state) {

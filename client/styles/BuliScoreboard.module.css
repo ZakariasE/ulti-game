@@ -14,7 +14,9 @@
 
 .players { display: flex; gap: 16px; flex-wrap: wrap; }
 
-.player { display: flex; align-items: center; gap: 6px; }
+.player { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.playerRow { display: flex; align-items: center; gap: 6px; }
+.side { font-size: 10px; font-weight: 700; min-height: 12px; line-height: 12px; }
 
 .name { color: #cfe3d4; }
 

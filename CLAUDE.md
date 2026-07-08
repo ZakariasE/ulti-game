@@ -92,6 +92,21 @@ Each component can be doubled **independently**. Timing follows each player's ow
 
 You may kontra all components or just individual ones.
 
+**Individual (per-defender) kontra.** For **Betli** (all iterations) and the
+**no-trump Durchmars** (plain + terített) kontra is **per defender**: each
+defender kontras on their **own line** (they cannot kontra for each other), the
+declarer may answer each line separately, and the two lines score independently
+(different pairwise amounts). Internally the kontra map is keyed by **lane** —
+component keys for uniform contracts, **defender ids** for individual ones
+(`_kontraLanes`, `isIndividualKontra`). In **non-buli** this just yields
+per-defender `deltas`. In **buli** the standing (`declarerRaw`) tracks only the
+**base one-unit** (full value with **kontra forced to 1** — félkez ×4 / red /
+redeal still apply); each defender's kontra **extra** (`base×(level−1)`) goes to a
+persistent **side-ledger** (`state.sidePairs`, `"a|b"→amount a owes b`) that is
+folded in only at **Elszámolás** and shown above the names in the scoreboard — it
+never affects the buli standing/premium. (`calculateRoundScore` returns
+`sidePairs`; `applyRoundEnd` accumulates it in buli mode.)
+
 > Kontra is **per-component** everywhere. In the base game (and the reopened
 > teljes-kéz round) it happens **during play**, per card-timing. In the **félkezes
 > 5-card round** it happens **during bidding**: on your turn you may pass, **kontra
@@ -241,9 +256,12 @@ Unmet at buli end costs **−220** (Ulti) / **−110** (Betli/40-100), individua
 
 ### Elszámolás (settlement)
 
-From the `BULI_OVER` screen: a pure client computation from `declaredScores` and
-the lobby **stake** — each player's net = Σ_{j≠i}(Sᵢ − Sⱼ) × stake (zero-sum),
-plus a pairwise "who pays whom" breakdown.
+From the `BULI_OVER` screen: a pure client computation from `declaredScores`, the
+individual-kontra **side-ledger** (`sidePairs`), and the lobby **stake** — each
+player's net = (Σ_{j≠i}(Sᵢ − Sⱼ) + sideNetᵢ) × stake (zero-sum), plus a pairwise
+"who pays whom" breakdown that merges the standings difference with the side
+amounts. The side-ledger is added **directly** (it is genuinely pairwise), not
+through the all-pairs expansion.
 
 ---
 

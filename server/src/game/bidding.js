@@ -28,6 +28,14 @@ function isNoTrumpContract(key) {
   return Object.prototype.hasOwnProperty.call(NO_TRUMP_CONTRACTS, key)
 }
 
+// Contracts whose kontra is INDIVIDUAL (per-defender): each defender kontras on
+// their own line, producing different pairwise amounts. Betli (all iterations)
+// and the no-trump Durchmars (plain + terített). Trump durchmars is NOT here.
+const INDIVIDUAL_KONTRA_KEYS = new Set(['betli', 'heart_betli', 'open_betli', 'durchmars_nt', 'open_durchmars'])
+function isIndividualKontra(decl) {
+  return !!decl && decl.scoring.some((k) => INDIVIDUAL_KONTRA_KEYS.has(k))
+}
+
 const DECLARABLE_SUITS = ['makk', 'zold', 'tok', 'piros']
 
 // Resolve the color + concrete trump. When a concrete suit is given (félkezes,
@@ -193,6 +201,7 @@ module.exports = {
   CHOOSABLE,
   PARTI_BEARERS,
   isNoTrumpContract,
+  isIndividualKontra,
   buildDeclaration,
   simpleDeclaration,
   noTrumpDeclaration,

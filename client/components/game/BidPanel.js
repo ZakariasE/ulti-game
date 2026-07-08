@@ -3,7 +3,7 @@ import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import {
   CHOOSABLE, NO_TRUMP_CONTRACTS, TRUMP_COMPONENTS, componentLabel, makeDeclaration,
-  declarationValue, bidTotalValue, declarationLabel, beatsDeclaration, kontraLevelName,
+  declarationValue, bidTotalValue, declarationLabel, beatsDeclaration, kontraLevelName, isIndividualKontra,
 } from '../../lib/bids'
 import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/BidPanel.module.css'
@@ -40,21 +40,28 @@ export default function BidPanel({ roomCode }) {
   const myFelk = biddingMode === 'felkezes' ? 4 : 1
   // The standing bid's value includes any per-component kontra carried from the
   // félkez round (bkontra), so the displayed worth reflects the real stake.
-  const curKontrázva = currentDecl && currentDecl.scoring.some((c) => (bkontra[c]?.level || 1) > 1)
+  const curKontrázva = Object.values(bkontra).some((k) => (k?.level || 1) > 1)
   const highBidText = currentDecl
     ? `${declarationLabel(currentDecl)} (${bidTotalValue(currentDecl, curFelk, redeal, bkontra)}${curKontrázva ? ', kontrázva' : ''}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
-  // Per-component bidding kontra (félkezes 5-card round only): the components of
-  // the standing bid that MY side is next in line to double.
+  // Per-lane bidding kontra (félkezes 5-card round only): the lanes of the
+  // standing bid that MY side is next in line to double. Lanes are per-DEFENDER
+  // (keyed by player id) for individual-kontra contracts (betli / nt-durchmars),
+  // otherwise scoring components.
   const myParty = currentHighBid && currentHighBid.playerId === myPlayerId ? 'declarer' : 'defenders'
+  const individualBid = isIndividualKontra(currentDecl)
   const bidKontraOptions = (namedTrump && isMyTurn && biddingPhase === 'BID' && currentDecl)
-    ? currentDecl.scoring.filter((c) => {
-        const k = bkontra[c] || { level: 1, lastParty: null }
-        const next = k.lastParty === 'defenders' ? 'declarer' : 'defenders'
-        return next === myParty
-      })
+    ? Object.entries(bkontra).filter(([lane, k]) => {
+        const next = (k?.lastParty === 'defenders') ? 'declarer' : 'defenders'
+        if (next !== myParty) return false
+        if (individualBid && myParty === 'defenders' && lane !== myPlayerId) return false
+        return true
+      }).map(([lane]) => lane)
     : []
+  const laneLabel = (lane) => (individualBid
+    ? `${componentLabel(currentDecl.scoring[0])} (${lane === myPlayerId ? 'Te' : players.find((p) => p.id === lane)?.name || '?'})`
+    : componentLabel(lane))
   const staged = pendingBidKontra || []
   const toggleBidKontra = (c) => dispatch({ type: 'TOGGLE_BID_KONTRA', component: c })
   const commitBidKontra = () => {
@@ -262,16 +269,16 @@ export default function BidPanel({ roomCode }) {
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Vagy kontra komponensenként</div>
           <div className={styles.chips}>
-            {bidKontraOptions.map((c) => {
+            {bidKontraOptions.map((lane) => {
               // Name by step (Kontra/Rekontra/…); a 5-card kontra multiplies ×4.
-              const nextName = kontraLevelName(2 ** ((bkontra[c]?.step || 0) + 1))
+              const nextName = kontraLevelName(2 ** ((bkontra[lane]?.step || 0) + 1))
               return (
                 <button
-                  key={c}
-                  className={`${styles.chip} ${staged.includes(c) ? styles.chipOn : ''}`}
-                  onClick={() => toggleBidKontra(c)}
+                  key={lane}
+                  className={`${styles.chip} ${staged.includes(lane) ? styles.chipOn : ''}`}
+                  onClick={() => toggleBidKontra(lane)}
                 >
-                  {nextName} {componentLabel(c)} (×4)
+                  {nextName} {laneLabel(lane)} (×4)
                 </button>
               )
             })}

@@ -24,6 +24,26 @@ export function componentLabel(component) {
   return (TRUMP_COMPONENTS[component] || NO_TRUMP_CONTRACTS[component] || {}).label || component
 }
 
+// Contracts with INDIVIDUAL (per-defender) kontra — betli (all iterations) and
+// the no-trump durchmars. For these, kontra lanes are keyed by defender id, not
+// by component. Mirror of server isIndividualKontra.
+const INDIVIDUAL_KONTRA_KEYS = new Set(['betli', 'heart_betli', 'open_betli', 'durchmars_nt', 'open_durchmars'])
+export function isIndividualKontra(decl) {
+  return !!decl && (decl.scoring || []).some((k) => INDIVIDUAL_KONTRA_KEYS.has(k))
+}
+
+// Per-player net of the individual-kontra side-ledger (sidePairs: "a|b" -> amount
+// a owes b). Positive = that player is owed; negative = they owe.
+export function sideNet(sidePairs, playerId) {
+  let net = 0
+  for (const [pair, amt] of Object.entries(sidePairs || {})) {
+    const [a, b] = pair.split('|')
+    if (a === playerId) net -= amt
+    else if (b === playerId) net += amt
+  }
+  return net
+}
+
 // Escalating kontra names, keyed by the multiplier reached.
 export const KONTRA_LEVEL_NAME = {
   2: 'Kontra', 4: 'Rekontra', 8: 'Szubkontra', 16: 'Mordkontra', 32: 'Hirskontra', 64: 'Fedáksári',

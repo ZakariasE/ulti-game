@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer } from 'react'
-import { declarationLabel, componentLabel, kontraLevelName } from '../lib/bids'
+import { declarationLabel, componentLabel, kontraLevelName, isIndividualKontra } from '../lib/bids'
 import { SUIT_NAMES } from '../lib/cards'
 
 const GameContext = createContext(null)
@@ -36,6 +36,7 @@ const initialState = {
   options: null, // { felkezes, buli:{on,handsPerBuli,premium}, kotelezo:{on,ultiPenalty,betliPenalty}, stake }
   buli: null, // buli progress/standings (buli mode)
   declaredScores: {}, // pid -> declarer-only cumulative points (buli mode)
+  sidePairs: {}, // individual-kontra side-ledger "a|b" -> amount a owes b (buli mode)
   // Bidding
   currentTurnId: null,
   biddingPhase: null, // 'BID' | 'DISCARD' | 'DECLARE' | 'ROB_OFFER' | 'POST_DEAL_DISCARD' | 'DONE'
@@ -138,6 +139,7 @@ function gameReducer(state, action) {
         options: action.options || state.options,
         buli: action.buli !== undefined ? action.buli : state.buli,
         declaredScores: action.declaredScores || state.declaredScores,
+        sidePairs: action.sidePairs || state.sidePairs,
       }
 
     case 'HAND_DEALT':
@@ -258,7 +260,12 @@ function gameReducer(state, action) {
       if (raised.length) {
         // Name by step (Kontra/Rekontra/…), not the multiplier.
         const step = action.kontra?.[raised[0]]?.step || 1
-        const comps = raised.map(componentLabel).join(', ')
+        // Individual-kontra lanes are defender ids — label them by the contract +
+        // which defender's line it is; otherwise by component.
+        const individual = isIndividualKontra(state.declaration)
+        const comps = raised.map((lane) => (individual
+          ? `${componentLabel(state.declaration.scoring[0])} (${nameOf(state, lane)})`
+          : componentLabel(lane))).join(', ')
         toast = announce(state, `${nameOf(state, action.byId)} — ${kontraLevelName(2 ** step)}: ${comps}`, 'kontra')
       }
       return { ...state, kontra: action.kontra, ...toast }
@@ -339,6 +346,7 @@ function gameReducer(state, action) {
         roundResult: action.result,
         scores: action.scores,
         declaredScores: action.declaredScores || state.declaredScores,
+        sidePairs: action.sidePairs || state.sidePairs,
         buli: action.buli || state.buli,
         claim: null,
         currentTrick: [],
@@ -351,6 +359,7 @@ function gameReducer(state, action) {
         phase: 'BULI_OVER',
         buli: action.buli,
         declaredScores: action.declaredScores || state.declaredScores,
+        sidePairs: action.sidePairs || state.sidePairs,
         readyState: null,
       }
 

@@ -209,7 +209,7 @@ function registerHandlers(io, socket) {
           commitBuliSettlement(state)
           state.phase = 'BULI_OVER'
           io.to(roomCode).emit('buli:completed', {
-            buli: buliSnapshot(state), declaredScores: state.declaredScores,
+            buli: buliSnapshot(state), declaredScores: state.declaredScores, sidePairs: state.sidePairs,
           })
         } else {
           prepareNextRound(state)
@@ -259,6 +259,7 @@ function _roundCompleted(state) {
     result: state.roundResult,
     scores: state.scores,
     declaredScores: state.declaredScores,
+    sidePairs: state.sidePairs,
     buli: buliSnapshot(state),
   }
 }
@@ -287,7 +288,7 @@ function _commitKontra(io, roomCode, state, playerId, components) {
 function _dealAndAnnounce(io, roomCode, state) {
   io.to(roomCode).emit('game:started', {
     dealerIndex: state.dealerIndex, players: state.players, options: state.options,
-    buli: buliSnapshot(state), declaredScores: state.declaredScores,
+    buli: buliSnapshot(state), declaredScores: state.declaredScores, sidePairs: state.sidePairs,
   })
   state.players.forEach((p) => _sendHand(io, state, p.id))
   // Tell the first bidder which two of their cards came from the talon.
