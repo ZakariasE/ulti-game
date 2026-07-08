@@ -37,8 +37,11 @@ export default function BidPanel({ roomCode }) {
   // current round's factor. Outbidding compares effective values across rounds.
   const curFelk = currentHighBid?.round === 'felkezes' ? 4 : 1
   const myFelk = biddingMode === 'felkezes' ? 4 : 1
+  // The standing bid's value includes any per-component kontra carried from the
+  // félkez round (bkontra), so the displayed worth reflects the real stake.
+  const curKontrázva = currentDecl && currentDecl.scoring.some((c) => (bkontra[c]?.level || 1) > 1)
   const highBidText = currentDecl
-    ? `${declarationLabel(currentDecl)} (${bidTotalValue(currentDecl, curFelk, redeal)}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
+    ? `${declarationLabel(currentDecl)} (${bidTotalValue(currentDecl, curFelk, redeal, bkontra)}${curKontrázva ? ', kontrázva' : ''}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
   // Per-component bidding kontra (félkezes 5-card round only): the components of

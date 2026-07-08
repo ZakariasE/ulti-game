@@ -76,13 +76,15 @@ export function declarationValue(decl) {
 
 // Full point value incl. per-component multipliers: original components use
 // `felkFactor` (×4 in the 5-card round, else ×1), hozámondott add-ons use ×2,
-// all × redeal. Used to display an expanded (hozámondás) standing bid's worth.
-export function bidTotalValue(decl, felkFactor = 1, redeal = 1) {
+// all × redeal, and × each component's kontra level. Used to display a standing
+// bid's true worth (incl. any kontra carried from the félkez round).
+export function bidTotalValue(decl, felkFactor = 1, redeal = 1, kontra = {}) {
   if (!decl || decl.invalid) return 0
   const hozam = new Set(decl.hozam || [])
   return decl.scoring.reduce((sum, c) => {
     const mult = (hozam.has(c) ? 2 : felkFactor) * redeal
-    return sum + componentBasePoints(c, decl.color) * mult
+    const kl = (kontra[c] && kontra[c].level) || 1
+    return sum + componentBasePoints(c, decl.color) * mult * kl
   }, 0)
 }
 

@@ -197,12 +197,21 @@ A chain of `handsPerBuli` hands. Scoring differs:
   hand in `declaredScores` — a won zöld parti in félkezes is **4, not 8**. The
   pairwise ×2 is applied **only at Elszámolás**. Defender results are not
   accumulated. Kept across chained bulis.
-- At buli end, rank the buli's declared points → **+premium to 1st, −premium to
-  last** (middle 0), added to `declaredScores`. **Ties split the premium:** a
-  2-way tie for 1st (or last) splits +premium (−premium) between the two; a full
-  3-way tie pays nothing. Stays zero-sum.
-- Then a **`BULI_OVER`** screen offers **Következő buli** (chain, keeping totals)
-  or **Elszámolás**.
+- At buli end: apply the **kötelező penalties first**, then rank the
+  **penalty-adjusted** points (points + penalties) → **+premium to 1st, −premium
+  to last** (middle 0). So a player who leads on raw buli points but missed a
+  required saying can drop to last and lose the premium. **Ties split the
+  premium:** a 2-way tie for 1st (or last) splits +premium (−premium) between the
+  two; a full 3-way tie pays nothing. Stays zero-sum.
+- **Settlement is deferred:** `_settleBuli` (at round end) only **computes** the
+  premiums/penalties and marks `buli.over` — it does **not** fold them into
+  `declaredScores` yet, so the last hand's SCORING screen still shows
+  pre-settlement totals. `commitBuliSettlement(state)` folds them in (idempotent
+  via `buli.settled`) when moving to the buli-over screen.
+- Then a **`BULI_OVER`** screen (columns: buli pont, **büntetés**, **prémium**,
+  összesen) offers **Következő buli** (chain, keeping totals) or **Elszámolás**.
+  Like the next-hand button, **Következő buli requires ALL connected players to
+  agree** (`buli:next` uses a `_readyForBuli` set and emits `round:ready`).
 
 ### Kötelező mondások (required sayings, per player, Félkezes + Buli)
 
@@ -277,7 +286,10 @@ plus a pairwise "who pays whom" breakdown.
     shifts, hand replayed). Kötelező credit: `_recordKotelezoSaid` (called from
     `applyDeclare`/hozám discard/`applyRob`-own-talon) tracks per-hand said-flags;
     `_markKotelezo(state)` folds them into `buli.kotelezo` at hand end. `_settleBuli`
-    (premium ± with tie-splitting, kötelező penalties), `startBuli`, `prepareNextRound`
+    (penalties first, then premium ± with tie-splitting on the penalty-adjusted
+    score; computes only — does not touch `declaredScores`), `commitBuliSettlement`
+    (folds the settlement into `declaredScores` at the buli-over screen, idempotent),
+    `startBuli`, `prepareNextRound`
     (clears round-scoped fields, resets `redealMultiplier`/`felkezesReveal`/`felkezesFives`/`reserve`).
   - Snapshots: `biddingSnapshot` (hides concrete minor trump; includes `currentHighBid.round`),
     `buliSnapshot`, `publicDeclaration`, `handCounts`.

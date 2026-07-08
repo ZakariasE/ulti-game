@@ -716,9 +716,17 @@ function _markKotelezo(state) {
   })
 }
 
-// End of buli: premium to 1st / −premium to last, per-player kötelező penalties.
-// Ties split the premium: a 2-way tie for 1st (or last) splits +premium (−premium)
-// between the two; a 3-way tie (everyone equal) pays no premium at all.
+// End of buli: kötelező penalties FIRST, then premium to 1st / −premium to last.
+// The premium is ranked on the penalty-ADJUSTED score (points + penalties), so a
+// player who leads on buli points but missed a required saying can drop to last
+// and lose the premium accordingly. Ties split the premium: a 2-way tie for 1st
+// (or last) splits +premium (−premium) between the two; a 3-way tie (everyone
+// equal) pays no premium at all.
+//
+// This only COMPUTES the settlement and marks the buli over — the premiums/
+// penalties are not folded into declaredScores yet (that happens at the buli-over
+// screen via commitBuliSettlement), so the last hand's scoring view still shows
+// pre-settlement totals.
 function _settleBuli(state) {
   const points = state.buli.points
 
@@ -726,13 +734,26 @@ function _settleBuli(state) {
   const penalties = {}
   state.players.forEach((p) => { premiums[p.id] = 0; penalties[p.id] = 0 })
 
+  // Penalties first.
+  if (state.options.kotelezo.on) {
+    const { ultiPenalty, betliPenalty } = state.options.kotelezo
+    state.players.forEach((p) => {
+      const k = state.buli.kotelezo[p.id] || { ulti: false, betli: false }
+      if (!k.ulti) penalties[p.id] -= ultiPenalty
+      if (!k.betli) penalties[p.id] -= betliPenalty
+    })
+  }
+
+  // Premium ranks by the penalty-adjusted score.
+  const adjusted = {}
+  state.players.forEach((p) => { adjusted[p.id] = points[p.id] + penalties[p.id] })
   const premium = state.options.buli.premium
-  const vals = state.players.map((p) => points[p.id])
+  const vals = state.players.map((p) => adjusted[p.id])
   const max = Math.max(...vals)
   const min = Math.min(...vals)
   if (premium && max !== min) { // max === min ⇒ everyone tied ⇒ no premium
-    const firstGroup = state.players.filter((p) => points[p.id] === max)
-    const lastGroup = state.players.filter((p) => points[p.id] === min)
+    const firstGroup = state.players.filter((p) => adjusted[p.id] === max)
+    const lastGroup = state.players.filter((p) => adjusted[p.id] === min)
     // A group of all 3 only happens when everyone's tied (handled above); a
     // 2-way tie splits its premium evenly.
     if (firstGroup.length < state.players.length) {
@@ -743,17 +764,10 @@ function _settleBuli(state) {
     }
   }
 
-  if (state.options.kotelezo.on) {
-    const { ultiPenalty, betliPenalty } = state.options.kotelezo
-    state.players.forEach((p) => {
-      const k = state.buli.kotelezo[p.id] || { ulti: false, betli: false }
-      if (!k.ulti) penalties[p.id] -= ultiPenalty
-      if (!k.betli) penalties[p.id] -= betliPenalty
-    })
-  }
-
+  // Projected final totals (for display); not applied to declaredScores yet.
+  const projected = {}
   state.players.forEach((p) => {
-    state.declaredScores[p.id] = (state.declaredScores[p.id] || 0) + premiums[p.id] + penalties[p.id]
+    projected[p.id] = (state.declaredScores[p.id] || 0) + premiums[p.id] + penalties[p.id]
   })
 
   const result = {
@@ -762,11 +776,24 @@ function _settleBuli(state) {
     premiums,
     penalties,
     kotelezo: JSON.parse(JSON.stringify(state.buli.kotelezo)),
-    declaredScores: { ...state.declaredScores },
+    declaredScores: projected,
   }
   state.buli.over = true
+  state.buli.settled = false
   state.buli.result = result
   state.buli.history.push(result)
+}
+
+// Fold the computed premiums/penalties into declaredScores. Called when moving to
+// the buli-over screen (idempotent). Kept separate from _settleBuli so the last
+// hand's scoring view shows pre-settlement totals.
+function commitBuliSettlement(state) {
+  if (!state.buli || !state.buli.over || state.buli.settled) return
+  const r = state.buli.result
+  state.players.forEach((p) => {
+    state.declaredScores[p.id] = (state.declaredScores[p.id] || 0) + (r.premiums[p.id] || 0) + (r.penalties[p.id] || 0)
+  })
+  state.buli.settled = true
 }
 
 function buliSnapshot(state) {
@@ -988,6 +1015,7 @@ module.exports = {
   respondClaim,
   applyRoundEnd,
   startBuli,
+  commitBuliSettlement,
   buliSnapshot,
   prepareNextRound,
   availableMarriages,

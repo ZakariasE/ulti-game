@@ -3,7 +3,7 @@ const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
   applyFirstLead, applyKontra, applyBiddingKontra,
   applyPlayCard, startClaim, respondClaim, prepareNextRound,
-  startBuli, buliSnapshot,
+  startBuli, commitBuliSettlement, buliSnapshot,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
@@ -204,7 +204,9 @@ function registerHandlers(io, socket) {
       if (state._readyForNext.size >= connected) {
         state._readyForNext = null
         if (state.buli && state.buli.over) {
-          // Buli finished — show its result instead of dealing the next hand.
+          // Buli finished — fold the premiums/penalties into declaredScores now
+          // (deferred from round end) and show its result instead of dealing.
+          commitBuliSettlement(state)
           state.phase = 'BULI_OVER'
           io.to(roomCode).emit('buli:completed', {
             buli: buliSnapshot(state), declaredScores: state.declaredScores,
@@ -220,15 +222,25 @@ function registerHandlers(io, socket) {
     }
   })
 
-  // Start the next buli (keeps declaredScores + history).
+  // Start the next buli (keeps declaredScores + history). Like the next-hand
+  // button, this requires ALL connected players to agree before it fires.
   socket.on('buli:next', ({ roomCode }) => {
     try {
       const state = rooms.getRoom(roomCode)
       if (!state.buli || !state.buli.over) throw new Error('No finished buli')
-      startBuli(state)
-      prepareNextRound(state)
-      applyDeal(state)
-      _dealAndAnnounce(io, roomCode, state)
+      if (!state._readyForBuli) state._readyForBuli = new Set()
+      state._readyForBuli.add(socket.id)
+
+      const connected = state.players.filter((p) => p.isConnected).length
+      io.to(roomCode).emit('round:ready', { readyCount: state._readyForBuli.size, total: connected })
+
+      if (state._readyForBuli.size >= connected) {
+        state._readyForBuli = null
+        startBuli(state)
+        prepareNextRound(state)
+        applyDeal(state)
+        _dealAndAnnounce(io, roomCode, state)
+      }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
