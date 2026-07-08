@@ -198,7 +198,9 @@ A chain of `handsPerBuli` hands. Scoring differs:
   pairwise ×2 is applied **only at Elszámolás**. Defender results are not
   accumulated. Kept across chained bulis.
 - At buli end, rank the buli's declared points → **+premium to 1st, −premium to
-  last** (middle 0; skipped if all tied), added to `declaredScores`.
+  last** (middle 0), added to `declaredScores`. **Ties split the premium:** a
+  2-way tie for 1st (or last) splits +premium (−premium) between the two; a full
+  3-way tie pays nothing. Stays zero-sum.
 - Then a **`BULI_OVER`** screen offers **Következő buli** (chain, keeping totals)
   or **Elszámolás**.
 

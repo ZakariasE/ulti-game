@@ -676,21 +676,30 @@ function _markKotelezo(state, declarerId, declaration) {
 }
 
 // End of buli: premium to 1st / −premium to last, per-player kötelező penalties.
+// Ties split the premium: a 2-way tie for 1st (or last) splits +premium (−premium)
+// between the two; a 3-way tie (everyone equal) pays no premium at all.
 function _settleBuli(state) {
   const points = state.buli.points
-  const ranked = [...state.players].sort(
-    (a, b) => (points[b.id] - points[a.id]) || (a.seatIndex - b.seatIndex)
-  )
-  const allEqual = ranked.every((p) => points[p.id] === points[ranked[0].id])
 
   const premiums = {}
   const penalties = {}
   state.players.forEach((p) => { premiums[p.id] = 0; penalties[p.id] = 0 })
 
   const premium = state.options.buli.premium
-  if (!allEqual && premium) {
-    premiums[ranked[0].id] = premium
-    premiums[ranked[ranked.length - 1].id] = -premium
+  const vals = state.players.map((p) => points[p.id])
+  const max = Math.max(...vals)
+  const min = Math.min(...vals)
+  if (premium && max !== min) { // max === min ⇒ everyone tied ⇒ no premium
+    const firstGroup = state.players.filter((p) => points[p.id] === max)
+    const lastGroup = state.players.filter((p) => points[p.id] === min)
+    // A group of all 3 only happens when everyone's tied (handled above); a
+    // 2-way tie splits its premium evenly.
+    if (firstGroup.length < state.players.length) {
+      firstGroup.forEach((p) => { premiums[p.id] += premium / firstGroup.length })
+    }
+    if (lastGroup.length < state.players.length) {
+      lastGroup.forEach((p) => { premiums[p.id] -= premium / lastGroup.length })
+    }
   }
 
   if (state.options.kotelezo.on) {
