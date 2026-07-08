@@ -209,13 +209,21 @@ A chain of `handsPerBuli` hands. Scoring differs:
 Each player must, during the buli, declare **one Ulti** and **one Betli or 40-100**.
 Unmet at buli end costs **−220** (Ulti) / **−110** (Betli/40-100), individually.
 
-- The **required Ulti only counts** if the declarer's original 5-card hand holds
-  **≤ 3 cards of the trump suit** (revealed). More than 3 → no credit.
-- Declared with **fewer than 3** trump cards (2 or 1) → the declarer earns a
-  **+10** bonus (**+20** if the Ulti is red) at hand end. It is folded into the
-  score as its own **`ulti_bonus` component** (a flat declarer premium — in
-  `declarerRaw`, not in the pairwise `deltas`), shown as a row in the round-over
-  breakdown. Applied exactly once (not separately in `applyRoundEnd`).
+- **Credit is for *saying* it** — trump count is irrelevant to credit. You keep the
+  credit if another player **outbids** you (you still said it), and if you only
+  **hozámond** (add on). You **lose** it if you switch your *own* bid away: in
+  félkez to a bid without that ulti, or in teljes kéz by **picking your talon back
+  up** to re-bid (forfeits the ulti even if the new bid contains one — that's why
+  a self-switch to a different-color bundle, which needs a talon pickup, loses it).
+  Tracked per hand on `state.bidding` (`saidUlti`/`saidBetli` = latest own bid;
+  `ultiLocked` = picked own talon up) via `_recordKotelezoSaid`; folded into the
+  sticky `buli.kotelezo` at hand end by `_markKotelezo(state)`.
+- **Premium is separate from credit.** A played (not just said) Ulti whose declarer
+  held **fewer than 3** (i.e. ≤2) cards of the trump suit in the 5-card hand earns
+  **+10** (**+20** red), folded in as its own **`ulti_bonus` component** (flat
+  declarer premium — in `declarerRaw`, not the pairwise `deltas`), shown as a
+  round-over row. Applied once (in `calculateRoundScore`, if the *played*
+  declaration includes an ulti); if something else is played, no premium.
 
 ### Elszámolás (settlement)
 
@@ -261,9 +269,11 @@ plus a pairwise "who pays whom" breakdown.
     `declaredScores`/`buli.points`; non-buli adds pairwise `result.deltas` to `scores`.
     An **üres** hand (declarer
     net 0 → `result.empty`) does **not** increment `buli.handsPlayed` (dealer still
-    shifts, hand replayed). `_markKotelezo`, `_settleBuli`
-    (premium ±, kötelező penalties), `startBuli`, `prepareNextRound` (clears round-scoped
-    fields, resets `redealMultiplier`/`felkezesReveal`/`felkezesFives`/`reserve`).
+    shifts, hand replayed). Kötelező credit: `_recordKotelezoSaid` (called from
+    `applyDeclare`/hozám discard/`applyRob`-own-talon) tracks per-hand said-flags;
+    `_markKotelezo(state)` folds them into `buli.kotelezo` at hand end. `_settleBuli`
+    (premium ± with tie-splitting, kötelező penalties), `startBuli`, `prepareNextRound`
+    (clears round-scoped fields, resets `redealMultiplier`/`felkezesReveal`/`felkezesFives`/`reserve`).
   - Snapshots: `biddingSnapshot` (hides concrete minor trump; includes `currentHighBid.round`),
     `buliSnapshot`, `publicDeclaration`, `handCounts`.
 - **`game/scoring.js`** — `calculateRoundScore({..., felkezesBid, redealMultiplier, ultiBonus})` → `{ components[],
@@ -284,7 +294,7 @@ plus a pairwise "who pays whom" breakdown.
 - `options`: `{ felkezes, fourAces (Négy ász biddable; default on), buli:{on,handsPerBuli,premium}, kotelezo:{on,ultiPenalty,betliPenalty}, stake }`.
 - `bidding`: `{ mode:'felkezes'|'normal', phase:'BID'|'DISCARD'|'DECLARE'|'ROB_OFFER'|'POST_DEAL_DISCARD'|'DONE',
   currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{ [comp]:{level,step,lastParty} } (per-component bidding kontra; ×4/level),
-  consecutivePasses, history }`. Closing = **the current high bidder passes on their turn**.
+  saidUlti/saidBetli/ultiLocked{pid} (kötelező credit tracking), consecutivePasses, history }`. Closing = **the current high bidder passes on their turn**.
 - `play`: `{ declarerId, defenderIds, declaration (may carry `hozam:[...]` add-ons ×2), felkezesBid (bool → drives ×4),
   kontra{comp:{level,step,lastParty}} (per-component, all modes; seeded from bidding.kontra; play kontra ×2/level),
   cardsPlayed{pid}, marriages, currentTrick, completedTricks, declarerFive, openingLeadDone, claim }`.

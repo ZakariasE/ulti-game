@@ -90,6 +90,10 @@ function applyDeal(state) {
       consecutivePasses: 0,
       currentHighBid: null,
       kontra: {}, // per-component bidding kontra: { [comp]: { level, lastParty } }
+      // Kötelező tracking (per hand): what each player currently commits to by
+      // their latest own bid; `ultiLocked` = they picked their talon back up, so
+      // their ulti credit is forfeit for this hand (see _recordKotelezoSaid).
+      saidUlti: {}, saidBetli: {}, ultiLocked: {},
       history: [],
     }
   } else {
@@ -104,6 +108,7 @@ function applyDeal(state) {
       consecutivePasses: 0,
       currentHighBid: null,
       kontra: {}, // per-component (unused during base-game bidding; seeded on declare)
+      saidUlti: {}, saidBetli: {}, ultiLocked: {},
       history: [],
     }
   }
@@ -148,6 +153,8 @@ function applyBidDiscard(state, playerId, cardIds, hozam) {
       }
       const expanded = expandDeclaration(state.bidding.currentHighBid.declaration, hozam)
       state.bidding.currentHighBid.declaration = expanded
+      // Hozámondás keeps/adds the ulti → recompute the kötelező commitment.
+      _recordKotelezoSaid(state, playerId, expanded)
       // Add-ons join the per-component kontra map (kontrázható in play, ×2).
       for (const c of expanded.scoring) {
         if (!state.bidding.kontra[c]) state.bidding.kontra[c] = { level: 1, step: 0, lastParty: null }
@@ -209,6 +216,7 @@ function applyDeclare(state, playerId, payload) {
   }
 
   state.bidding.currentHighBid = { playerId, declaration, round: state.bidding.mode }
+  _recordKotelezoSaid(state, playerId, declaration) // kötelező: what this player now commits to
   // A fresh (out)bid clears any kontra: reset to this declaration's components ×1.
   state.bidding.kontra = {}
   for (const c of declaration.scoring) state.bidding.kontra[c] = { level: 1, step: 0, lastParty: null }
@@ -233,6 +241,14 @@ function applyRob(state, playerId) {
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
   if (state.bidding.phase !== 'ROB_OFFER') throw new Error('Cannot rob now')
+
+  // Kötelező: picking your OWN talon back up (you are the standing high bidder)
+  // forfeits your ulti credit for this hand, even if you re-declare an ulti.
+  if (state.options.kotelezo.on && state.bidding.currentHighBid &&
+      state.bidding.currentHighBid.playerId === playerId) {
+    state.bidding.ultiLocked[playerId] = true
+    state.bidding.saidUlti[playerId] = false
+  }
 
   state.talonInHand = { playerId, cardIds: state.talon.map((c) => c.id) }
   state.hands[playerId] = [...state.hands[playerId], ...state.talon]
@@ -610,7 +626,7 @@ function applyRoundEnd(state) {
     // toward the buli's hand count — only the dealer shifts and it is replayed.
     result.empty = d === 0
     if (!result.empty) state.buli.handsPlayed++
-    _markKotelezo(state, declarerId, state.play.declaration)
+    _markKotelezo(state)
   } else {
     for (const [playerId, delta] of Object.entries(result.deltas)) {
       state.scores[playerId] = (state.scores[playerId] || 0) + delta
@@ -664,15 +680,29 @@ function _requiredUltiBonus(state, declaration) {
   return declaration.color === 'red' ? 20 : 10
 }
 
-// Kötelező mondások: record that the declarer said an Ulti / Betli-40-100.
-// The required Ulti only counts with ≤3 trump cards in the 5-card hand.
-function _markKotelezo(state, declarerId, declaration) {
-  const k = state.buli.kotelezo[declarerId] || (state.buli.kotelezo[declarerId] = { ulti: false, betli: false })
-  if (declaration.scoring.includes('ulti')) {
-    const count = _ultiTrumpCount(state, declaration)
-    if (count === null || count <= 3) k.ulti = true
-  }
-  if (declaration.scoring.some((s) => KOTELEZO_BETLI_KEYS.has(s))) k.betli = true
+// Kötelező mondások — record what a player commits to as they declare. Credit is
+// for *saying* it (trump count is irrelevant to credit; it only gates the +10/+20
+// premium on a played ulti). A player's LATEST own bid defines their commitment,
+// so switching your own bid to something without the ulti drops the ulti (félkez).
+// Being outbid by ANOTHER player doesn't touch your flags → you keep credit.
+// `ultiLocked` (set when you pick your own talon back up in teljes kéz) forfeits
+// the ulti for the hand even if you re-declare one.
+function _recordKotelezoSaid(state, playerId, declaration) {
+  if (!state.options.kotelezo.on || !state.bidding) return
+  const b = state.bidding
+  if (!b.ultiLocked[playerId]) b.saidUlti[playerId] = declaration.scoring.includes('ulti')
+  b.saidBetli[playerId] = declaration.scoring.some((s) => KOTELEZO_BETLI_KEYS.has(s))
+}
+
+// At hand end, fold each player's said-flags into the buli's sticky kötelező
+// record (once true it stays true across the buli's hands).
+function _markKotelezo(state) {
+  const b = state.bidding || {}
+  state.players.forEach((p) => {
+    const k = state.buli.kotelezo[p.id] || (state.buli.kotelezo[p.id] = { ulti: false, betli: false })
+    if (b.saidUlti && b.saidUlti[p.id]) k.ulti = true
+    if (b.saidBetli && b.saidBetli[p.id]) k.betli = true
+  })
 }
 
 // End of buli: premium to 1st / −premium to last, per-player kötelező penalties.
