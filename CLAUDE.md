@@ -99,12 +99,14 @@ declarer may answer each line separately, and the two lines score independently
 (different pairwise amounts). Internally the kontra map is keyed by **lane** —
 component keys for uniform contracts, **defender ids** for individual ones
 (`_kontraLanes`, `isIndividualKontra`). In **non-buli** this just yields
-per-defender `deltas`. In **buli** the standing (`declarerRaw`) tracks only the
-**base one-unit** (full value with **kontra forced to 1** — félkez ×4 / red /
-redeal still apply); each defender's kontra **extra** (`base×(level−1)`) goes to a
-persistent **side-ledger** (`state.sidePairs`, `"a|b"→amount a owes b`) that is
-folded in only at **Elszámolás** and shown above the names in the scoreboard — it
-never affects the buli standing/premium. (`calculateRoundScore` returns
+per-defender `deltas`. In **buli** the standing (`declarerRaw`) tracks the
+**common kontra level** — the level BOTH defenders share (their minimum) — so when
+**both defenders kontra equally it behaves exactly like a normal (uniform)
+kontra** of the whole contract (goes into the standing, no side-ledger). Only each
+defender's **excess beyond the common level** (`base×(level−commonLevel)`) goes to
+a persistent **side-ledger** (`state.sidePairs`, `"a|b"→amount a owes b`) that is
+folded in only at **Elszámolás** and shown above the names in the scoreboard — the
+excess never affects the buli standing/premium. (`calculateRoundScore` returns
 `sidePairs`; `applyRoundEnd` accumulates it in buli mode.)
 
 > Kontra is **per-component** everywhere. In the base game (and the reopened

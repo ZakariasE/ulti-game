@@ -114,8 +114,10 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
 
   // Individual (per-defender) kontra: betli / no-trump durchmars. Each defender
   // has their own kontra line, so `deltas` differ per defender (used directly in
-  // non-buli). The buli STANDING (declarerRaw) tracks only the base one-unit
-  // (kontra level 1); each defender's kontra EXTRA goes to `sidePairs`, a pairwise
+  // non-buli). The buli STANDING (declarerRaw) tracks the COMMON kontra level —
+  // the level BOTH defenders share (their minimum) — so when both kontra equally
+  // it behaves exactly like a normal (uniform) kontra of the whole contract. Only
+  // each defender's EXCESS beyond that common level goes to `sidePairs`, a pairwise
   // side-ledger that surfaces only at Elszámolás (never in the buli standing).
   if (isIndividualKontra(declaration)) {
     const key = declaration.scoring[0]
@@ -123,6 +125,8 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     const base = componentBasePoints(key, declaration.color, declaration.open)
     const mult = (felkezesBid ? 4 : 1) * redealMultiplier
     const baseUnit = base * mult
+    const levels = defenderIds.map((d) => (kontra[d] && kontra[d].level) || 1)
+    const commonLevel = levels.length ? Math.min(...levels) : 1 // shared kontra ⇒ standing
     const sidePairs = {}
     const addPair = (x, y, amt) => { // x owes y `amt`
       const a = x < y ? x : y
@@ -134,17 +138,18 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
       const amount = baseUnit * level
       if (won) { deltas[declarerId] += amount; deltas[defId] -= amount }
       else { deltas[declarerId] -= amount; deltas[defId] += amount }
-      const extra = baseUnit * (level - 1)
+      const extra = baseUnit * (level - commonLevel) // only the excess over the shared level
       if (extra) {
         if (won) addPair(defId, declarerId, extra) // defender pays the declarer more
         else addPair(declarerId, defId, extra)     // declarer pays that defender more
       }
       return { id: defId, level, amount }
     })
-    const delta = won ? baseUnit : -baseUnit // one base unit — what the buli standing tracks
+    // Buli standing: the shared kontra level applies to the whole contract.
+    const delta = (won ? baseUnit : -baseUnit) * commonLevel
     const components = [{
       key, label: componentLabel(key), won, basePoints: base,
-      kontraLevel: 1, hundred: false, lossMult: 1, mult, hozam: false,
+      kontraLevel: commonLevel, hundred: false, lossMult: 1, mult, hozam: false,
       individual: true, perDefender, delta,
     }]
     return { components, deltas, declarerRaw: delta, cardTotal, partiDetail: null, declarerId, color: declaration.color, sidePairs }
