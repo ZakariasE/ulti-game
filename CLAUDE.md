@@ -171,6 +171,19 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
    [4] but not a félkez Ulti [16]). **No bidding-kontra in this round** (kontra
    resumes/continues in play). Robbing combines **discard + declaration** into one
    step (pick 2 to put down + your bid, confirm once).
+   - **Hozámondás (add-on saying):** when the félkez winner sets their talon
+     (POST_DEAL_DISCARD) they may **expand** their bid with add-on components
+     (`ulti / 4 aces / 40-100 / 20-100 / durchmars`), all sharing the félkez bid's
+     **color/trump** (enforced by rebuilding on that trump — you can't add a
+     different suit/color). Each add-on scores **×2** (not ×4); original félkez
+     components keep ×4. The bundle is re-validated, so **the parti drops if any
+     add-on is a non-parti-bearer** (durchmars / 40-100 / 20-100) — e.g. félkez
+     piros parti (8) + piros ulti = 8+16=**24**; + piros 40-100 = **16** (parti
+     gone); + piros ulti + 40-100 = **32**. The expanded bid becomes the standing
+     bid for the reopened round (its higher value must be beaten). Add-ons are
+     per-component kontrázható in play (×2). Always on in félkez; no toggle.
+     (`expandDeclaration`/`effectiveRankValue` in `bidding.js`; `declaration.hozam`
+     lists the add-ons.)
 5. **Play.** Kontra is **per-component** (exactly like the base game): a defender
    kontra on their 1st card, the declarer's rekontra on their 2nd card, etc. Any
    kontra from the 5-card round is already seeded here and continues.
@@ -251,13 +264,16 @@ plus a pairwise "who pays whom" breakdown.
     fields, resets `redealMultiplier`/`felkezesReveal`/`felkezesFives`/`reserve`).
   - Snapshots: `biddingSnapshot` (hides concrete minor trump; includes `currentHighBid.round`),
     `buliSnapshot`, `publicDeclaration`, `handCounts`.
-- **`game/scoring.js`** — `calculateRoundScore({..., stakeMultiplier, ultiBonus})` → `{ components[],
-  deltas{pid}, declarerRaw, cardTotal, partiDetail, declarerId, color, stakeMultiplier }`.
-  `payout = base × kontraLevel × (hundred?2:1) × stakeMultiplier`; a **lost Ulti** uses `payout ×
-  lossMult(2)`; `deltas[declarer] = Σ amount × nDef`. `ultiBonus>0` adds a flat `ulti_bonus`
-  component (not in `deltas`). **`declarerRaw = Σ component.delta`** (per-defender total — what
-  buli tracks, and what the round-over **"Összesen (felvevő)"** row shows — not the pairwise `deltas`).
+- **`game/scoring.js`** — `calculateRoundScore({..., felkezesBid, redealMultiplier, ultiBonus})` → `{ components[],
+  deltas{pid}, declarerRaw, cardTotal, partiDetail, declarerId, color }`. Per-component
+  `mult = (hozam ? 2 : felkezesBid ? 4 : 1) × redealMultiplier`; `payout = base × kontraLevel ×
+  (hundred?2:1) × mult`; a **lost Ulti** uses `payout × lossMult(2)`; `deltas[declarer] = Σ amount ×
+  nDef`. `ultiBonus>0` adds a flat `ulti_bonus` component (not in `deltas`). Each component carries
+  `mult`/`hozam`/`lossMult` for display. **`declarerRaw = Σ component.delta`** (per-defender total —
+  what buli tracks, and what the round-over **"Összesen (felvevő)"** row shows — not pairwise `deltas`).
 - **`game/bidding.js`** — declaration build/validate/rank (server mirror of `client/lib/bids.js`).
+  `expandDeclaration(baseDecl, addOns)` (hozámondás: rebuild on the same trump, set `hozam`) and
+  `effectiveRankValue(decl, felkFactor)` (value-to-beat: original ×felkFactor, add-ons ×2, parti excl.).
 - **`game/deck.js`** — deck + deal helpers. **`socket/handlers.js`** — all events (below).
   **`rooms/RoomManager.js`** — room lifecycle.
 
@@ -267,7 +283,7 @@ plus a pairwise "who pays whom" breakdown.
 - `bidding`: `{ mode:'felkezes'|'normal', phase:'BID'|'DISCARD'|'DECLARE'|'ROB_OFFER'|'POST_DEAL_DISCARD'|'DONE',
   currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{ [comp]:{level,step,lastParty} } (per-component bidding kontra; ×4/level),
   consecutivePasses, history }`. Closing = **the current high bidder passes on their turn**.
-- `play`: `{ declarerId, defenderIds, declaration, felkezesBid (bool → drives ×4),
+- `play`: `{ declarerId, defenderIds, declaration (may carry `hozam:[...]` add-ons ×2), felkezesBid (bool → drives ×4),
   kontra{comp:{level,step,lastParty}} (per-component, all modes; seeded from bidding.kontra; play kontra ×2/level),
   cardsPlayed{pid}, marriages, currentTrick, completedTricks, declarerFive, openingLeadDone, claim }`.
 - Top-level: `scores` (non-buli), `declaredScores` (buli, RAW), `buli:{index,handsPlayed,points,kotelezo,over,history}`,
@@ -275,7 +291,7 @@ plus a pairwise "who pays whom" breakdown.
 
 ### Socket events
 - **client→server:** `room:create` (w/ options), `room:join`, `game:start`, `bid:declare`,
-  `bid:pass`, `bid:discard`, `bid:rob`, `bid:kontra` (félkez per-component bidding kontra; `{components}`), `play:firstLead`,
+  `bid:pass`, `bid:discard` (`{cardIds, hozam?}` — hozám add-ons at POST_DEAL_DISCARD), `bid:rob`, `bid:kontra` (félkez per-component bidding kontra; `{components}`), `play:firstLead`,
   `card:play`, `claim:start`, `claim:respond`, `round:continue`, `buli:next`.
 - **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
   `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,
@@ -287,14 +303,16 @@ plus a pairwise "who pays whom" breakdown.
 ### Client (`client/`)
 - **`context/GameContext.js`** — reducer + big `state`. Notable staging fields: `pendingKontra`
   (per-component play kontra), `pendingBidKontra` (per-component félkez **bidding** kontra),
-  `pendingDiscard` (combined discard+declare),
+  `pendingDiscard` (combined discard+declare), `pendingHozam` (hozámondás add-ons at POST_DEAL_DISCARD),
   `pendingMarriages`. Bidding mirror: `biddingMode`, `biddingPhase`, `currentHighBid` (incl `round`),
   `biddingKontra` (per-component bidding kontra map), `redealMultiplier`. `declaredScores`, `buli`.
   Event→dispatch wiring is in **`pages/game/[roomCode].js`**.
 - **Components (`components/game`):** `GameTable` (info bar shows the standing bid during bidding),
-  `BidPanel` (bidding + the combined discard+declare when phase is `DISCARD`; also the
+  `BidPanel` (bidding + the combined discard+declare when phase is `DISCARD`; the
   per-component **bidding-kontra** chips + `Kontrázok` in the félkez 5-card round via
-  `TOGGLE_BID_KONTRA`/`bid:kontra`), `PlayerHand` (play + discard
+  `TOGGLE_BID_KONTRA`/`bid:kontra`; and the **hozámondás** add-on chips + combined
+  talon confirm at `POST_DEAL_DISCARD` via `TOGGLE_HOZAM`/`bid:discard {hozam}`),
+  `PlayerHand` (play + discard
   selection via `TOGGLE_DISCARD`; opening-lead gate uses `effectiveTrump = trumpSuit||pendingTrump`),
   `KontraBar` (per-component play kontra; shows carried-over bidding kontra levels),
   `MarriageBar`, `TrumpChoice` (concrete-suit pick before the opening lead; shown for any

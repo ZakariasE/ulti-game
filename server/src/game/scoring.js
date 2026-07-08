@@ -61,7 +61,7 @@ function marriagePoints(marriages, ids, eligible) {
 // Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
 function calculateRoundScore({ declaration, declarerId, defenderIds,
                                completedTricks, talon, declarerPoints, kontra = {}, marriages = {},
-                               stakeMultiplier = 1, ultiBonus = 0 }) {
+                               felkezesBid = false, redealMultiplier = 1, ultiBonus = 0 }) {
   const trumpSuit = declaration.trumpSuit
   const announced = marriages[declarerId] || [] // declarer's own (for 40-100 / 20-100)
 
@@ -113,13 +113,19 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   setup(declarerId)
   defenderIds.forEach(setup)
 
+  const hozamSet = new Set(declaration.hozam || [])
   const components = declaration.scoring.map((key) => {
     const won = componentWon(key, ctx)
     const basePoints = componentBasePoints(key, declaration.color)
     const kontraLevel = (kontra[key] && kontra[key].level) || 1
     // Reaching 100 card points doubles the Parti stake — for whichever side won it.
     const hundred = key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100
-    const payout = basePoints * kontraLevel * (hundred ? 2 : 1) * stakeMultiplier
+    // Per-component multiplier: a hozámondott add-on scores ×2; an original
+    // félkez component ×4 (only if the bid was won in the 5-card round); a normal
+    // teljes-kéz component ×1. Redeal doublings apply to the whole hand.
+    const isHozam = hozamSet.has(key)
+    const mult = (isHozam ? 2 : (felkezesBid ? 4 : 1)) * redealMultiplier
+    const payout = basePoints * kontraLevel * (hundred ? 2 : 1) * mult
     // A lost Ulti costs the declarer double (win +N, lose −2N).
     const lossMult = key === 'ulti' ? 2 : 1
     const amount = won ? payout : payout * lossMult
@@ -131,7 +137,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
       deltas[declarerId] -= amount * defenderIds.length
       defenderIds.forEach((id) => { deltas[id] += amount })
     }
-    return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, lossMult, delta: won ? amount : -amount }
+    return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, lossMult, mult, hozam: isHozam, delta: won ? amount : -amount }
   })
 
   // Kötelező ulti premium (lean-trump <3 in the 5-card hand): a flat declarer
@@ -148,7 +154,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   // Buli mode tracks this; the pairwise expansion happens only at settlement.
   const declarerRaw = components.reduce((s, c) => s + c.delta, 0)
 
-  return { components, deltas, declarerRaw, cardTotal, partiDetail, declarerId, color: declaration.color, stakeMultiplier }
+  return { components, deltas, declarerRaw, cardTotal, partiDetail, declarerId, color: declaration.color }
 }
 
 module.exports = { calculateRoundScore }

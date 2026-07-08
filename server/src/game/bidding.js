@@ -83,6 +83,36 @@ function simpleDeclaration(color, trumpSuit) {
   }
 }
 
+// Hozámondás: expand a won félkez declaration with add-on components (declared
+// as the winner discards their teljes-kéz talon). Add-ons must share the base
+// bid's color/trump (enforced by reusing them) and be valid to combine; each
+// add-on scores ×2 (recorded in `hozam`). Re-running buildDeclaration means the
+// parti drops if any add-on is a non-parti-bearer, exactly like a normal bundle.
+function expandDeclaration(baseDecl, addOns) {
+  if (baseDecl.isNoTrump) throw new Error('Adu nélküli játékhoz nem lehet hozzámondani')
+  const add = [...new Set(addOns || [])]
+  if (add.length === 0) return baseDecl
+  const origChosen = baseDecl.components.filter((c) => c !== 'parti')
+  for (const c of add) {
+    if (!CHOOSABLE.includes(c)) throw new Error(`Nem mondható hozzá: ${c}`)
+    if (origChosen.includes(c)) throw new Error(`Már benne van: ${c}`)
+  }
+  const combined = [...origChosen, ...add]
+  const expanded = buildDeclaration(combined, baseDecl.color, baseDecl.trumpSuit)
+  expanded.hozam = add // the added components — each scores ×2
+  return expanded
+}
+
+// Effective value-to-beat for a (possibly hozámondás-expanded) declaration.
+// Original components use `felkFactor` (×4 in the 5-card round, else ×1); each
+// hozámondott add-on uses ×2. Ranking ignores the parti (as elsewhere).
+function effectiveRankValue(decl, felkFactor) {
+  const hozam = new Set(decl.hozam || [])
+  const nonParti = decl.scoring.filter((c) => c !== 'parti')
+  if (nonParti.length === 0) return componentBasePoints('parti', decl.color) * felkFactor
+  return nonParti.reduce((s, c) => s + componentBasePoints(c, decl.color) * (hozam.has(c) ? 2 : felkFactor), 0)
+}
+
 function noTrumpDeclaration(key) {
   if (!isNoTrumpContract(key)) throw new Error(`Unknown contract: ${key}`)
   return {
@@ -165,6 +195,8 @@ module.exports = {
   buildDeclaration,
   simpleDeclaration,
   noTrumpDeclaration,
+  expandDeclaration,
+  effectiveRankValue,
   componentBasePoints,
   componentLabel,
   declarationValue,

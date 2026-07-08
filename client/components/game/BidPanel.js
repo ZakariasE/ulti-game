@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import {
-  CHOOSABLE, NO_TRUMP_CONTRACTS, componentLabel, makeDeclaration,
-  declarationValue, declarationLabel, isHigherDeclaration, kontraLevelName,
+  CHOOSABLE, NO_TRUMP_CONTRACTS, TRUMP_COMPONENTS, componentLabel, makeDeclaration,
+  declarationValue, bidTotalValue, declarationLabel, isHigherDeclaration, kontraLevelName,
 } from '../../lib/bids'
 import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/BidPanel.module.css'
@@ -14,7 +14,7 @@ export default function BidPanel({ roomCode }) {
   const { state, dispatch } = useGame()
   const { emit } = useSocket()
   const { currentTurnId, biddingPhase, biddingMode, currentHighBid, myPlayerId, players, options,
-    redealMultiplier, biddingKontra, pendingDiscard, pendingBidKontra } = state
+    redealMultiplier, biddingKontra, pendingDiscard, pendingBidKontra, pendingHozam } = state
 
   const [picked, setPicked] = useState([]) // chosen trump components
   const [color, setColor] = useState('normal')
@@ -34,9 +34,9 @@ export default function BidPanel({ roomCode }) {
   const isMyTurn = currentTurnId === myPlayerId
   const currentDecl = currentHighBid?.declaration
   // The standing bid's value uses ITS round's ×4 factor.
-  const curMult = (currentHighBid?.round === 'felkezes' ? 4 : 1) * redeal
+  const curFelk = currentHighBid?.round === 'felkezes' ? 4 : 1
   const highBidText = currentDecl
-    ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl) * curMult}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
+    ? `${declarationLabel(currentDecl)} (${bidTotalValue(currentDecl, curFelk, redeal)}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
   // Per-component bidding kontra (félkezes 5-card round only): the components of
@@ -66,12 +66,58 @@ export default function BidPanel({ roomCode }) {
     )
   }
 
-  // POST_DEAL_DISCARD (félkez winner): discard only, no declaration.
+  // POST_DEAL_DISCARD (félkez winner): set the talon AND optionally hozámond —
+  // add-on components (same color/trump as the félkez bid), each worth ×2.
   if (biddingPhase === 'POST_DEAL_DISCARD') {
+    const decl = currentHighBid?.declaration
+    const already = new Set(decl?.components || [])
+    const isRed = decl?.color === 'red'
+    const hozamPick = pendingHozam || []
+    const addable = CHOOSABLE.filter((c) => {
+      if (already.has(c)) return false
+      if (c === 'four_aces' && options?.fourAces === false) return false
+      if (c === 'twenty_hundred' && already.has('forty_hundred')) return false
+      if (c === 'forty_hundred' && already.has('twenty_hundred')) return false
+      return true
+    })
+    const colorLabel = isRed ? ' — piros' : (decl?.trumpSuit ? ` — ${SUIT_NAMES[decl.trumpSuit]}` : '')
+    const discardReady = (pendingDiscard || []).length === 2
+    const toggleHz = (c) => dispatch({ type: 'TOGGLE_HOZAM', component: c })
+    const confirm = () => emit('bid:discard', { roomCode, cardIds: pendingDiscard, hozam: hozamPick })
     return (
       <div className={styles.panel}>
-        <h3>Te jössz</h3>
-        <p className={styles.waiting}>Válassz 2 lapot a kezedből (lent), amit eldobsz.</p>
+        <h3>Talon + hozámondás</h3>
+        <p className={styles.waiting}>Válassz 2 eldobandó lapot (lent). Hozzámondhatsz továbbiakat (×2):</p>
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Hozámondás{colorLabel} — mind ×2</div>
+          <div className={styles.chips}>
+            {addable.map((c) => {
+              const on = hozamPick.includes(c)
+              const disabled =
+                (c === 'twenty_hundred' && hozamPick.includes('forty_hundred')) ||
+                (c === 'forty_hundred' && hozamPick.includes('twenty_hundred'))
+              const val = (TRUMP_COMPONENTS[c]?.base || 0) * (isRed ? 2 : 1) * 2
+              return (
+                <button
+                  key={c}
+                  className={`${styles.chip} ${on ? styles.chipOn : ''}`}
+                  disabled={disabled}
+                  onClick={() => toggleHz(c)}
+                >
+                  {componentLabel(c)} ({val})
+                </button>
+              )
+            })}
+          </div>
+          {hozamPick.length > 0 && decl?.hasParti && hozamPick.some((c) => c === 'forty_hundred' || c === 'twenty_hundred' || c === 'durchmars') && (
+            <p className={styles.hint}>Figyelem: nem-parti bemondás hozzáadásával a parti elveszik.</p>
+          )}
+        </div>
+        <div className={styles.actions}>
+          <button className={styles.btnPrimary} disabled={!discardReady} onClick={confirm}>
+            {discardReady ? (hozamPick.length ? 'Talon + hozámondás' : 'Talon lerakása') : 'Válassz 2 lapot'}
+          </button>
+        </div>
       </div>
     )
   }

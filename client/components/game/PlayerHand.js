@@ -57,27 +57,11 @@ export default function PlayerHand({ roomCode }) {
     dispatch({ type: 'TOGGLE_DISCARD', cardId })
   }
 
-  function confirmDiscard() {
-    emit('bid:discard', { roomCode, cardIds: discardSel })
-  }
-
   return (
     <div className={styles.wrap}>
-      {discardOnly && (
+      {isDiscarding && (
         <div className={styles.discardBar}>
-          <span>Válassz 2 lapot, amit eldobsz ({discardSel.length}/2)</span>
-          <button
-            className={styles.discardBtn}
-            disabled={discardSel.length !== 2}
-            onClick={confirmDiscard}
-          >
-            Eldobom ezt a 2 lapot
-          </button>
-        </div>
-      )}
-      {isDiscarding && !discardOnly && (
-        <div className={styles.discardBar}>
-          <span>Válassz 2 eldobandó lapot, majd mondj be ({discardSel.length}/2)</span>
+          <span>Válassz 2 eldobandó lapot{discardOnly ? ' (fent erősítsd meg + hozámondás)' : ', majd mondj be'} ({discardSel.length}/2)</span>
         </div>
       )}
       <div className={styles.hand}>

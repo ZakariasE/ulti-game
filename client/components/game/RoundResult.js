@@ -59,14 +59,14 @@ export default function RoundResult({ roomCode }) {
           <tbody>
             {roundResult.components.map((c) => (
               <tr key={c.key}>
-                <td>{c.label}</td>
+                <td>{c.label}{c.hozam ? ' (hozám)' : ''}</td>
                 <td className={c.won ? styles.win : styles.loss}>
                   {c.flat ? 'bónusz' : (c.won ? 'nyert' : 'vesztett')}
                 </td>
                 <td>
                   {c.flat
                     ? `+${c.delta}`
-                    : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{roundResult.stakeMultiplier > 1 ? ` ×${roundResult.stakeMultiplier}` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
+                    : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
                 </td>
               </tr>
             ))}

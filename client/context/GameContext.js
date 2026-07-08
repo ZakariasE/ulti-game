@@ -54,6 +54,7 @@ const initialState = {
   kontraOptions: [], // components I may double right now
   pendingKontra: [], // components I've staged to double with my next card
   pendingDiscard: [], // cards staged to discard (combined discard+declare)
+  pendingHozam: [], // félkez winner's hozámondás add-on components (POST_DEAL_DISCARD)
   marriageOptions: [], // suits I may announce right now (my first card)
   pendingMarriages: [], // suits I've toggled to announce with my next card
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
@@ -97,6 +98,7 @@ function resetForNewRound(state) {
     biddingKontra: {},
     pendingBidKontra: [],
     pendingDiscard: [],
+    pendingHozam: [],
     marriageOptions: [],
     pendingMarriages: [],
     marriagesByPlayer: {},
@@ -156,6 +158,7 @@ function gameReducer(state, action) {
         pendingBidKontra: [], // clear staged bidding-kontra picks on any state change
         // Keep the discard selection only while a discard is in progress.
         pendingDiscard: (action.phase === 'DISCARD' || action.phase === 'POST_DEAL_DISCARD') ? state.pendingDiscard : [],
+        pendingHozam: action.phase === 'POST_DEAL_DISCARD' ? state.pendingHozam : [],
         handCounts: action.handCounts || state.handCounts,
       }
 
@@ -239,6 +242,14 @@ function gameReducer(state, action) {
         pendingDiscard: state.pendingDiscard.includes(action.cardId)
           ? state.pendingDiscard.filter((id) => id !== action.cardId)
           : state.pendingDiscard.length < 2 ? [...state.pendingDiscard, action.cardId] : state.pendingDiscard,
+      }
+
+    case 'TOGGLE_HOZAM':
+      return {
+        ...state,
+        pendingHozam: state.pendingHozam.includes(action.component)
+          ? state.pendingHozam.filter((c) => c !== action.component)
+          : [...state.pendingHozam, action.component],
       }
 
     case 'KONTRA_UPDATED': {

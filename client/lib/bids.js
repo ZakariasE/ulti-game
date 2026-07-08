@@ -74,6 +74,18 @@ export function declarationValue(decl) {
   return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
 }
 
+// Full point value incl. per-component multipliers: original components use
+// `felkFactor` (×4 in the 5-card round, else ×1), hozámondott add-ons use ×2,
+// all × redeal. Used to display an expanded (hozámondás) standing bid's worth.
+export function bidTotalValue(decl, felkFactor = 1, redeal = 1) {
+  if (!decl || decl.invalid) return 0
+  const hozam = new Set(decl.hozam || [])
+  return decl.scoring.reduce((sum, c) => {
+    const mult = (hozam.has(c) ? 2 : felkFactor) * redeal
+    return sum + componentBasePoints(c, decl.color) * mult
+  }, 0)
+}
+
 // Bidding rank ignores the +1/+2 parti bonus (Betli 5 outranks Ulti 4+1).
 export function rankValue(decl) {
   if (!decl || decl.invalid) return -1

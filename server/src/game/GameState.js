@@ -1,8 +1,9 @@
 const { createDeck, shuffle, deal, dealFelkezes } = require('./deck')
 const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rules')
 const {
-  getInitialBidderSeat, getNextBidderSeat, isHigherDeclaration, rankValue,
+  getInitialBidderSeat, getNextBidderSeat, isHigherDeclaration,
   buildDeclaration, simpleDeclaration, noTrumpDeclaration, declarationLabel,
+  expandDeclaration, effectiveRankValue,
 } = require('./bidding')
 const { calculateRoundScore } = require('./scoring')
 
@@ -121,7 +122,7 @@ function applyDeal(state) {
 
 // ── Bidding ──────────────────────────────────────────────────────────────────
 
-function applyBidDiscard(state, playerId, cardIds) {
+function applyBidDiscard(state, playerId, cardIds, hozam) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
@@ -139,9 +140,22 @@ function applyBidDiscard(state, playerId, cardIds) {
   state.talonInHand = null // the talon is set aside again
 
   if (phase === 'POST_DEAL_DISCARD') {
+    // Hozámondás: the winner may expand their félkez bid with add-ons (×2 each)
+    // as they set the talon. Négy ász add-on obeys the room option.
+    if (hozam && hozam.length) {
+      if (!state.options.fourAces && hozam.includes('four_aces')) {
+        throw new Error('A Négy ász nincs engedélyezve ebben a szobában')
+      }
+      const expanded = expandDeclaration(state.bidding.currentHighBid.declaration, hozam)
+      state.bidding.currentHighBid.declaration = expanded
+      // Add-ons join the per-component kontra map (kontrázható in play, ×2).
+      for (const c of expanded.scoring) {
+        if (!state.bidding.kontra[c]) state.bidding.kontra[c] = { level: 1, step: 0, lastParty: null }
+      }
+    }
     // Félkezes: the winner has set their talon. REOPEN normal bidding — the
-    // others (full 10-card hands) may rob the talon and outbid; the félkezes
-    // bid stands as the value to beat.
+    // others (full 10-card hands) may rob the talon and outbid; the (possibly
+    // expanded) félkezes bid stands as the value to beat.
     state.bidding.mode = 'normal'
     state.bidding.phase = 'ROB_OFFER'
     state.bidding.consecutivePasses = 0
@@ -184,11 +198,11 @@ function applyDeclare(state, playerId, payload) {
   }
   const current = state.bidding.currentHighBid
   if (current) {
-    // Effective value = rank × 4 (only for a bid made in the 5-card félkezes
-    // round). A bid made in the reopened round is a normal (teljes kéz) bid ×1.
+    // Effective value: original components × the round's félkez factor (×4 in the
+    // 5-card round, ×1 in the reopened round), plus any hozámondott add-ons ×2.
     // Kontra is per-component and does not gate outbidding — an outbid clears it.
-    const curVal = rankValue(current.declaration) * _felkezFactor(current.round)
-    const newVal = rankValue(declaration) * _felkezFactor(state.bidding.mode)
+    const curVal = effectiveRankValue(current.declaration, _felkezFactor(current.round))
+    const newVal = effectiveRankValue(declaration, _felkezFactor(state.bidding.mode))
     const beats = newVal > curVal ||
       (newVal === curVal && isHigherDeclaration(declaration, current.declaration))
     if (!beats) throw new Error('Declaration must out-rank the current bid')
@@ -574,10 +588,11 @@ function applyRoundEnd(state) {
     declarerPoints: state.play.declarerPoints,
     kontra: state.play.kontra,
     marriages: state.play.marriages,
-    // ×4 only if the winning bid was made in the 5-card félkezes round (a teljes
-    // kéz bid is normal); × redeal doublings. Per-component kontra (incl. any made
-    // during bidding) is applied per component inside calculateRoundScore.
-    stakeMultiplier: (state.play.felkezesBid ? 4 : 1) * (state.redealMultiplier || 1),
+    // Per-component multiplier is computed inside calculateRoundScore: original
+    // components ×4 (only if the bid was won in the 5-card round), hozámondott
+    // add-ons ×2, normal teljes-kéz ×1; all × redeal doublings.
+    felkezesBid: !!state.play.felkezesBid,
+    redealMultiplier: state.redealMultiplier || 1,
     ultiBonus,
   })
 
@@ -896,6 +911,7 @@ function publicDeclaration(decl) {
     // Concrete in félkezes (named at declaration); null while a minor trump is
     // still hidden in normal bidding; piros for red.
     trumpSuit: decl.trumpSuit,
+    hozam: decl.hozam || [], // hozámondott add-ons (score ×2), for display/value
     label: declarationLabel(decl),
   }
 }

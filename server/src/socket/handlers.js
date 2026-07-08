@@ -54,10 +54,10 @@ function registerHandlers(io, socket) {
 
   // ── Bidding ────────────────────────────────────────────────────────────────
 
-  socket.on('bid:discard', ({ roomCode, cardIds }) => {
+  socket.on('bid:discard', ({ roomCode, cardIds, hozam }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      const result = applyBidDiscard(state, socket.id, cardIds)
+      const result = applyBidDiscard(state, socket.id, cardIds, hozam)
       _sendHand(io, state, socket.id)
       if (result && result.biddingComplete) {
         // Félkezes: the declarer's post-deal discard starts play.
