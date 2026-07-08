@@ -648,8 +648,10 @@ function applyRoundEnd(state) {
   const conceded = !!state.play.conceded
   // Required-ulti bonus (lean-trump <3): a flat +10 (+20 red) declarer premium,
   // folded into the score as its own component so it shows in the breakdown and
-  // flows into declarerRaw exactly once. Not awarded on a concede (never played).
-  const ultiBonus = conceded ? 0 : _requiredUltiBonus(state, state.play.declaration)
+  // flows into declarerRaw exactly once. It stands even on a concede — it rewards
+  // the committed félkez ulti bid, not the play outcome. (The kötelező saying
+  // credit likewise still stands: _markKotelezo runs at hand end regardless.)
+  const ultiBonus = _requiredUltiBonus(state, state.play.declaration)
   const result = calculateRoundScore({
     declaration: state.play.declaration,
     declarerId: state.play.declarerId,
