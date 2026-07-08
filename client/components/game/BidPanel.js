@@ -90,7 +90,10 @@ export default function BidPanel({ roomCode }) {
     const already = new Set(decl?.components || [])
     const isRed = decl?.color === 'red'
     const hozamPick = pendingHozam || []
-    const addable = CHOOSABLE.filter((c) => {
+    // Adu nélküli (betli / nt-durchmars) nyerő bid: nincs hozámondás (a szerver is
+    // elutasítja), így csak a talont rakja le.
+    const noHozam = !!decl?.isNoTrump
+    const addable = noHozam ? [] : CHOOSABLE.filter((c) => {
       if (already.has(c)) return false
       if (c === 'four_aces' && options?.fourAces === false) return false
       if (c === 'twenty_hundred' && already.has('forty_hundred')) return false
@@ -100,39 +103,43 @@ export default function BidPanel({ roomCode }) {
     const colorLabel = isRed ? ' — piros' : (decl?.trumpSuit ? ` — ${SUIT_NAMES[decl.trumpSuit]}` : '')
     const discardReady = (pendingDiscard || []).length === 2
     const toggleHz = (c) => dispatch({ type: 'TOGGLE_HOZAM', component: c })
-    const confirm = () => emit('bid:discard', { roomCode, cardIds: pendingDiscard, hozam: hozamPick })
+    const confirm = () => emit('bid:discard', { roomCode, cardIds: pendingDiscard, hozam: noHozam ? [] : hozamPick })
     return (
       <div className={styles.panel}>
-        <h3>Talon + hozámondás</h3>
-        <p className={styles.waiting}>Válassz 2 eldobandó lapot (lent). Hozzámondhatsz továbbiakat (×2):</p>
-        <div className={styles.section}>
-          <div className={styles.sectionTitle}>Hozámondás{colorLabel} — mind ×2</div>
-          <div className={styles.chips}>
-            {addable.map((c) => {
-              const on = hozamPick.includes(c)
-              const disabled =
-                (c === 'twenty_hundred' && hozamPick.includes('forty_hundred')) ||
-                (c === 'forty_hundred' && hozamPick.includes('twenty_hundred'))
-              const val = (TRUMP_COMPONENTS[c]?.base || 0) * (isRed ? 2 : 1) * 2
-              return (
-                <button
-                  key={c}
-                  className={`${styles.chip} ${on ? styles.chipOn : ''}`}
-                  disabled={disabled}
-                  onClick={() => toggleHz(c)}
-                >
-                  {componentLabel(c)} ({val})
-                </button>
-              )
-            })}
+        <h3>{noHozam ? 'Talon' : 'Talon + hozámondás'}</h3>
+        <p className={styles.waiting}>
+          {noHozam ? 'Válassz 2 eldobandó lapot (lent).' : 'Válassz 2 eldobandó lapot (lent). Hozzámondhatsz továbbiakat (×2):'}
+        </p>
+        {!noHozam && (
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>Hozámondás{colorLabel} — mind ×2</div>
+            <div className={styles.chips}>
+              {addable.map((c) => {
+                const on = hozamPick.includes(c)
+                const disabled =
+                  (c === 'twenty_hundred' && hozamPick.includes('forty_hundred')) ||
+                  (c === 'forty_hundred' && hozamPick.includes('twenty_hundred'))
+                const val = (TRUMP_COMPONENTS[c]?.base || 0) * (isRed ? 2 : 1) * 2
+                return (
+                  <button
+                    key={c}
+                    className={`${styles.chip} ${on ? styles.chipOn : ''}`}
+                    disabled={disabled}
+                    onClick={() => toggleHz(c)}
+                  >
+                    {componentLabel(c)} ({val})
+                  </button>
+                )
+              })}
+            </div>
+            {hozamPick.length > 0 && decl?.hasParti && hozamPick.some((c) => c === 'forty_hundred' || c === 'twenty_hundred' || c === 'durchmars') && (
+              <p className={styles.hint}>Figyelem: nem-parti bemondás hozzáadásával a parti elveszik.</p>
+            )}
           </div>
-          {hozamPick.length > 0 && decl?.hasParti && hozamPick.some((c) => c === 'forty_hundred' || c === 'twenty_hundred' || c === 'durchmars') && (
-            <p className={styles.hint}>Figyelem: nem-parti bemondás hozzáadásával a parti elveszik.</p>
-          )}
-        </div>
+        )}
         <div className={styles.actions}>
           <button className={styles.btnPrimary} disabled={!discardReady} onClick={confirm}>
-            {discardReady ? (hozamPick.length ? 'Talon + hozámondás' : 'Talon lerakása') : 'Válassz 2 lapot'}
+            {discardReady ? (!noHozam && hozamPick.length ? 'Talon + hozámondás' : 'Talon lerakása') : 'Válassz 2 lapot'}
           </button>
         </div>
       </div>
