@@ -236,6 +236,9 @@ function applyDeclare(state, playerId, payload) {
     state.bidding.kontra[lane] = { level: 1, step: 0, lastParty: null }
   }
   state.bidding.consecutivePasses = 0
+  // Mandatory kontra: recomputed on every (out)bid — true iff this standing bid is
+  // the betli that COMPLETES the declarer's kötelező betli/40-100 requirement.
+  state.bidding.mandatoryBetli = _isMandatoryBetli(state, playerId, declaration)
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
   // Required ulti: reveal the announcer's 5-card hand until the second deal
@@ -279,6 +282,17 @@ function applyBidPass(state, playerId) {
   const felkezesRound = state.bidding.mode === 'felkezes'
   const passPhase = felkezesRound ? 'BID' : 'ROB_OFFER'
   if (state.bidding.phase !== passPhase) throw new Error('Cannot pass now')
+
+  // Mandatory kontra: against the betli that completes the declarer's required
+  // saying, each defender must kontra (their own line) or outbid — they may not
+  // pass until their line is doubled. The declarer (high bidder) is exempt.
+  if (felkezesRound && state.bidding.mandatoryBetli && state.bidding.currentHighBid &&
+      playerId !== state.bidding.currentHighBid.playerId) {
+    const myLane = state.bidding.kontra[playerId]
+    if (!myLane || myLane.level <= 1) {
+      throw new Error('Kötelező kontrázni vagy überelni ezt a betlit')
+    }
+  }
 
   state.bidding.consecutivePasses++
   state.bidding.history.push({ playerId, action: 'pass' })
@@ -395,6 +409,7 @@ function _felkezesSecondDeal(state) {
   })
   state.reserve = []
   state.felkezesReveal = null // hide the 5-card reveal now the cards are dealt
+  state.bidding.mandatoryBetli = false // no mandatory kontra in the reopened round
   state.bidding.phase = 'POST_DEAL_DISCARD'
   state.bidding.currentBidderSeat = declarer.seatIndex
   return { secondDeal: true, declarerId }
@@ -601,6 +616,20 @@ function applyTrickEnd(state) {
 
 const BETLI_KEYS = new Set(['betli', 'heart_betli', 'open_betli'])
 const DURCHMARS_KEYS = new Set(['durchmars', 'durchmars_nt', 'open_durchmars'])
+
+// True iff `declaration` (by `declarerId`, in the 5-card félkez round) is a literal
+// Betli that COMPLETES that player's kötelező betli/40-100 requirement — i.e. they
+// hadn't satisfied it yet this buli. Only a betli triggers this (not a 40-100,
+// even though 40-100 also satisfies the requirement), and only the completing one
+// (a further betli once already satisfied does not). When true, the two defenders
+// must kontra (their own line) or outbid — they may not pass (see applyBidPass).
+function _isMandatoryBetli(state, declarerId, declaration) {
+  if (!state.options.kotelezo.on || !state.buli) return false
+  if (!state.bidding || state.bidding.mode !== 'felkezes') return false
+  if (!declaration.scoring.some((k) => BETLI_KEYS.has(k))) return false
+  const k = state.buli.kotelezo[declarerId]
+  return !(k && k.betli) // not yet satisfied ⇒ this betli completes it ⇒ mandatory
+}
 
 // A pure Betli fails the moment the declarer wins a trick; a pure Durchmars the
 // moment a defender does. (Durchmars combined with other components plays on.)
@@ -1009,7 +1038,8 @@ function biddingSnapshot(state) {
     phase: b.phase,
     mode: b.mode,
     redealMultiplier: state.redealMultiplier || 1,
-    kontra: b.kontra || {}, // per-component bidding kontra (client derives eligible options)
+    kontra: b.kontra || {}, // per-lane bidding kontra (client derives eligible options)
+    mandatoryBetli: !!b.mandatoryBetli, // defenders must kontra/outbid this betli
     currentHighBid: b.currentHighBid
       ? { playerId: b.currentHighBid.playerId, round: b.currentHighBid.round, declaration: publicDeclaration(b.currentHighBid.declaration) }
       : null,

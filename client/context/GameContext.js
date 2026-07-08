@@ -43,8 +43,9 @@ const initialState = {
   biddingMode: null, // 'felkezes' | 'normal'
   currentHighBid: null, // { playerId, declaration }
   redealMultiplier: 1, // félkezes: ×2 per all-pass redeal
-  biddingKontra: {}, // félkezes per-component bidding kontra: { [comp]: { level, lastParty } }
-  pendingBidKontra: [], // components staged to kontra on my bidding turn
+  biddingKontra: {}, // félkezes per-lane bidding kontra: { [lane]: { level, lastParty } }
+  pendingBidKontra: [], // lanes staged to kontra on my bidding turn
+  mandatoryBetli: false, // félkez: defenders must kontra/outbid the standing betli
   // Play
   declaration: null, // public declaration once bidding resolves
   declarerId: null,
@@ -156,7 +157,8 @@ function gameReducer(state, action) {
         biddingMode: action.mode || state.biddingMode,
         currentHighBid: action.currentHighBid,
         redealMultiplier: action.redealMultiplier || 1,
-        biddingKontra: action.kontra || {}, // per-component: { [comp]: { level, lastParty } }
+        biddingKontra: action.kontra || {}, // per-lane: { [lane]: { level, lastParty } }
+        mandatoryBetli: !!action.mandatoryBetli,
         pendingBidKontra: [], // clear staged bidding-kontra picks on any state change
         // Keep the discard selection only while a discard is in progress.
         pendingDiscard: (action.phase === 'DISCARD' || action.phase === 'POST_DEAL_DISCARD') ? state.pendingDiscard : [],

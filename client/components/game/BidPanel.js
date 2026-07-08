@@ -14,7 +14,7 @@ export default function BidPanel({ roomCode }) {
   const { state, dispatch } = useGame()
   const { emit } = useSocket()
   const { currentTurnId, biddingPhase, biddingMode, currentHighBid, myPlayerId, players, options,
-    redealMultiplier, biddingKontra, pendingDiscard, pendingBidKontra, pendingHozam } = state
+    redealMultiplier, biddingKontra, pendingDiscard, pendingBidKontra, pendingHozam, mandatoryBetli } = state
 
   const [picked, setPicked] = useState([]) // chosen trump components
   const [color, setColor] = useState('normal')
@@ -64,6 +64,10 @@ export default function BidPanel({ roomCode }) {
     : componentLabel(lane))
   const staged = pendingBidKontra || []
   const toggleBidKontra = (c) => dispatch({ type: 'TOGGLE_BID_KONTRA', component: c })
+  // Mandatory kontra: a defender facing the required-completing betli must kontra
+  // their own line (or outbid) — they may not pass until it is doubled.
+  const myLaneDoubled = (bkontra[myPlayerId]?.level || 1) > 1
+  const mustKontra = !!mandatoryBetli && isMyTurn && biddingPhase === 'BID' && myParty === 'defenders' && !myLaneDoubled
   const commitBidKontra = () => {
     if (staged.length) emit('bid:kontra', { roomCode, components: staged })
   }
@@ -255,9 +259,12 @@ export default function BidPanel({ roomCode }) {
             {candValid && !candHigher ? 'Magasabbat kell mondani' : 'Bemondom'}
           </button>
           {biddingPhase === 'BID' && (
-            <button className={styles.btnSecondary} onClick={() => emit('bid:pass', { roomCode })}>Passz</button>
+            <button className={styles.btnSecondary} disabled={mustKontra} onClick={() => emit('bid:pass', { roomCode })}>Passz</button>
           )}
         </div>
+        {mustKontra && (
+          <p className={styles.hint}><strong>Kötelező kontrázni vagy überelni ezt a betlit</strong> (a bemondó betlije befejezi a kötelező mondását).</p>
+        )}
         <p className={styles.hint}>
           {namedTrump
             ? 'Félkezesben azonnal meg kell mondani a színt (adut).'

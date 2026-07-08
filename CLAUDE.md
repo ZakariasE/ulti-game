@@ -233,6 +233,15 @@ A chain of `handsPerBuli` hands. Scoring differs:
 Each player must, during the buli, declare **one Ulti** and **one Betli or 40-100**.
 Unmet at buli end costs **−220** (Ulti) / **−110** (Betli/40-100), individually.
 
+- **Mandatory kontra on the completing betli.** When a player declares (in the
+  FÉLKEZ 5-card round) the **betli that COMPLETES their required Betli/40-100**
+  (only a literal betli — *not* a 40-100 — and only if they hadn't satisfied it
+  yet this buli), the **two defenders must kontra (their own line) or outbid** —
+  they may not pass until their line is doubled (betli kontra is individual, so
+  each defender's own lane). A further betli once already satisfied is **not**
+  mandatory. `_isMandatoryBetli` sets `state.bidding.mandatoryBetli` on every
+  (out)bid; `applyBidPass` blocks a defender's pass while their lane is ×1;
+  cleared at the second deal; the client disables Passz + shows a hint.
 - **Credit is for *saying* it in the FÉLKEZ (5-card) round** — trump count is
   irrelevant to credit. A saying declared in **teljes kéz** (reopened round or a
   hozámondott add-on) does **not** earn credit, so **outbidding someone's félkez
