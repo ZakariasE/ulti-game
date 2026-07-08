@@ -60,7 +60,7 @@ function marriagePoints(marriages, ids, eligible) {
 // Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
 function calculateRoundScore({ declaration, declarerId, defenderIds,
                                completedTricks, talon, declarerPoints, kontra = {}, marriages = {},
-                               felkezesBid = false, redealMultiplier = 1, ultiBonus = 0 }) {
+                               felkezesBid = false, redealMultiplier = 1, ultiBonus = 0, conceded = false }) {
   const trumpSuit = declaration.trumpSuit
   const announced = marriages[declarerId] || [] // declarer's own (for 40-100 / 20-100)
 
@@ -81,9 +81,10 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   const defenderTotal = defenderTrickPoints + defenderMarriage
   const cardTotal = declarerTotal
 
-  // Breakdown of the Parti card race, per side (for the round-over screen).
+  // Breakdown of the Parti card race, per side (for the round-over screen). Not
+  // shown on a concede — no card race happened.
   let partiDetail = null
-  if (declaration.scoring.includes('parti')) {
+  if (!conceded && declaration.scoring.includes('parti')) {
     const sumHits = (ids) => completedTricks
       .filter((t) => ids.includes(t.winnerId))
       .reduce((s, t) => s + t.cards.reduce((x, c) => x + (c.card.rank === 'asz' || c.card.rank === '10' ? 10 : 0), 0), 0)
@@ -121,7 +122,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   // side-ledger that surfaces only at Elszámolás (never in the buli standing).
   if (isIndividualKontra(declaration)) {
     const key = declaration.scoring[0]
-    const won = componentWon(key, ctx)
+    const won = conceded ? false : componentWon(key, ctx)
     const base = componentBasePoints(key, declaration.color, declaration.open)
     const mult = (felkezesBid ? 4 : 1) * redealMultiplier
     const baseUnit = base * mult
@@ -157,11 +158,12 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
 
   const hozamSet = new Set(declaration.hozam || [])
   const components = declaration.scoring.map((key) => {
-    const won = componentWon(key, ctx)
+    const won = conceded ? false : componentWon(key, ctx)
     const basePoints = componentBasePoints(key, declaration.color, declaration.open)
     const kontraLevel = (kontra[key] && kontra[key].level) || 1
     // Reaching 100 card points doubles the Parti stake — for whichever side won it.
-    const hundred = key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100
+    // (Not on a concede — no card race.)
+    const hundred = !conceded && key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100
     // Per-component multiplier: a hozámondott add-on scores ×2; an original
     // félkez component ×4 (only if the bid was won in the 5-card round); a normal
     // teljes-kéz component ×1. Redeal doublings apply to the whole hand.

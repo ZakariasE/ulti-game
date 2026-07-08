@@ -645,10 +645,11 @@ function _goalFailed(state, trickWinnerId) {
 }
 
 function applyRoundEnd(state) {
+  const conceded = !!state.play.conceded
   // Required-ulti bonus (lean-trump <3): a flat +10 (+20 red) declarer premium,
   // folded into the score as its own component so it shows in the breakdown and
-  // flows into declarerRaw exactly once.
-  const ultiBonus = _requiredUltiBonus(state, state.play.declaration)
+  // flows into declarerRaw exactly once. Not awarded on a concede (never played).
+  const ultiBonus = conceded ? 0 : _requiredUltiBonus(state, state.play.declaration)
   const result = calculateRoundScore({
     declaration: state.play.declaration,
     declarerId: state.play.declarerId,
@@ -664,6 +665,9 @@ function applyRoundEnd(state) {
     felkezesBid: !!state.play.felkezesBid,
     redealMultiplier: state.redealMultiplier || 1,
     ultiBonus,
+    // Concede (bedobás): every component scores as a loss, with whatever kontra
+    // levels were reached before the declarer threw in.
+    conceded,
   })
 
   const declarerId = state.play.declarerId
@@ -930,6 +934,19 @@ function applyClaimAll(state) {
   return applyRoundEnd(state)
 }
 
+// ── Concede (bedobás): the declarer gives up ───────────────────────────────────
+
+// The declarer throws in the hand — it ends immediately, the defenders win, and
+// every component is scored as a loss using whatever kontra levels were reached.
+// Allowed any time once play has begun (the declarer is confirmed), even before
+// the opening lead.
+function applyConcede(state, playerId) {
+  if (state.phase !== 'PLAYING') throw new Error('Not in play')
+  if (playerId !== state.play.declarerId) throw new Error('Only the declarer can concede')
+  state.play.conceded = true
+  return applyRoundEnd(state)
+}
+
 // ── Kontra (per component, tied to card-play timing) ───────────────────────────
 
 // Each kontra state is { level (scoring multiplier), step (escalation count),
@@ -1083,6 +1100,7 @@ module.exports = {
   applyPlayCard,
   startClaim,
   respondClaim,
+  applyConcede,
   applyRoundEnd,
   startBuli,
   commitBuliSettlement,

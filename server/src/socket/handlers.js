@@ -2,7 +2,7 @@ const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
   applyFirstLead, applyKontra, applyBiddingKontra,
-  applyPlayCard, startClaim, respondClaim, prepareNextRound,
+  applyPlayCard, startClaim, respondClaim, applyConcede, prepareNextRound,
   startBuli, commitBuliSettlement, buliSnapshot,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
@@ -187,6 +187,17 @@ function registerHandlers(io, socket) {
         io.to(roomCode).emit('claim:result', { accepted: true })
         io.to(roomCode).emit('round:completed', _roundCompleted(state))
       }
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  // Bedobás: the declarer throws in — the hand ends immediately as a loss.
+  socket.on('play:concede', ({ roomCode }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      applyConcede(state, socket.id)
+      io.to(roomCode).emit('round:completed', _roundCompleted(state))
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }

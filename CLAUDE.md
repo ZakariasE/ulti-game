@@ -68,6 +68,8 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 
 **Early termination:** a pure Betli or a pure Durchmars (trump or no-trump) ends the **instant its goal becomes impossible** — Betli the moment the declarer wins a trick, Durchmars the moment a defender wins one — and is scored as a loss without playing out the remaining tricks. (A Durchmars combined with other trump components plays on.)
 
+**Bedobás (concede):** the declarer may **throw in** at any point once play has begun (even before the opening lead) via a *Bedobom* button. The hand ends immediately, the defenders win, and **every component is scored as a loss** using whatever **kontra** levels were reached before the concede (a lost Ulti still doubles). The required-ulti premium is **not** awarded on a concede. `applyConcede` sets `play.conceded`; `calculateRoundScore({ conceded:true })` forces every component lost (no parti card-race / 100 bonus). Client: `play:concede` from the *Bedobom* button in `ClaimBar` (with a one-step confirm).
+
 **Combination rules:**
 - Combinable: Ulti, 40-100, 20-100, 4 Aces, Durchmars (any subset).
 - Betli never combines.
@@ -353,7 +355,7 @@ through the all-pairs expansion.
 ### Socket events
 - **client→server:** `room:create` (w/ options), `room:join`, `game:start`, `bid:declare`,
   `bid:pass`, `bid:discard` (`{cardIds, hozam?, hozamOpen?}` — hozám add-ons at POST_DEAL_DISCARD; `hozamOpen` = terített durchmars add-on), `bid:rob`, `bid:kontra` (félkez per-component bidding kontra; `{components}`), `play:firstLead`,
-  `card:play`, `claim:start`, `claim:respond`, `round:continue`, `buli:next`.
+  `card:play`, `claim:start`, `claim:respond`, `play:concede` (declarer bedobás — hand ends as a loss), `round:continue`, `buli:next`.
 - **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
   `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,
   `marriage:announced`, `kontra:updated`, `opening:info` (declarer only), `play:turnStart`,

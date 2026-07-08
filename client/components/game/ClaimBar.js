@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import styles from '../../styles/ClaimBar.module.css'
@@ -6,10 +7,12 @@ const BETLI = new Set(['betli', 'heart_betli', 'open_betli'])
 
 // "Nincs több ütés": the declarer claims all remaining tricks; both defenders
 // must agree, then the round ends immediately with the declarer winning.
+// "Bedobom": the declarer throws in — the hand ends immediately as a loss.
 export default function ClaimBar({ roomCode }) {
   const { state, dispatch } = useGame()
   const { emit } = useSocket()
   const { phase, declaration, declarerId, myPlayerId, currentTrick, completedTricks, claim, claimVote } = state
+  const [confirming, setConfirming] = useState(false)
 
   if (phase !== 'PLAYING' || !declaration) return null
   const amDeclarer = declarerId === myPlayerId
@@ -46,16 +49,29 @@ export default function ClaimBar({ roomCode }) {
     return <div className={styles.bar}><span className={styles.waiting}>Várakozás az ellenfelek válaszára…</span></div>
   }
 
-  // The declarer may offer the claim between tricks (not in a Betli).
-  const canOffer = amDeclarer && !claim && !declaration.scoring.some((k) => BETLI.has(k)) &&
-    currentTrick.length === 0 && completedTricks.length >= 1 && completedTricks.length < 10
-  if (canOffer) {
-    return (
-      <div className={styles.bar}>
-        <button className={styles.claim} onClick={() => emit('claim:start', { roomCode })}>Nincs több ütés</button>
-      </div>
-    )
-  }
+  // Only the declarer has controls beyond this point.
+  if (!amDeclarer) return null
 
-  return null
+  // The declarer may offer the claim between tricks (not in a Betli).
+  const canOffer = !declaration.scoring.some((k) => BETLI.has(k)) &&
+    currentTrick.length === 0 && completedTricks.length >= 1 && completedTricks.length < 10
+
+  // Bedobás is available any time the declarer is on lead/at play (no card mid-air
+  // required) — confirmed once, since it forfeits the hand.
+  return (
+    <div className={styles.bar}>
+      {canOffer && (
+        <button className={styles.claim} onClick={() => emit('claim:start', { roomCode })}>Nincs több ütés</button>
+      )}
+      {confirming ? (
+        <>
+          <span className={styles.confirm}>Biztosan bedobod? Elveszíted a leosztást.</span>
+          <button className={styles.no} onClick={() => { emit('play:concede', { roomCode }); setConfirming(false) }}>Igen, bedobom</button>
+          <button className={styles.cancel} onClick={() => setConfirming(false)}>Mégse</button>
+        </>
+      ) : (
+        <button className={styles.concede} onClick={() => setConfirming(true)}>Bedobom</button>
+      )}
+    </div>
+  )
 }

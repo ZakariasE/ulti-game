@@ -44,6 +44,30 @@
 }
 .no:hover { background: #e53935; }
 
+.concede {
+  background: #37474f;
+  color: #eceff1;
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.concede:hover { background: #455a64; }
+
+.cancel {
+  background: transparent;
+  color: #cfe3d4;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 6px 14px;
+  border-radius: 6px;
+}
+
+.confirm {
+  color: #ffcdd2;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .waiting {
   color: #cbb7dd;
   font-size: 13px;
