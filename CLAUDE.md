@@ -92,11 +92,11 @@ Each component can be doubled **independently**. Timing follows each player's ow
 
 You may kontra all components or just individual ones.
 
-> Per-component play kontra applies in **every mode** (base game, félkezes, and
-> the reopened teljes-kéz round). In félkezes a kontra made during the 5-card
-> **auction** (`applyBiddingKontra`, ×4/level) survives as a **frozen hand-wide
-> multiplier**; it is no longer escalated during play — play kontra is
-> per-component everywhere.
+> Kontra is **per-component, during play, in every mode** (base game, félkezes,
+> reopened teljes-kéz round) — exactly like the base game. There is **no
+> bidding-time kontra** (the old félkez 5-card auction kontra button was removed);
+> `applyBiddingKontra` / the `bid:kontra` event still exist server-side but are
+> unreachable from the UI, so `play.biddingKontra` stays at level 0.
 
 ### Trick-Taking Rules
 
@@ -138,13 +138,12 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
    - **Pre-bid redeal:** if the bidding goes **two full go-arounds with no bid**
      (2n passes), redeal and double the whole-hand value (`redealMultiplier`
      ×2, compounding; resets when a hand is actually played).
-   - **Bidding-kontra** (5-card round only): a defender (even chain levels) or the
-     declarer (odd) escalates on their turn. Each level is **×4** here. The kontra
-     inflates the **value-to-beat** — bids compare by **effective value** =
-     `rank × 4 (5-card only) × kontra`; a fresh outbid **clears** the kontra.
+   - **No bidding-time kontra.** Kontra happens only during play, per-component
+     (like the base game — see the Kontra section). Bids compare by **effective
+     value** = `rank × 4 (5-card only)`.
    - **Closing:** bidding ends when the current **high bidder (declarer) passes**
      on their own turn — they always get the final say. Plain: declare → pass →
-     pass → declarer passes. Kontra: declare → kontra → pass → declarer passes.
+     pass → declarer passes.
    - **Required-ulti reveal:** announcing an Ulti reveals the announcer's 5 cards
      to everyone until the second deal (kötelező games).
 3. **Second deal:** the winner gets +7 (→12), each defender +5 (→10); the winner
@@ -160,11 +159,9 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
    **discard + declaration** into one step (pick 2 to put down + your bid, confirm
    once).
 5. **Play.** Kontra is **per-component** (exactly like the base game): a defender
-   kontra on their 1st card, the declarer's rekontra on their 2nd card, etc. Any
-   kontra made during the 5-card auction stays as a frozen hand-wide multiplier on
-   top (it is not escalated in play).
+   kontra on their 1st card, the declarer's rekontra on their 2nd card, etc.
 6. **Scoring** = component × per-component kontra level × 4 (**only if won in the
-   5-card round**) × 2^k (redeals) × frozen auction-kontra multiplier.
+   5-card round**) × 2^k (redeals).
 
 ### Buli (a "party" of hands)
 
@@ -214,15 +211,15 @@ plus a pairwise "who pays whom" breakdown.
     `options`, `scores`, `declaredScores`, `buli`, `reserve`, `redealMultiplier`.
   - `applyDeal` — base: 10 each + 2 talon (first bidder gets 12); félkezes: 5 each + 17 `reserve`.
   - Bidding: `applyDeclare`, `applyBidPass`, `applyBidDiscard`, `applyRob`,
-    `applyBiddingKontra` (félkez 5-card round only), `_redealFelkezes`, `_felkezesSecondDeal`,
+    `applyBiddingKontra` (dead — bidding-time kontra removed from UI), `_redealFelkezes`, `_felkezesSecondDeal`,
     `_resolveBidding` → `_startPlay`. Helper `_felkezFactor(round)` = 4 for `'felkezes'` else 1.
   - Play: `applyFirstLead` (opening lead names the trump), `applyPlayCard`, `_getLegalCardIds`,
     `_autoRecordContractMarriage` (auto 40/20 for 40-100/20-100), claims (`startClaim`,
     `respondClaim`, "nincs több ütés").
   - Kontra — per-component in **every mode**: `eligibleKontra`, `applyKontra`,
-    `_kontraExpectation`. `applyBiddingKontra` handles the félkez **5-card auction**
-    (×4/level, hand-wide); its result is frozen into `play.biddingKontra` at play
-    start and no longer escalated. `felkezesKontraEligible` is retired (always
+    `_kontraExpectation`. There is **no bidding-time kontra**: `applyBiddingKontra`
+    and the `bid:kontra` event still exist but are unreachable from the UI, so
+    `play.biddingKontra` stays level 0. `felkezesKontraEligible` is retired (always
     `false`); `applyFelkezesPlayKontra` is dead (kept only as a guard).
   - Round end: `applyRoundEnd` — **branches on buli**. Buli tracks only
     `result.declarerRaw` (+ `_requiredUltiBonus`) into `declaredScores`/`buli.points`;
@@ -248,14 +245,14 @@ plus a pairwise "who pays whom" breakdown.
   currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{level,multiplier,lastParty},
   consecutivePasses, history }`. Closing = **the current high bidder passes on their turn**.
 - `play`: `{ declarerId, defenderIds, declaration, felkezesBid (bool → drives ×4),
-  biddingKontra:{level,multiplier,lastParty} (frozen félkez 5-card auction kontra), kontra{comp:{level,lastParty}} (per-component, all modes),
+  biddingKontra:{level,multiplier,lastParty} (dead — stays level 0), kontra{comp:{level,lastParty}} (per-component, all modes),
   cardsPlayed{pid}, marriages, currentTrick, completedTricks, declarerFive, openingLeadDone, claim }`.
 - Top-level: `scores` (non-buli), `declaredScores` (buli, RAW), `buli:{index,handsPlayed,points,kotelezo,over,history}`,
   `reserve`, `redealMultiplier`, `felkezesReveal`, `felkezesFives`, `talonInHand`, `roundResult`.
 
 ### Socket events
 - **client→server:** `room:create` (w/ options), `room:join`, `game:start`, `bid:declare`,
-  `bid:pass`, `bid:discard`, `bid:rob`, `bid:kontra` (félkez bidding-kontra), `play:firstLead`,
+  `bid:pass`, `bid:discard`, `bid:rob`, `bid:kontra` (dead — bidding-kontra removed), `play:firstLead`,
   `card:play`, `claim:start`, `claim:respond`, `round:continue`, `buli:next`.
 - **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
   `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,
@@ -275,7 +272,7 @@ plus a pairwise "who pays whom" breakdown.
   `BidPanel` (bidding + the combined discard+declare when phase is `DISCARD`; `mult` uses
   `biddingMode`; standing bid value uses `currentHighBid.round`), `PlayerHand` (play + discard
   selection via `TOGGLE_DISCARD`; opening-lead gate uses `effectiveTrump = trumpSuit||pendingTrump`),
-  `KontraBar` (per-component in all modes; shows a frozen félkez auction-kontra tag),
+  `KontraBar` (per-component in all modes),
   `MarriageBar`, `TrumpChoice` (concrete-suit pick before the opening lead; shown for any
   hidden-trump Normal contract, incl. the reopened félkez round), `RoundResult` (buli mode shows `declarerRaw`), `BuliScoreboard`,
   `BuliResult`/`BULI_OVER`, `Elszamolas` (client-only settlement). Lobby: `GameOptionsModal`, `WaitingRoom`.
@@ -291,9 +288,9 @@ plus a pairwise "who pays whom" breakdown.
   client gates on `effectiveTrump = trumpSuit||pendingTrump`, not `pendingTrump` (else the
   declarer can't lead → freeze). In the **reopened round** trump is hidden and picked via
   `TrumpChoice` at the opening lead, exactly like the base game.
-- **Play kontra is per-component in every mode.** `eligibleKontra` no longer short-circuits
-  on `options.felkezes`; the félkez 5-card **auction** kontra (`applyBiddingKontra`) is the
-  only hand-wide multiplier and is frozen at play start.
+- **Kontra is per-component in every mode, during play only.** `eligibleKontra` no longer
+  short-circuits on `options.felkezes`, and there is **no bidding-time kontra** — the félkez
+  5-card auction kontra button was removed, so `play.biddingKontra` stays level 0.
 
 ## Tech Stack
 

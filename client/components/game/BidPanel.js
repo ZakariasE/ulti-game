@@ -39,15 +39,8 @@ export default function BidPanel({ roomCode }) {
     ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl) * curMult * kontra.multiplier})${kontra.level > 0 ? ` ${kontraLevelName(2 ** kontra.level)}` : ''} — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
-  // Can I escalate the kontra right now? (my turn, a bid exists, my side's step)
-  const nextParty = kontra.level % 2 === 0 ? 'defenders' : 'declarer'
-  const myParty = currentHighBid && currentHighBid.playerId === myPlayerId ? 'declarer' : 'defenders'
-  // Bidding-kontra is only in the 5-card round; in the reopened round it waits for play.
-  const canKontra = felkezes && biddingMode === 'felkezes' && isMyTurn && !!currentHighBid && nextParty === myParty
-  const nextKontraName = kontraLevelName(2 ** (kontra.level + 1))
-  const kontraBtn = canKontra
-    ? <button className={styles.btnSecondary} onClick={() => emit('bid:kontra', { roomCode })}>{nextKontraName}</button>
-    : null
+  // No bidding-time kontra: in every mode (incl. félkezes) kontra happens during
+  // play, per-component (see KontraBar), exactly like the base game.
 
   if (!isMyTurn) {
     const bidder = players.find((p) => p.id === currentTurnId)
@@ -79,7 +72,6 @@ export default function BidPanel({ roomCode }) {
           <button className={styles.btnPrimary} onClick={() => emit('bid:rob', { roomCode })}>
             Talon felvétele
           </button>
-          {kontraBtn}
           <button className={styles.btnSecondary} onClick={() => emit('bid:pass', { roomCode })}>
             Passz
           </button>
@@ -176,7 +168,6 @@ export default function BidPanel({ roomCode }) {
           <button className={styles.btnPrimary} disabled={!candHigher} onClick={declareTrump}>
             {candValid && !candHigher ? 'Magasabbat kell mondani' : 'Bemondom'}
           </button>
-          {biddingPhase === 'BID' && kontraBtn}
           {biddingPhase === 'BID' && (
             <button className={styles.btnSecondary} onClick={() => emit('bid:pass', { roomCode })}>Passz</button>
           )}
