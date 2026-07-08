@@ -136,7 +136,7 @@ function applyDeal(state) {
 
 // ── Bidding ──────────────────────────────────────────────────────────────────
 
-function applyBidDiscard(state, playerId, cardIds, hozam) {
+function applyBidDiscard(state, playerId, cardIds, hozam, hozamOpen) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
@@ -160,7 +160,7 @@ function applyBidDiscard(state, playerId, cardIds, hozam) {
       if (!state.options.fourAces && hozam.includes('four_aces')) {
         throw new Error('A Négy ász nincs engedélyezve ebben a szobában')
       }
-      const expanded = expandDeclaration(state.bidding.currentHighBid.declaration, hozam)
+      const expanded = expandDeclaration(state.bidding.currentHighBid.declaration, hozam, { open: hozamOpen })
       state.bidding.currentHighBid.declaration = expanded
       // (Kötelező credit is set in the 5-card round only — hozámondás is teljes kéz
       // and only adds, so it never changes the félkez ulti credit already recorded.)

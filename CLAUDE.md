@@ -198,7 +198,10 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
      piros parti (8) + piros ulti = 8+16=**24**; + piros 40-100 = **16** (parti
      gone); + piros ulti + 40-100 = **32**. The expanded bid becomes the standing
      bid for the reopened round (its higher value must be beaten). Add-ons are
-     per-component kontrázható in play (×2). Always on in félkez; no toggle.
+     per-component kontrázható in play (×2). Always on in félkez; no toggle. The
+     **durchmars add-on may be terített** (`hozamOpen` on `bid:discard` →
+     `expandDeclaration(base, addOns, { open })`): it then doubles the durchmars
+     part (6→12) and reveals the hand after trick 1.
      (`expandDeclaration`/`effectiveRankValue` in `bidding.js`; `declaration.hozam`
      lists the add-ons.)
 5. **Play.** Kontra is **per-component** (exactly like the base game): a defender
@@ -349,7 +352,7 @@ through the all-pairs expansion.
 
 ### Socket events
 - **client→server:** `room:create` (w/ options), `room:join`, `game:start`, `bid:declare`,
-  `bid:pass`, `bid:discard` (`{cardIds, hozam?}` — hozám add-ons at POST_DEAL_DISCARD), `bid:rob`, `bid:kontra` (félkez per-component bidding kontra; `{components}`), `play:firstLead`,
+  `bid:pass`, `bid:discard` (`{cardIds, hozam?, hozamOpen?}` — hozám add-ons at POST_DEAL_DISCARD; `hozamOpen` = terített durchmars add-on), `bid:rob`, `bid:kontra` (félkez per-component bidding kontra; `{components}`), `play:firstLead`,
   `card:play`, `claim:start`, `claim:respond`, `round:continue`, `buli:next`.
 - **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
   `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,

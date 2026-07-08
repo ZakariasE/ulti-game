@@ -100,7 +100,7 @@ function simpleDeclaration(color, trumpSuit) {
 // bid's color/trump (enforced by reusing them) and be valid to combine; each
 // add-on scores ×2 (recorded in `hozam`). Re-running buildDeclaration means the
 // parti drops if any add-on is a non-parti-bearer, exactly like a normal bundle.
-function expandDeclaration(baseDecl, addOns) {
+function expandDeclaration(baseDecl, addOns, opts = {}) {
   if (baseDecl.isNoTrump) throw new Error('Adu nélküli játékhoz nem lehet hozzámondani')
   const add = [...new Set(addOns || [])]
   if (add.length === 0) return baseDecl
@@ -110,7 +110,10 @@ function expandDeclaration(baseDecl, addOns) {
     if (origChosen.includes(c)) throw new Error(`Már benne van: ${c}`)
   }
   const combined = [...origChosen, ...add]
-  const expanded = buildDeclaration(combined, baseDecl.color, baseDecl.trumpSuit, { open: baseDecl.open })
+  // `opts.open` = the durchmars add-on is terített (doubles it, reveals the hand);
+  // it also carries forward if the base bid was already open.
+  const open = !!baseDecl.open || !!opts.open
+  const expanded = buildDeclaration(combined, baseDecl.color, baseDecl.trumpSuit, { open })
   expanded.hozam = add // the added components — each scores ×2
   return expanded
 }
