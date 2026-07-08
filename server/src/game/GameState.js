@@ -153,8 +153,8 @@ function applyBidDiscard(state, playerId, cardIds, hozam) {
       }
       const expanded = expandDeclaration(state.bidding.currentHighBid.declaration, hozam)
       state.bidding.currentHighBid.declaration = expanded
-      // Hozámondás keeps/adds the ulti → recompute the kötelező commitment.
-      _recordKotelezoSaid(state, playerId, expanded)
+      // (Kötelező credit is set in the 5-card round only — hozámondás is teljes kéz
+      // and only adds, so it never changes the félkez ulti credit already recorded.)
       // Add-ons join the per-component kontra map (kontrázható in play, ×2).
       for (const c of expanded.scoring) {
         if (!state.bidding.kontra[c]) state.bidding.kontra[c] = { level: 1, step: 0, lastParty: null }
@@ -672,9 +672,14 @@ function _ultiTrumpCount(state, declaration) {
   return five.filter((c) => c.suit === declaration.trumpSuit).length
 }
 
-// A required ulti with <3 trump cards in the 5-card hand pays +10 (+20 red).
+// A committed FÉLKEZ ulti with <3 trump cards in the 5-card hand pays +10 (+20 red)
+// to the declarer who plays it. Only counts when the bid was won in the 5-card
+// round and the ulti is original (not a hozámondott add-on) — so it never goes to
+// someone who outbid a félkez ulti in teljes kéz.
 function _requiredUltiBonus(state, declaration) {
   if (!state.options.kotelezo.on || !declaration.scoring.includes('ulti')) return 0
+  if (!state.play.felkezesBid) return 0
+  if ((declaration.hozam || []).includes('ulti')) return 0
   const count = _ultiTrumpCount(state, declaration)
   if (count === null || count >= 3) return 0
   return declaration.color === 'red' ? 20 : 10
@@ -689,6 +694,10 @@ function _requiredUltiBonus(state, declaration) {
 // the ulti for the hand even if you re-declare one.
 function _recordKotelezoSaid(state, playerId, declaration) {
   if (!state.options.kotelezo.on || !state.bidding) return
+  // A required saying only counts if declared in the FÉLKEZ (5-card) round — a bid
+  // (or hozámondás add-on) made in teljes kéz does NOT earn the acknowledgment, so
+  // outbidding someone's félkez ulti in teljes kéz gives the outbidder no credit.
+  if (state.bidding.mode !== 'felkezes') return
   const b = state.bidding
   if (!b.ultiLocked[playerId]) b.saidUlti[playerId] = declaration.scoring.includes('ulti')
   b.saidBetli[playerId] = declaration.scoring.some((s) => KOTELEZO_BETLI_KEYS.has(s))

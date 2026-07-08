@@ -209,21 +209,26 @@ A chain of `handsPerBuli` hands. Scoring differs:
 Each player must, during the buli, declare **one Ulti** and **one Betli or 40-100**.
 Unmet at buli end costs **−220** (Ulti) / **−110** (Betli/40-100), individually.
 
-- **Credit is for *saying* it** — trump count is irrelevant to credit. You keep the
-  credit if another player **outbids** you (you still said it), and if you only
-  **hozámond** (add on). You **lose** it if you switch your *own* bid away: in
-  félkez to a bid without that ulti, or in teljes kéz by **picking your talon back
-  up** to re-bid (forfeits the ulti even if the new bid contains one — that's why
-  a self-switch to a different-color bundle, which needs a talon pickup, loses it).
-  Tracked per hand on `state.bidding` (`saidUlti`/`saidBetli` = latest own bid;
-  `ultiLocked` = picked own talon up) via `_recordKotelezoSaid`; folded into the
-  sticky `buli.kotelezo` at hand end by `_markKotelezo(state)`.
-- **Premium is separate from credit.** A played (not just said) Ulti whose declarer
-  held **fewer than 3** (i.e. ≤2) cards of the trump suit in the 5-card hand earns
-  **+10** (**+20** red), folded in as its own **`ulti_bonus` component** (flat
-  declarer premium — in `declarerRaw`, not the pairwise `deltas`), shown as a
-  round-over row. Applied once (in `calculateRoundScore`, if the *played*
-  declaration includes an ulti); if something else is played, no premium.
+- **Credit is for *saying* it in the FÉLKEZ (5-card) round** — trump count is
+  irrelevant to credit. A saying declared in **teljes kéz** (reopened round or a
+  hozámondott add-on) does **not** earn credit, so **outbidding someone's félkez
+  ulti in teljes kéz gives the outbidder nothing** (only the original félkez
+  declarer is credited). You keep the credit if another player **outbids** you
+  (you still said it in félkez) and if you only **hozámond** (add on — the félkez
+  ulti is already recorded and only ever kept). You **lose** it if you switch your
+  *own* bid away: in félkez to a bid without that ulti, or in teljes kéz by
+  **picking your talon back up** to re-bid (forfeits the ulti even if the new bid
+  contains one — a self-switch to a different-colour bundle needs a talon pickup,
+  so it loses it). Tracked per hand on `state.bidding` (`saidUlti`/`saidBetli`,
+  recorded only while `mode==='felkezes'`; `ultiLocked` = picked own talon up) via
+  `_recordKotelezoSaid`; folded into the sticky `buli.kotelezo` by `_markKotelezo(state)`.
+- **Premium is separate from credit.** It goes to the declarer who **plays a
+  committed FÉLKEZ ulti** (bid won in the 5-card round, ulti original — not
+  hozámondott) holding **fewer than 3** (≤2) of the trump suit in their 5-card
+  hand: **+10** (**+20** red), folded in as its own **`ulti_bonus` component**
+  (flat declarer premium — in `declarerRaw`, not the pairwise `deltas`), shown as a
+  round-over row. `_requiredUltiBonus` gates on `play.felkezesBid` + non-hozám ulti,
+  so it never goes to someone who outbid a félkez ulti in teljes kéz.
 
 ### Elszámolás (settlement)
 
