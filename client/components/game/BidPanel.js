@@ -9,6 +9,12 @@ import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/BidPanel.module.css'
 
 const FELKEZES_SUITS = ['makk', 'zold', 'tok', 'piros']
+// Sayings that require a trump suit (cleared when Színtelen / no-trump is chosen).
+// Durchmars is NOT here — it works both as a trump component and no-trump.
+const TRUMP_ONLY = ['ulti', 'four_aces', 'forty_hundred', 'twenty_hundred']
+// The betli contracts stay as their own exclusive chips; the no-trump durchmars is
+// expressed as the durchmars component + the Színtelen (no-trump) color.
+const BETLI_CONTRACTS = ['betli', 'heart_betli', 'open_betli']
 
 export default function BidPanel({ roomCode }) {
   const { state, dispatch } = useGame()
@@ -186,26 +192,40 @@ export default function BidPanel({ roomCode }) {
   const needDiscard = biddingPhase === 'DISCARD'
   const discardReady = !needDiscard || (pendingDiscard || []).length === 2
 
-  // A no-trump contract is exclusive (can't combine with trump components / color).
+  // A betli contract is exclusive (its own chip). "Színtelen" (no-trump) is a
+  // color option: durchmars + Színtelen = the no-trump durchmars.
   const isNt = !!ntContract
-  // Terített only applies to a trump durchmars.
+  const noTrumpMode = !isNt && (namedTrump ? felkTrump === 'notrump' : color === 'notrump')
+  // Terített applies to any durchmars (trump 6→12, or no-trump 12→24).
   const canOpen = !isNt && picked.includes('durchmars')
   const openNow = open && canOpen
-  // Build the candidate declaration: a chosen no-trump contract, else the trump
-  // picks (empty picks = a simple parti).
-  const candidate = isNt
-    ? makeDeclaration('notrump', { contract: ntContract })
-    : (picked.length === 0
+  // Build the candidate declaration: a betli contract, else a no-trump durchmars
+  // (Színtelen + durchmars), else the trump picks (empty picks = a simple parti).
+  let candidate
+  if (isNt) {
+    candidate = makeDeclaration('notrump', { contract: ntContract })
+  } else if (noTrumpMode) {
+    candidate = picked.length > 0 && picked.every((c) => c === 'durchmars')
+      ? makeDeclaration('notrump', { contract: openNow ? 'open_durchmars' : 'durchmars_nt' })
+      : { invalid: true, error: 'Színtelen mellé csak durchmars mondható' }
+  } else {
+    candidate = picked.length === 0
       ? makeDeclaration('simple', { color: effColor })
-      : makeDeclaration('trump', { components: picked, color: effColor, open: openNow }))
+      : makeDeclaration('trump', { components: picked, color: effColor, open: openNow })
+  }
   // The 5-card round requires a named trump suit before a TRUMP bid (no-trump has none).
   const suitReady = isNt || !namedTrump || !!felkTrump
   const candValid = !candidate.invalid && suitReady && discardReady
   const candHigher = candValid && beatsDeclaration(candidate, myFelk, currentDecl, curFelk)
 
-  // Picking a trump component clears any no-trump choice, and vice-versa.
+  // Picking a trump-only saying leaves no-trump mode; picking any component clears
+  // a betli choice.
   function toggle(comp) {
     setNtContract(null)
+    if (TRUMP_ONLY.includes(comp)) {
+      if (namedTrump && felkTrump === 'notrump') setFelkTrump(null)
+      if (!namedTrump && color === 'notrump') setColor('normal')
+    }
     setPicked((prev) => (prev.includes(comp) ? prev.filter((c) => c !== comp) : [...prev, comp]))
   }
   function pickNt(key) {
@@ -213,6 +233,15 @@ export default function BidPanel({ roomCode }) {
     setPicked([])
     setOpen(false)
     setFelkTrump(null)
+  }
+  // Choosing a color/suit; Színtelen (no-trump) clears trump-only sayings + betli.
+  function chooseColor(c) {
+    setColor(c)
+    if (c === 'notrump') { setNtContract(null); setPicked((prev) => prev.filter((x) => !TRUMP_ONLY.includes(x))) }
+  }
+  function chooseFelkTrump(s) {
+    setFelkTrump(s)
+    if (s === 'notrump') { setNtContract(null); setPicked((prev) => prev.filter((x) => !TRUMP_ONLY.includes(x))) }
   }
 
   // When robbing (DISCARD phase), put down the 2 selected cards and declare in
@@ -224,6 +253,7 @@ export default function BidPanel({ roomCode }) {
   function declareBid() {
     commitDiscardIfNeeded()
     if (isNt) emit('bid:declare', { roomCode, type: 'notrump', contract: ntContract })
+    else if (noTrumpMode) emit('bid:declare', { roomCode, type: 'notrump', contract: openNow ? 'open_durchmars' : 'durchmars_nt' })
     else {
       const trumpSuit = namedTrump ? felkTrump : undefined
       if (picked.length === 0) emit('bid:declare', { roomCode, type: 'simple', color: effColor, trumpSuit })
@@ -232,6 +262,7 @@ export default function BidPanel({ roomCode }) {
     setPicked([])
     setNtContract(null)
     setFelkTrump(null)
+    setColor('normal')
     setOpen(false)
   }
 
@@ -252,34 +283,37 @@ export default function BidPanel({ roomCode }) {
               {componentLabel(comp)}
             </button>
           ))}
-          {/* No-trump contracts sit in the same set — picking one is exclusive. */}
-          {Object.entries(NO_TRUMP_CONTRACTS).map(([key, info]) => (
+          {/* Betli contracts are their own exclusive chips (no-trump durchmars is
+              expressed via the durchmars component + the Színtelen color). */}
+          {BETLI_CONTRACTS.map((key) => (
             <button
               key={key}
               className={`${styles.chip} ${ntContract === key ? styles.chipOn : ''}`}
               onClick={() => pickNt(key)}
             >
-              {info.label}
+              {NO_TRUMP_CONTRACTS[key].label}
             </button>
           ))}
         </div>
-        {/* Color / trump suit / terített only apply to a TRUMP bid. */}
+        {/* Color / trump suit + Színtelen (no-trump). Hidden for a betli contract. */}
         {!isNt && (namedTrump ? (
           <div className={styles.colorRow}>
             {FELKEZES_SUITS.map((s) => (
               <button
                 key={s}
                 className={`${styles.chip} ${s === 'piros' ? styles.red : ''} ${felkTrump === s ? styles.chipOn : ''}`}
-                onClick={() => setFelkTrump(s)}
+                onClick={() => chooseFelkTrump(s)}
               >
                 {SUIT_NAMES[s]}{s === 'piros' ? ' ♥ (×2)' : ''}
               </button>
             ))}
+            <button className={`${styles.chip} ${felkTrump === 'notrump' ? styles.chipOn : ''}`} onClick={() => chooseFelkTrump('notrump')}>Színtelen</button>
           </div>
         ) : (
           <div className={styles.colorRow}>
-            <button className={`${styles.chip} ${color === 'normal' ? styles.chipOn : ''}`} onClick={() => setColor('normal')}>Sima</button>
-            <button className={`${styles.chip} ${styles.red} ${color === 'red' ? styles.chipOn : ''}`} onClick={() => setColor('red')}>Piros ♥ (×2)</button>
+            <button className={`${styles.chip} ${color === 'normal' ? styles.chipOn : ''}`} onClick={() => chooseColor('normal')}>Sima</button>
+            <button className={`${styles.chip} ${styles.red} ${color === 'red' ? styles.chipOn : ''}`} onClick={() => chooseColor('red')}>Piros ♥ (×2)</button>
+            <button className={`${styles.chip} ${color === 'notrump' ? styles.chipOn : ''}`} onClick={() => chooseColor('notrump')}>Színtelen</button>
           </div>
         ))}
         {canOpen && (
@@ -296,10 +330,10 @@ export default function BidPanel({ roomCode }) {
           {candidate.invalid
             ? <span className={styles.invalid}>{candidate.error}</span>
             : (!isNt && namedTrump && !felkTrump)
-              ? <span className={styles.invalid}>Válassz színt</span>
+              ? <span className={styles.invalid}>Válassz színt vagy Színtelen</span>
               : !discardReady
                 ? <span className={styles.invalid}>Válassz 2 eldobandó lapot (lent)</span>
-                : <>Bemondás: <strong>{isNt ? declarationLabel(candidate) : (picked.length === 0 ? (effColor === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate))}</strong>{!isNt && namedTrump ? ` — ${SUIT_NAMES[felkTrump]}` : ''} — {declarationValue(candidate) * mult} pont</>}
+                : <>Bemondás: <strong>{isNt || noTrumpMode ? declarationLabel(candidate) : (picked.length === 0 ? (effColor === 'red' ? 'Szimpla (piros)' : 'Szimpla') : declarationLabel(candidate))}</strong>{!isNt && !noTrumpMode && namedTrump && felkTrump ? ` — ${SUIT_NAMES[felkTrump]}` : ''} — {declarationValue(candidate) * mult} pont</>}
         </div>
         <div className={styles.actions}>
           <button className={styles.btnPrimary} disabled={!candHigher} onClick={declareBid}>
@@ -312,11 +346,11 @@ export default function BidPanel({ roomCode }) {
         {mustKontra && (
           <p className={styles.hint}><strong>Kötelező kontrázni vagy überelni ezt a betlit</strong> (a bemondó betlije befejezi a kötelező mondását).</p>
         )}
-        {!isNt && (
+        {!isNt && !noTrumpMode && (
           <p className={styles.hint}>
             {namedTrump
-              ? 'Félkezesben azonnal meg kell mondani a színt (adut).'
-              : 'Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu.'}
+              ? 'Félkezesben azonnal meg kell mondani a színt (adut). Színtelen = adu nélkül.'
+              : 'Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu. Színtelen = adu nélkül.'}
           </p>
         )}
       </div>
