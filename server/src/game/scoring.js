@@ -60,7 +60,8 @@ function marriagePoints(marriages, ids, eligible) {
 // Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
 function calculateRoundScore({ declaration, declarerId, defenderIds,
                                completedTricks, talon, declarerPoints, kontra = {}, marriages = {},
-                               felkezesBid = false, redealMultiplier = 1, ultiBonus = 0, conceded = false }) {
+                               felkezesBid = false, redealMultiplier = 1, ultiBonus = 0,
+                               conceded = false, conceded100 = false, forcePartiWon = false }) {
   const trumpSuit = declaration.trumpSuit
   const announced = marriages[declarerId] || [] // declarer's own (for 40-100 / 20-100)
 
@@ -158,12 +159,18 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
 
   const hozamSet = new Set(declaration.hozam || [])
   const components = declaration.scoring.map((key) => {
-    const won = conceded ? false : componentWon(key, ctx)
+    // forcePartiWon = quick félkez-parti (declarer auto-wins the parti after
+    // trick 1 with no kontra); conceded = every component lost.
+    const won = (forcePartiWon && key === 'parti') ? true : (conceded ? false : componentWon(key, ctx))
     const basePoints = componentBasePoints(key, declaration.color, declaration.open)
     const kontraLevel = (kontra[key] && kontra[key].level) || 1
-    // Reaching 100 card points doubles the Parti stake — for whichever side won it.
-    // (Not on a concede — no card race.)
-    const hundred = !conceded && key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100
+    // Reaching 100 doubles the Parti stake. Normal hand: whichever side hit ≥100.
+    // Concede-with-100 (bedobom százzal): forced for the parti. Never on a quick
+    // parti (only one trick was played).
+    let hundred = false
+    if (key === 'parti' && !forcePartiWon) {
+      hundred = conceded ? conceded100 : (won ? declarerTotal : defenderTotal) >= 100
+    }
     // Per-component multiplier: a hozámondott add-on scores ×2; an original
     // félkez component ×4 (only if the bid was won in the 5-card round); a normal
     // teljes-kéz component ×1. Redeal doublings apply to the whole hand.

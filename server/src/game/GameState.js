@@ -607,11 +607,30 @@ function applyTrickEnd(state) {
   if (state.play.trickCount === 10) {
     return { winnerId: winner.playerId, points, roundComplete: true, ...applyRoundEnd(state) }
   }
+  // Quick félkez parti: a pure parti won in the 5-card round, un-kontrázott,
+  // resolves after the FIRST trick — the declarer simply wins the parti and the
+  // round ends. (If a defender kontrázott, k.level > 1 and it plays on normally.)
+  if (state.play.trickCount === 1 && _isQuickPartiWin(state)) {
+    state.play.quickPartiWin = true
+    return { winnerId: winner.playerId, points, roundComplete: true, ...applyRoundEnd(state) }
+  }
   // Pure Betli / Durchmars end the instant the goal becomes impossible.
   if (_goalFailed(state, winner.playerId)) {
     return { winnerId: winner.playerId, points, roundComplete: true, ...applyRoundEnd(state) }
   }
   return { winnerId: winner.playerId, points, roundComplete: false }
+}
+
+// A pure Parti (only the parti component) won in the félkez 5-card round, with no
+// kontra on it, is conceded by the defenders: after the first trick the declarer
+// just takes the parti. Any parti kontra (from bidding or the first trick's cards)
+// makes it play out normally.
+function _isQuickPartiWin(state) {
+  if (!state.play.felkezesBid) return false
+  const decl = state.play.declaration
+  if (!(decl.scoring.length === 1 && decl.scoring[0] === 'parti')) return false
+  const k = state.play.kontra.parti
+  return !k || k.level === 1
 }
 
 const BETLI_KEYS = new Set(['betli', 'heart_betli', 'open_betli'])
@@ -668,8 +687,12 @@ function applyRoundEnd(state) {
     redealMultiplier: state.redealMultiplier || 1,
     ultiBonus,
     // Concede (bedobás): every component scores as a loss, with whatever kontra
-    // levels were reached before the declarer threw in.
+    // levels were reached before the declarer threw in. `conceded100` (bedobom
+    // százzal) additionally pays the Parti as if the defenders reached 100.
     conceded,
+    conceded100: !!state.play.conceded100,
+    // Quick félkez parti: declarer auto-wins the parti after trick 1 (no kontra).
+    forcePartiWon: !!state.play.quickPartiWin,
   })
 
   const declarerId = state.play.declarerId
@@ -941,11 +964,13 @@ function applyClaimAll(state) {
 // The declarer throws in the hand — it ends immediately, the defenders win, and
 // every component is scored as a loss using whatever kontra levels were reached.
 // Allowed any time once play has begun (the declarer is confirmed), even before
-// the opening lead.
-function applyConcede(state, playerId) {
+// the opening lead. `hundred` (bedobom százzal, offered only once tricks have
+// begun) pays the Parti as if the defenders reached 100.
+function applyConcede(state, playerId, hundred) {
   if (state.phase !== 'PLAYING') throw new Error('Not in play')
   if (playerId !== state.play.declarerId) throw new Error('Only the declarer can concede')
   state.play.conceded = true
+  state.play.conceded100 = !!hundred
   return applyRoundEnd(state)
 }
 

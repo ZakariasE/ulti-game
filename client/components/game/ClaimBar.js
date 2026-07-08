@@ -12,7 +12,7 @@ export default function ClaimBar({ roomCode }) {
   const { state, dispatch } = useGame()
   const { emit } = useSocket()
   const { phase, declaration, declarerId, myPlayerId, currentTrick, completedTricks, claim, claimVote } = state
-  const [confirming, setConfirming] = useState(false)
+  const [confirming, setConfirming] = useState(null) // null | 'plain' | '100'
 
   if (phase !== 'PLAYING' || !declaration) return null
   const amDeclarer = declarerId === myPlayerId
@@ -56,8 +56,14 @@ export default function ClaimBar({ roomCode }) {
   const canOffer = !declaration.scoring.some((k) => BETLI.has(k)) &&
     currentTrick.length === 0 && completedTricks.length >= 1 && completedTricks.length < 10
 
-  // Bedobás is available any time the declarer is on lead/at play (no card mid-air
-  // required) — confirmed once, since it forfeits the hand.
+  // Bedobás is available any time the declarer is at play (even before the opening
+  // lead) — confirmed once, since it forfeits the hand. Once tricks have begun, a
+  // parti-bearing contract also offers "Bedobom, százzal": pay the parti as if the
+  // defenders reached 100.
+  const tricksBegun = (completedTricks?.length || 0) > 0 || (currentTrick?.length || 0) > 0
+  const canHundred = tricksBegun && declaration.hasParti
+  const doConcede = (hundred) => { emit('play:concede', { roomCode, hundred }); setConfirming(null) }
+
   return (
     <div className={styles.bar}>
       {canOffer && (
@@ -65,12 +71,21 @@ export default function ClaimBar({ roomCode }) {
       )}
       {confirming ? (
         <>
-          <span className={styles.confirm}>Biztosan bedobod? Elveszíted a leosztást.</span>
-          <button className={styles.no} onClick={() => { emit('play:concede', { roomCode }); setConfirming(false) }}>Igen, bedobom</button>
-          <button className={styles.cancel} onClick={() => setConfirming(false)}>Mégse</button>
+          <span className={styles.confirm}>
+            {confirming === '100'
+              ? 'Biztosan bedobod (százzal)? Elveszíted a leosztást, a parti 100-zal számol.'
+              : 'Biztosan bedobod? Elveszíted a leosztást.'}
+          </span>
+          <button className={styles.no} onClick={() => doConcede(confirming === '100')}>Igen</button>
+          <button className={styles.cancel} onClick={() => setConfirming(null)}>Mégse</button>
         </>
       ) : (
-        <button className={styles.concede} onClick={() => setConfirming(true)}>Bedobom</button>
+        <>
+          <button className={styles.concede} onClick={() => setConfirming('plain')}>Bedobom</button>
+          {canHundred && (
+            <button className={styles.concede} onClick={() => setConfirming('100')}>Bedobom, százzal</button>
+          )}
+        </>
       )}
     </div>
   )

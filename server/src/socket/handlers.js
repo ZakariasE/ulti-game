@@ -193,10 +193,10 @@ function registerHandlers(io, socket) {
   })
 
   // Bedobás: the declarer throws in — the hand ends immediately as a loss.
-  socket.on('play:concede', ({ roomCode }) => {
+  socket.on('play:concede', ({ roomCode, hundred }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      applyConcede(state, socket.id)
+      applyConcede(state, socket.id, hundred)
       io.to(roomCode).emit('round:completed', _roundCompleted(state))
     } catch (err) {
       socket.emit('game:error', { message: err.message })
