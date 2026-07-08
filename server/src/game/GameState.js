@@ -1,7 +1,7 @@
 const { createDeck, shuffle, deal, dealFelkezes } = require('./deck')
 const { getLegalPlays, determineTrickWinner, countTrickPoints } = require('./rules')
 const {
-  getInitialBidderSeat, getNextBidderSeat, isHigherDeclaration,
+  getInitialBidderSeat, getNextBidderSeat, fewerComponents,
   buildDeclaration, simpleDeclaration, noTrumpDeclaration, declarationLabel,
   expandDeclaration, effectiveRankValue,
 } = require('./bidding')
@@ -205,13 +205,15 @@ function applyDeclare(state, playerId, payload) {
   }
   const current = state.bidding.currentHighBid
   if (current) {
-    // Effective value: original components × the round's félkez factor (×4 in the
-    // 5-card round, ×1 in the reopened round), plus any hozámondott add-ons ×2.
-    // Kontra is per-component and does not gate outbidding — an outbid clears it.
+    // Effective value (incl. parti): components × the round's félkez factor (×4
+    // in the 5-card round, ×1 in the reopened round), plus any hozámondott add-ons
+    // ×2. On a tie, the bid with fewer components wins (pure count — NOT a raw
+    // rankValue re-compare, which would be wrong across rounds). Kontra is
+    // per-component and does not gate outbidding — an outbid clears it.
     const curVal = effectiveRankValue(current.declaration, _felkezFactor(current.round))
     const newVal = effectiveRankValue(declaration, _felkezFactor(state.bidding.mode))
     const beats = newVal > curVal ||
-      (newVal === curVal && isHigherDeclaration(declaration, current.declaration))
+      (newVal === curVal && fewerComponents(declaration, current.declaration))
     if (!beats) throw new Error('Declaration must out-rank the current bid')
   }
 

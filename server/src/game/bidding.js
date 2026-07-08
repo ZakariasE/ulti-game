@@ -105,12 +105,12 @@ function expandDeclaration(baseDecl, addOns) {
 
 // Effective value-to-beat for a (possibly hozámondás-expanded) declaration.
 // Original components use `felkFactor` (×4 in the 5-card round, else ×1); each
-// hozámondott add-on uses ×2. Ranking ignores the parti (as elsewhere).
+// hozámondott add-on uses ×2. The parti IS included (it counts toward the value,
+// e.g. a félkez Ulti is (4+1)×4 = 20). Ties are broken by component count — see
+// fewerComponents / isHigherDeclaration.
 function effectiveRankValue(decl, felkFactor) {
   const hozam = new Set(decl.hozam || [])
-  const nonParti = decl.scoring.filter((c) => c !== 'parti')
-  if (nonParti.length === 0) return componentBasePoints('parti', decl.color) * felkFactor
-  return nonParti.reduce((s, c) => s + componentBasePoints(c, decl.color) * (hozam.has(c) ? 2 : felkFactor), 0)
+  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color) * (hozam.has(c) ? 2 : felkFactor), 0)
 }
 
 function noTrumpDeclaration(key) {
@@ -143,32 +143,25 @@ function declarationValue(decl) {
   return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
 }
 
-// Bidding rank ignores the +1/+2 parti bonus: a "clean" Betli (5) outranks an
-// Ulti (4+1), and Heart Betli (10) outranks Heart Ulti (8+2). A lone Simple is
-// ranked by its parti value.
+// Bidding rank is the FULL value INCLUDING the parti: an Ulti is 4+1 = 5, a
+// clean Betli is 5, a 40-100 is 4. So Ulti outranks 40-100 (5 > 4). Ties are
+// broken by fewerComponents.
 function rankValue(decl) {
-  const nonParti = decl.scoring.filter((c) => c !== 'parti')
-  if (nonParti.length === 0) return componentBasePoints('parti', decl.color)
-  return nonParti.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
 }
 
-// Tiebreak for equal values: order no-trump specials, then by a component
-// priority so the ordering is stable and deterministic.
-const TIEBREAK = [
-  'parti', 'betli', 'ulti', 'four_aces', 'forty_hundred', 'durchmars_nt',
-  'durchmars', 'twenty_hundred', 'heart_betli', 'heart_durchmars', 'open_betli', 'open_durchmars',
-]
-function tiebreakKey(decl) {
-  return Math.min(...decl.scoring.map((c) => {
-    const i = TIEBREAK.indexOf(c)
-    return i < 0 ? TIEBREAK.length : i
-  }))
+// Tie-break for equal (effective) value: the bid with FEWER scoring components
+// ranks higher — a clean Betli [betli] (1) beats an Ulti [ulti, parti] (2),
+// even though both are worth 5. Equal value AND equal component count ⇒ neither
+// out-ranks the other (cannot outbid).
+function fewerComponents(next, current) {
+  return next.scoring.length < current.scoring.length
 }
 
 function isHigherDeclaration(next, current) {
   const dv = rankValue(next) - rankValue(current)
   if (dv !== 0) return dv > 0
-  return tiebreakKey(next) > tiebreakKey(current)
+  return fewerComponents(next, current)
 }
 
 // A short human label for a declaration, e.g. "Ulti + 40-100 (red)".
@@ -201,6 +194,7 @@ module.exports = {
   componentLabel,
   declarationValue,
   rankValue,
+  fewerComponents,
   isHigherDeclaration,
   declarationLabel,
   getInitialBidderSeat,

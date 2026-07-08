@@ -86,52 +86,44 @@ export function bidTotalValue(decl, felkFactor = 1, redeal = 1) {
   }, 0)
 }
 
-// Bidding rank ignores the +1/+2 parti bonus (Betli 5 outranks Ulti 4+1).
+// Bidding rank is the FULL value INCLUDING the parti (Ulti 4+1=5 outranks 40-100 4).
 export function rankValue(decl) {
   if (!decl || decl.invalid) return -1
-  const nonParti = decl.scoring.filter((c) => c !== 'parti')
-  if (nonParti.length === 0) return componentBasePoints('parti', decl.color)
-  return nonParti.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
 }
 
 // Effective value-to-beat (mirror of server effectiveRankValue). Original
 // components use `felkFactor` (×4 in the 5-card round, else ×1); hozámondott
-// add-ons use ×2; the parti is excluded (as in rankValue).
+// add-ons use ×2; the parti IS included (a félkez Ulti is (4+1)×4 = 20).
 export function effectiveRankValue(decl, felkFactor = 1) {
   if (!decl || decl.invalid) return -1
   const hozam = new Set(decl.hozam || [])
-  const nonParti = decl.scoring.filter((c) => c !== 'parti')
-  if (nonParti.length === 0) return componentBasePoints('parti', decl.color) * felkFactor
-  return nonParti.reduce((s, c) => s + componentBasePoints(c, decl.color) * (hozam.has(c) ? 2 : felkFactor), 0)
+  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color) * (hozam.has(c) ? 2 : felkFactor), 0)
+}
+
+// Tie-break for equal (effective) value: fewer scoring components ranks higher
+// (Betli [betli] beats Ulti [ulti, parti]).
+export function fewerComponents(next, current) {
+  return next.scoring.length < current.scoring.length
 }
 
 // Does `next` (declared this round → nextFelk factor) out-rank the standing
 // `current` (declared in its own round → curFelk)? Mirrors server applyDeclare:
-// compare effective values, tiebreak by isHigherDeclaration when equal.
+// compare effective values, then break ties by component count (a pure count —
+// NOT a raw rankValue re-compare, which would be wrong across rounds).
 export function beatsDeclaration(next, nextFelk, current, curFelk) {
   if (!current) return true
   if (!next || next.invalid) return false
   const curVal = effectiveRankValue(current, curFelk)
   const newVal = effectiveRankValue(next, nextFelk)
-  return newVal > curVal || (newVal === curVal && isHigherDeclaration(next, current))
-}
-
-const TIEBREAK = [
-  'parti', 'betli', 'ulti', 'four_aces', 'forty_hundred', 'durchmars_nt',
-  'durchmars', 'twenty_hundred', 'heart_betli', 'heart_durchmars', 'open_betli', 'open_durchmars',
-]
-function tiebreakKey(decl) {
-  return Math.min(...decl.scoring.map((c) => {
-    const i = TIEBREAK.indexOf(c)
-    return i < 0 ? TIEBREAK.length : i
-  }))
+  return newVal > curVal || (newVal === curVal && fewerComponents(next, current))
 }
 
 export function isHigherDeclaration(next, current) {
   if (!current) return true
   const dv = rankValue(next) - rankValue(current)
   if (dv !== 0) return dv > 0
-  return tiebreakKey(next) > tiebreakKey(current)
+  return fewerComponents(next, current)
 }
 
 export function declarationLabel(decl) {
