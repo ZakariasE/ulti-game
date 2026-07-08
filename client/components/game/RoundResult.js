@@ -32,12 +32,6 @@ export default function RoundResult({ roomCode }) {
           Felvevő: <strong>{declarer?.name}</strong> — pont: {roundResult.cardTotal}
         </p>
 
-        {roundResult.ultiBonus && (
-          <p className={styles.pos}>
-            Kötelező ulti bónusz (kevés adu): +{roundResult.ultiBonus.amount}
-          </p>
-        )}
-
         {roundResult.partiDetail && (
           <div className={styles.parti}>
             <div className={styles.partiTitle}>Parti részletezés</div>
@@ -66,14 +60,22 @@ export default function RoundResult({ roomCode }) {
             {roundResult.components.map((c) => (
               <tr key={c.key}>
                 <td>{c.label}</td>
-                <td className={c.won ? styles.win : styles.loss}>{c.won ? 'nyert' : 'vesztett'}</td>
-                <td>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{roundResult.stakeMultiplier > 1 ? ` ×${roundResult.stakeMultiplier}` : ''}</td>
+                <td className={c.won ? styles.win : styles.loss}>
+                  {c.flat ? 'bónusz' : (c.won ? 'nyert' : 'vesztett')}
+                </td>
+                <td>
+                  {c.flat
+                    ? `+${c.delta}`
+                    : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{roundResult.stakeMultiplier > 1 ? ` ×${roundResult.stakeMultiplier}` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
+                </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             {(() => {
-              const net = roundResult.deltas[roundResult.declarerId] || 0
+              // Per-defender total (the sum of the Tét column) — NOT the pairwise
+              // amount. The per-player table below shows the actual balance change.
+              const net = roundResult.declarerRaw || 0
               return (
                 <tr className={styles.totalRow}>
                   <td>Összesen (felvevő)</td>

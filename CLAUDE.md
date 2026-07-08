@@ -81,7 +81,7 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 
 **Marriages (jelentés):** **every player** may announce held marriages (K+O) on **their own first card** — announced by default, opt out per suit. A jelentés adds **40** (trump suit) or **20** (other) to the announcing side's card points (that side must win ≥1 trick). Only the **value** (20/40) is announced publicly — never the suit. Jelentések can **only** be announced in contracts that carry a **Parti**; in Parti-less contracts (Betli, Durchmars, 40-100, 20-100, …) they cannot be announced. For **40-100 / 20-100** the required 40 (trump K+O) / 20 (a non-trump K+O) is **implied by the contract** and auto-counted for the declarer, not announced. The **Parti** is won when the declarer's total (trick points + own marriages) **exceeds the defenders' total** (their points + their marriages).
 
-**Payout:** per component — on win each defender pays `base × kontra`; on loss the declarer pays each defender.
+**Payout:** per component — on win each defender pays `base × kontra`; on loss the declarer pays each defender. **A lost Ulti is doubled** (win +N per defender, lose −2N) — `lossMult` in `scoring.js`.
 
 ### Kontra (per component, tied to card plays)
 
@@ -197,7 +197,10 @@ Unmet at buli end costs **−220** (Ulti) / **−110** (Betli/40-100), individua
 - The **required Ulti only counts** if the declarer's original 5-card hand holds
   **≤ 3 cards of the trump suit** (revealed). More than 3 → no credit.
 - Declared with **fewer than 3** trump cards (2 or 1) → the declarer earns a
-  **+10** bonus (**+20** if the Ulti is red) at hand end.
+  **+10** bonus (**+20** if the Ulti is red) at hand end. It is folded into the
+  score as its own **`ulti_bonus` component** (a flat declarer premium — in
+  `declarerRaw`, not in the pairwise `deltas`), shown as a row in the round-over
+  breakdown. Applied exactly once (not separately in `applyRoundEnd`).
 
 ### Elszámolás (settlement)
 
@@ -237,19 +240,23 @@ plus a pairwise "who pays whom" breakdown.
     my side may double now) + `applyBiddingKontra` (turn-based). `_startPlay` seeds
     `play.kontra` from `bidding.kontra`, so the chain continues into play. `scoring.js`
     multiplies by `level`.
-  - Round end: `applyRoundEnd` — **branches on buli**. Buli tracks only
-    `result.declarerRaw` (+ `_requiredUltiBonus`) into `declaredScores`/`buli.points`;
-    non-buli adds pairwise `result.deltas` to `scores`. An **üres** hand (declarer
+  - Round end: `applyRoundEnd` — computes `_requiredUltiBonus` and passes it into
+    `calculateRoundScore` (which adds the `ulti_bonus` component), then **branches on
+    buli**. Buli tracks only `result.declarerRaw` (already incl. the bonus) into
+    `declaredScores`/`buli.points`; non-buli adds pairwise `result.deltas` to `scores`.
+    An **üres** hand (declarer
     net 0 → `result.empty`) does **not** increment `buli.handsPlayed` (dealer still
     shifts, hand replayed). `_markKotelezo`, `_settleBuli`
     (premium ±, kötelező penalties), `startBuli`, `prepareNextRound` (clears round-scoped
     fields, resets `redealMultiplier`/`felkezesReveal`/`felkezesFives`/`reserve`).
   - Snapshots: `biddingSnapshot` (hides concrete minor trump; includes `currentHighBid.round`),
     `buliSnapshot`, `publicDeclaration`, `handCounts`.
-- **`game/scoring.js`** — `calculateRoundScore({..., stakeMultiplier})` → `{ components[],
+- **`game/scoring.js`** — `calculateRoundScore({..., stakeMultiplier, ultiBonus})` → `{ components[],
   deltas{pid}, declarerRaw, cardTotal, partiDetail, declarerId, color, stakeMultiplier }`.
-  `payout = base × kontraLevel × (hundred?2:1) × stakeMultiplier`; `deltas[declarer] =
-  Σ payout × nDef`; **`declarerRaw = Σ component.delta`** (per-defender total — what buli uses).
+  `payout = base × kontraLevel × (hundred?2:1) × stakeMultiplier`; a **lost Ulti** uses `payout ×
+  lossMult(2)`; `deltas[declarer] = Σ amount × nDef`. `ultiBonus>0` adds a flat `ulti_bonus`
+  component (not in `deltas`). **`declarerRaw = Σ component.delta`** (per-defender total — what
+  buli tracks, and what the round-over **"Összesen (felvevő)"** row shows — not the pairwise `deltas`).
 - **`game/bidding.js`** — declaration build/validate/rank (server mirror of `client/lib/bids.js`).
 - **`game/deck.js`** — deck + deal helpers. **`socket/handlers.js`** — all events (below).
   **`rooms/RoomManager.js`** — room lifecycle.

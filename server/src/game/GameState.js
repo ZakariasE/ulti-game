@@ -561,6 +561,10 @@ function _goalFailed(state, trickWinnerId) {
 }
 
 function applyRoundEnd(state) {
+  // Required-ulti bonus (lean-trump <3): a flat +10 (+20 red) declarer premium,
+  // folded into the score as its own component so it shows in the breakdown and
+  // flows into declarerRaw exactly once.
+  const ultiBonus = _requiredUltiBonus(state, state.play.declaration)
   const result = calculateRoundScore({
     declaration: state.play.declaration,
     declarerId: state.play.declarerId,
@@ -574,20 +578,16 @@ function applyRoundEnd(state) {
     // kéz bid is normal); × redeal doublings. Per-component kontra (incl. any made
     // during bidding) is applied per component inside calculateRoundScore.
     stakeMultiplier: (state.play.felkezesBid ? 4 : 1) * (state.redealMultiplier || 1),
+    ultiBonus,
   })
 
   const declarerId = state.play.declarerId
   const buliOn = state.options.buli.on && state.buli
   if (buliOn) {
     // Buli: track ONLY the declarer's own RAW points (one unit, not the pairwise
-    // ×2 — the pairwise expansion is done at Elszámolás).
-    let d = result.declarerRaw || 0
-    // Required-ulti bonus: a lean-trump (<3) 5-card ulti earns +10 (+20 red).
-    const bonus = _requiredUltiBonus(state, state.play.declaration)
-    if (bonus) {
-      d += bonus
-      result.ultiBonus = { playerId: declarerId, amount: bonus }
-    }
+    // ×2 — the pairwise expansion is done at Elszámolás). declarerRaw already
+    // includes the ulti bonus (added as a component above).
+    const d = result.declarerRaw || 0
     state.declaredScores[declarerId] = (state.declaredScores[declarerId] || 0) + d
     state.buli.points[declarerId] = (state.buli.points[declarerId] || 0) + d
     // "Üres" hand: the declarer's net is 0 (e.g. a won Ulti cancelling a

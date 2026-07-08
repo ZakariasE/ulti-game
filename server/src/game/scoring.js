@@ -61,7 +61,7 @@ function marriagePoints(marriages, ids, eligible) {
 // Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
 function calculateRoundScore({ declaration, declarerId, defenderIds,
                                completedTricks, talon, declarerPoints, kontra = {}, marriages = {},
-                               stakeMultiplier = 1 }) {
+                               stakeMultiplier = 1, ultiBonus = 0 }) {
   const trumpSuit = declaration.trumpSuit
   const announced = marriages[declarerId] || [] // declarer's own (for 40-100 / 20-100)
 
@@ -120,16 +120,29 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     // Reaching 100 card points doubles the Parti stake — for whichever side won it.
     const hundred = key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100
     const payout = basePoints * kontraLevel * (hundred ? 2 : 1) * stakeMultiplier
+    // A lost Ulti costs the declarer double (win +N, lose −2N).
+    const lossMult = key === 'ulti' ? 2 : 1
+    const amount = won ? payout : payout * lossMult
 
     if (won) {
-      deltas[declarerId] += payout * defenderIds.length
-      defenderIds.forEach((id) => { deltas[id] -= payout })
+      deltas[declarerId] += amount * defenderIds.length
+      defenderIds.forEach((id) => { deltas[id] -= amount })
     } else {
-      deltas[declarerId] -= payout * defenderIds.length
-      defenderIds.forEach((id) => { deltas[id] += payout })
+      deltas[declarerId] -= amount * defenderIds.length
+      defenderIds.forEach((id) => { deltas[id] += amount })
     }
-    return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, delta: won ? payout : -payout }
+    return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, lossMult, delta: won ? amount : -amount }
   })
+
+  // Kötelező ulti premium (lean-trump <3 in the 5-card hand): a flat declarer
+  // bonus (+10, +20 red), shown as its own row. It is NOT a pairwise defender
+  // payment, so it only feeds declarerRaw (what buli tracks) — not `deltas`.
+  if (ultiBonus > 0) {
+    components.push({
+      key: 'ulti_bonus', label: 'Ulti bónusz (kevés adu)', won: true, flat: true,
+      basePoints: ultiBonus, kontraLevel: 1, hundred: false, lossMult: 1, delta: ultiBonus,
+    })
+  }
 
   // Raw per-defender total for the declarer (one "unit", not the pairwise ×2).
   // Buli mode tracks this; the pairwise expansion happens only at settlement.
