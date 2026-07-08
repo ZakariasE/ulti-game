@@ -197,14 +197,15 @@ export default function BidPanel({ roomCode }) {
           <div className={styles.sectionTitle}>Vagy kontra komponensenként</div>
           <div className={styles.chips}>
             {bidKontraOptions.map((c) => {
-              const nextLevel = (bkontra[c]?.level || 1) * 2
+              // Name by step (Kontra/Rekontra/…); a 5-card kontra multiplies ×4.
+              const nextName = kontraLevelName(2 ** ((bkontra[c]?.step || 0) + 1))
               return (
                 <button
                   key={c}
                   className={`${styles.chip} ${staged.includes(c) ? styles.chipOn : ''}`}
                   onClick={() => toggleBidKontra(c)}
                 >
-                  {kontraLevelName(nextLevel)} {componentLabel(c)}
+                  {nextName} {componentLabel(c)} (×4)
                 </button>
               )
             })}

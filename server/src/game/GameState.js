@@ -197,7 +197,7 @@ function applyDeclare(state, playerId, payload) {
   state.bidding.currentHighBid = { playerId, declaration, round: state.bidding.mode }
   // A fresh (out)bid clears any kontra: reset to this declaration's components ×1.
   state.bidding.kontra = {}
-  for (const c of declaration.scoring) state.bidding.kontra[c] = { level: 1, lastParty: null }
+  for (const c of declaration.scoring) state.bidding.kontra[c] = { level: 1, step: 0, lastParty: null }
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
@@ -304,7 +304,8 @@ function applyBiddingKontra(state, playerId, components) {
     const k = state.bidding.kontra[c]
     if (!k) throw new Error(`Not part of this bid: ${c}`)
     if (_biddingKontraNextParty(k) !== myParty) throw new Error('Not your side to double this now')
-    k.level *= 2
+    k.level *= 4 // 5-card félkezes round: a kontra quadruples
+    k.step = (k.step || 0) + 1
     k.lastParty = myParty
     raised.push(c)
   }
@@ -361,7 +362,11 @@ function _startPlay(state, declarerId, declaration) {
   const kontra = {}
   for (const c of declaration.scoring) {
     const bk = state.bidding.kontra && state.bidding.kontra[c]
-    kontra[c] = { level: bk ? bk.level : 1, lastParty: bk ? bk.lastParty : null }
+    kontra[c] = {
+      level: bk ? bk.level : 1,
+      step: bk ? (bk.step || 0) : 0,
+      lastParty: bk ? bk.lastParty : null,
+    }
   }
 
   const cardsPlayed = {}
@@ -774,18 +779,16 @@ function applyClaimAll(state) {
   return applyRoundEnd(state)
 }
 
-// ── Félkezes play-kontra (retired — see below) ─────────────────────────────────
-
 // ── Kontra (per component, tied to card-play timing) ───────────────────────────
 
-// The escalation step `d` (number of doublings so far) is raised by:
-//   defenders when d is even, on their (d/2 + 1)-th card
-//   declarer  when d is odd,  on their ((d+1)/2 + 1)-th card
-function _kontraStep(level) {
-  return Math.round(Math.log2(level)) // 1->0, 2->1, 4->2, ...
-}
-function _kontraExpectation(level) {
-  const d = _kontraStep(level)
+// Each kontra state is { level (scoring multiplier), step (escalation count),
+// lastParty }. `step` (not the multiplier) drives timing/naming, since a 5-card
+// kontra is ×4 and a teljes-kéz kontra is ×2 — so level ≠ 2^step in general.
+// After `step` escalations, the NEXT is raised by:
+//   defenders when step is even, on their (step/2 + 1)-th card
+//   declarer  when step is odd,  on their ((step+1)/2 + 1)-th card
+function _kontraExpectation(step) {
+  const d = step || 0
   if (d % 2 === 0) return { party: 'defenders', cardNum: d / 2 + 1 }
   return { party: 'declarer', cardNum: (d + 1) / 2 + 1 }
 }
@@ -809,11 +812,12 @@ function applyKontra(state, playerId, components) {
   for (const c of list) {
     const k = state.play.kontra[c]
     if (!k) throw new Error(`Not part of this declaration: ${c}`)
-    const exp = _kontraExpectation(k.level)
+    const exp = _kontraExpectation(k.step || 0)
     if (exp.party !== party) throw new Error('Not your side to double this now')
     if (exp.cardNum !== myCardNum) throw new Error('Not the right moment to double')
     if (k.lastParty === party) throw new Error('Waiting for the other side')
-    k.level *= 2
+    k.level *= 2 // teljes kéz (10 cards): a play kontra doubles
+    k.step = (k.step || 0) + 1
     k.lastParty = party
     raised.push(c)
   }
@@ -840,7 +844,7 @@ function eligibleKontra(state, playerId) {
   const myCardNum = state.play.cardsPlayed[playerId] + 1
   return Object.entries(state.play.kontra)
     .filter(([, k]) => {
-      const exp = _kontraExpectation(k.level)
+      const exp = _kontraExpectation(k.step || 0)
       return exp.party === party && exp.cardNum === myCardNum && k.lastParty !== party
     })
     .map(([c]) => c)

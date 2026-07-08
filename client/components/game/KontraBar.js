@@ -2,7 +2,9 @@ import { useGame } from '../../context/GameContext'
 import { componentLabel, kontraLevelName } from '../../lib/bids'
 import styles from '../../styles/KontraBar.module.css'
 
-function nextName(level) { return kontraLevelName(level * 2) }
+// The escalation name is driven by the step count, not the multiplier (a 5-card
+// kontra is ×4 so level ≠ 2^step). Next escalation = step+1.
+function nextName(k) { return kontraLevelName(2 ** (((k && k.step) || 0) + 1)) }
 
 export default function KontraBar() {
   const { state, dispatch } = useGame()
@@ -45,7 +47,7 @@ export default function KontraBar() {
                 className={`${styles.btn} ${on ? styles.btnOn : ''}`}
                 onClick={() => toggle(c)}
               >
-                {nextName(kontra[c]?.level || 1)} {componentLabel(c)}
+                {nextName(kontra[c])} {componentLabel(c)}
               </button>
             )
           })}

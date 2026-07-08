@@ -245,9 +245,10 @@ function gameReducer(state, action) {
       const raised = action.raised || []
       let toast = {}
       if (raised.length) {
-        const level = action.kontra?.[raised[0]]?.level || 2
+        // Name by step (Kontra/Rekontra/…), not the multiplier.
+        const step = action.kontra?.[raised[0]]?.step || 1
         const comps = raised.map(componentLabel).join(', ')
-        toast = announce(state, `${nameOf(state, action.byId)} — ${kontraLevelName(level)}: ${comps}`, 'kontra')
+        toast = announce(state, `${nameOf(state, action.byId)} — ${kontraLevelName(2 ** step)}: ${comps}`, 'kontra')
       }
       return { ...state, kontra: action.kontra, ...toast }
     }

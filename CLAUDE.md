@@ -97,8 +97,16 @@ You may kontra all components or just individual ones.
 > 5-card round** it happens **during bidding**: on your turn you may pass, **kontra
 > any subset** of the standing bid's components, or outbid. That per-component
 > kontra chain is **carried into play** (seeded into `play.kontra`) and can
-> continue there per-component. ×2 per level, alternating defenders → declarer →
-> defenders; an outbid clears it.
+> continue there per-component. Alternates defenders → declarer → defenders; an
+> outbid clears it.
+>
+> **Multiplier depends on when the kontra is made:** a kontra made while still in
+> the **5-card félkez round quadruples (×4)** the component; a kontra made in
+> **teljes kéz (10 cards — i.e. during play) doubles (×2)**. So a component can be,
+> e.g., ulti ×4 (kontra'd in the 5-card round) then ×8 (rekontra'd in play).
+> Because ×4 breaks `level == 2^step`, kontra state is `{ level (scoring
+> multiplier), step (escalation count, drives timing + Kontra/Rekontra/… naming),
+> lastParty }`. `scoring.js` multiplies by `level`; timing/naming use `step`.
 
 ### Trick-Taking Rules
 
@@ -141,11 +149,11 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
      (2n passes), redeal and double the whole-hand value (`redealMultiplier`
      ×2, compounding; resets when a hand is actually played).
    - **Per-component bidding-kontra.** On your turn you may **pass**, **kontra any
-     subset** of the standing bid's components, or **outbid**. Each kontra doubles
-     the chosen components (×2/level), alternating defenders → declarer. The chain
-     is seeded into `play.kontra` and continues in play. Bids compare by **effective
-     value** = `rank × 4 (5-card only)` (kontra does not gate outbidding; an outbid
-     clears it).
+     subset** of the standing bid's components, or **outbid**. A kontra here is
+     **×4** per level (vs ×2 in play — see the Kontra section), alternating
+     defenders → declarer. The chain is seeded into `play.kontra` and continues in
+     play. Bids compare by **effective value** = `rank × 4 (5-card only)` (kontra
+     does not gate outbidding; an outbid clears it).
    - **Closing:** bidding ends when the current **high bidder (declarer) passes**
      on their own turn — they always get the final say (raise/kontra/pass). Plain:
      declare → pass → pass → declarer passes.
@@ -222,12 +230,13 @@ plus a pairwise "who pays whom" breakdown.
   - Play: `applyFirstLead` (opening lead names the trump), `applyPlayCard`, `_getLegalCardIds`,
     `_autoRecordContractMarriage` (auto 40/20 for 40-100/20-100), claims (`startClaim`,
     `respondClaim`, "nincs több ütés").
-  - Kontra — per-component in **every mode**. Play-time: `eligibleKontra`,
-    `applyKontra`, `_kontraExpectation` (card timing). Félkez 5-card **bidding**:
-    `biddingKontraOptions` (which components my side may double now) + `applyBiddingKontra`
-    (turn-based; `state.bidding.kontra` is a per-component `{ [comp]: { level, lastParty } }`
-    map). `_startPlay` seeds `play.kontra` from `bidding.kontra`, so the chain
-    continues into play.
+  - Kontra — per-component in **every mode**, state `{ level, step, lastParty }`
+    (`level` = scoring multiplier, `step` = escalation count for timing/naming).
+    Play-time (×2): `eligibleKontra`, `applyKontra`, `_kontraExpectation(step)` (card
+    timing). Félkez 5-card **bidding** (×4): `biddingKontraOptions` (which components
+    my side may double now) + `applyBiddingKontra` (turn-based). `_startPlay` seeds
+    `play.kontra` from `bidding.kontra`, so the chain continues into play. `scoring.js`
+    multiplies by `level`.
   - Round end: `applyRoundEnd` — **branches on buli**. Buli tracks only
     `result.declarerRaw` (+ `_requiredUltiBonus`) into `declaredScores`/`buli.points`;
     non-buli adds pairwise `result.deltas` to `scores`. An **üres** hand (declarer
@@ -249,10 +258,10 @@ plus a pairwise "who pays whom" breakdown.
 - `phase`: `LOBBY | DEALING | BIDDING | PLAYING | SCORING | BULI_OVER`.
 - `options`: `{ felkezes, fourAces (Négy ász biddable; default on), buli:{on,handsPerBuli,premium}, kotelezo:{on,ultiPenalty,betliPenalty}, stake }`.
 - `bidding`: `{ mode:'felkezes'|'normal', phase:'BID'|'DISCARD'|'DECLARE'|'ROB_OFFER'|'POST_DEAL_DISCARD'|'DONE',
-  currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{ [comp]:{level,lastParty} } (per-component bidding kontra),
+  currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{ [comp]:{level,step,lastParty} } (per-component bidding kontra; ×4/level),
   consecutivePasses, history }`. Closing = **the current high bidder passes on their turn**.
 - `play`: `{ declarerId, defenderIds, declaration, felkezesBid (bool → drives ×4),
-  kontra{comp:{level,lastParty}} (per-component, all modes; seeded from bidding.kontra),
+  kontra{comp:{level,step,lastParty}} (per-component, all modes; seeded from bidding.kontra; play kontra ×2/level),
   cardsPlayed{pid}, marriages, currentTrick, completedTricks, declarerFive, openingLeadDone, claim }`.
 - Top-level: `scores` (non-buli), `declaredScores` (buli, RAW), `buli:{index,handsPlayed,points,kotelezo,over,history}`,
   `reserve`, `redealMultiplier`, `felkezesReveal`, `felkezesFives`, `talonInHand`, `roundResult`.
@@ -297,10 +306,12 @@ plus a pairwise "who pays whom" breakdown.
   declarer can't lead → freeze). In the **reopened round** trump is hidden and picked via
   `TrumpChoice` at the opening lead, exactly like the base game.
 - **Kontra is per-component in every mode.** Base game / reopened round: during **play**
-  (`eligibleKontra`/`applyKontra`, card timing). Félkez 5-card round: during **bidding**
-  (`biddingKontraOptions`/`applyBiddingKontra`, turn timing), then seeded into `play.kontra`
-  and continued in play. `state.bidding.kontra` and `state.play.kontra` are both per-component
-  `{ [comp]: { level, lastParty } }` maps — keep them in the same shape.
+  (`eligibleKontra`/`applyKontra`, card timing, **×2**). Félkez 5-card round: during
+  **bidding** (`biddingKontraOptions`/`applyBiddingKontra`, turn timing, **×4**), then seeded
+  into `play.kontra` and continued in play. Both `state.bidding.kontra` and `state.play.kontra`
+  are per-component `{ [comp]: { level, step, lastParty } }` maps — keep them in the same
+  shape. **`level` is the scoring multiplier; `step` drives timing + Kontra/Rekontra/… naming**
+  (don't use `log2(level)` for step — a ×4 kontra breaks that).
 
 ## Tech Stack
 
