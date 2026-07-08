@@ -88,7 +88,7 @@ function applyDeal(state) {
       mode: 'felkezes', // 5-card round (vs 'normal' reopened round)
       consecutivePasses: 0,
       currentHighBid: null,
-      kontra: { level: 0, multiplier: 1, lastParty: null }, // bidding-time kontra chain
+      kontra: {}, // per-component bidding kontra: { [comp]: { level, lastParty } }
       history: [],
     }
   } else {
@@ -102,7 +102,7 @@ function applyDeal(state) {
       mode: 'normal',
       consecutivePasses: 0,
       currentHighBid: null,
-      kontra: { level: 0, multiplier: 1, lastParty: null },
+      kontra: {}, // per-component (unused during base-game bidding; seeded on declare)
       history: [],
     }
   }
@@ -185,9 +185,9 @@ function applyDeclare(state, playerId, payload) {
   const current = state.bidding.currentHighBid
   if (current) {
     // Effective value = rank × 4 (only for a bid made in the 5-card félkezes
-    // round) × any standing kontra. A fresh outbid clears the kontra and, if
-    // made in the reopened round, is a normal (teljes kéz) bid worth ×1.
-    const curVal = rankValue(current.declaration) * _felkezFactor(current.round) * state.bidding.kontra.multiplier
+    // round). A bid made in the reopened round is a normal (teljes kéz) bid ×1.
+    // Kontra is per-component and does not gate outbidding — an outbid clears it.
+    const curVal = rankValue(current.declaration) * _felkezFactor(current.round)
     const newVal = rankValue(declaration) * _felkezFactor(state.bidding.mode)
     const beats = newVal > curVal ||
       (newVal === curVal && isHigherDeclaration(declaration, current.declaration))
@@ -195,7 +195,9 @@ function applyDeclare(state, playerId, payload) {
   }
 
   state.bidding.currentHighBid = { playerId, declaration, round: state.bidding.mode }
-  state.bidding.kontra = { level: 0, multiplier: 1, lastParty: null } // outbid clears the kontra
+  // A fresh (out)bid clears any kontra: reset to this declaration's components ×1.
+  state.bidding.kontra = {}
+  for (const c of declaration.scoring) state.bidding.kontra[c] = { level: 1, lastParty: null }
   state.bidding.consecutivePasses = 0
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
@@ -258,32 +260,58 @@ function applyBidPass(state, playerId) {
   return { biddingComplete: false }
 }
 
-// Félkezes bidding-kontra: a defender (even levels) or the declarer (odd levels)
-// escalates the standing bid on their turn. ×4 in the 5-card round, ×2 in the
-// reopened round. The kontra inflates the value-to-beat; outbidding clears it.
-function applyBiddingKontra(state, playerId) {
-  if (!state.options.felkezes) throw new Error('Bidding kontra is félkezes only')
+// Which side may escalate a component next, from its last doubler.
+function _biddingKontraNextParty(k) {
+  return k.lastParty === 'defenders' ? 'declarer' : 'defenders'
+}
+
+// Which components the given player may kontra right now (their turn, 5-card
+// round, a standing bid, and their side is the one to escalate that component).
+function biddingKontraOptions(state, playerId) {
+  if (!state.options.felkezes || !state.bidding) return []
+  if (state.bidding.mode !== 'felkezes' || state.bidding.phase !== 'BID') return []
+  const player = state.players.find((p) => p.id === playerId)
+  if (!player || state.bidding.currentBidderSeat !== player.seatIndex) return []
+  const current = state.bidding.currentHighBid
+  if (!current) return []
+  const myParty = playerId === current.playerId ? 'declarer' : 'defenders'
+  return current.declaration.scoring.filter((c) => {
+    const k = state.bidding.kontra[c]
+    return k && _biddingKontraNextParty(k) === myParty
+  })
+}
+
+// Félkezes per-component bidding-kontra: on your turn (5-card round) you may
+// double any subset of the standing bid's components your side is due to
+// escalate. ×2 per level; alternates defenders → declarer → defenders. An outbid
+// clears it (see applyDeclare). The chain carries into play (see _startPlay).
+function applyBiddingKontra(state, playerId, components) {
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
   if (state.bidding.currentBidderSeat !== player.seatIndex) throw new Error('Not your turn')
-  // Bidding-kontra lives only in the 5-card round (×4). In the reopened round the
-  // kontra chain continues in play instead.
-  if (state.bidding.mode !== 'felkezes' || state.bidding.phase !== 'BID') throw new Error('Cannot kontra now')
-  if (!state.bidding.currentHighBid) throw new Error('Nothing to kontra')
+  if (!state.options.felkezes || state.bidding.mode !== 'felkezes' || state.bidding.phase !== 'BID') {
+    throw new Error('Cannot kontra now')
+  }
+  const current = state.bidding.currentHighBid
+  if (!current) throw new Error('Nothing to kontra')
 
-  const k = state.bidding.kontra
-  const declarerId = state.bidding.currentHighBid.playerId
-  const nextParty = k.level % 2 === 0 ? 'defenders' : 'declarer'
-  const myParty = playerId === declarerId ? 'declarer' : 'defenders'
-  if (myParty !== nextParty) throw new Error('Not your side to double now')
+  const myParty = playerId === current.playerId ? 'declarer' : 'defenders'
+  const list = components && components.length ? components : []
+  if (!list.length) throw new Error('Pick at least one component to kontra')
 
-  k.level += 1
-  k.multiplier *= 4 // 5-card round levels are ×4
-  k.lastParty = myParty
+  const raised = []
+  for (const c of list) {
+    const k = state.bidding.kontra[c]
+    if (!k) throw new Error(`Not part of this bid: ${c}`)
+    if (_biddingKontraNextParty(k) !== myParty) throw new Error('Not your side to double this now')
+    k.level *= 2
+    k.lastParty = myParty
+    raised.push(c)
+  }
   state.bidding.consecutivePasses = 0
-  state.bidding.history.push({ playerId, action: 'kontra', level: k.level })
+  state.bidding.history.push({ playerId, action: 'kontra', components: raised })
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
-  return { kontra: { ...k } }
+  return { kontra: state.bidding.kontra, raised }
 }
 
 // Félkezes: everyone passed twice with no bid → redeal, whole-hand value ×2
@@ -328,9 +356,13 @@ function _startPlay(state, declarerId, declaration) {
   const defenderIds = state.players.filter((p) => p.id !== declarerId).map((p) => p.id)
   const declarer = state.players.find((p) => p.id === declarerId)
 
-  // Per-component kontra state.
+  // Per-component kontra state — seeded from any kontra made during bidding
+  // (félkezes 5-card round); the chain continues in play from there.
   const kontra = {}
-  for (const c of declaration.scoring) kontra[c] = { level: 1, lastParty: null }
+  for (const c of declaration.scoring) {
+    const bk = state.bidding.kontra && state.bidding.kontra[c]
+    kontra[c] = { level: bk ? bk.level : 1, lastParty: bk ? bk.lastParty : null }
+  }
 
   const cardsPlayed = {}
   state.players.forEach((p) => { cardsPlayed[p.id] = 0 })
@@ -353,10 +385,6 @@ function _startPlay(state, declarerId, declaration) {
     // The winning bid gets the ×4 félkezes multiplier only if it was declared in
     // the 5-card round; a bid won in the reopened round is a normal (teljes) bid.
     felkezesBid: (state.bidding.currentHighBid && state.bidding.currentHighBid.round === 'felkezes'),
-    // Hand-wide kontra chain (félkezes): carried from bidding, continues in play.
-    biddingKontra: {
-      ...(state.bidding.kontra || { level: 0, multiplier: 1, lastParty: null }),
-    },
   }
   state.phase = 'PLAYING'
   return { biddingComplete: true, declarerId, declaration }
@@ -538,9 +566,9 @@ function applyRoundEnd(state) {
     kontra: state.play.kontra,
     marriages: state.play.marriages,
     // ×4 only if the winning bid was made in the 5-card félkezes round (a teljes
-    // kéz bid is normal); × redeal doublings; × the hand-wide kontra chain.
-    stakeMultiplier: (state.play.felkezesBid ? 4 : 1) * (state.redealMultiplier || 1) *
-      (state.options.felkezes ? (state.play.biddingKontra?.multiplier || 1) : 1),
+    // kéz bid is normal); × redeal doublings. Per-component kontra (incl. any made
+    // during bidding) is applied per component inside calculateRoundScore.
+    stakeMultiplier: (state.play.felkezesBid ? 4 : 1) * (state.redealMultiplier || 1),
   })
 
   const declarerId = state.play.declarerId
@@ -748,24 +776,6 @@ function applyClaimAll(state) {
 
 // ── Félkezes play-kontra (retired — see below) ─────────────────────────────────
 
-// Hand-wide play kontra is retired: play-time kontra is now per-component in
-// every mode (see eligibleKontra). A kontra made during the 5-card félkezes
-// auction (applyBiddingKontra) stays as a frozen hand-wide multiplier; it is no
-// longer escalated during play.
-function felkezesKontraEligible() {
-  return false
-}
-
-// Escalate the hand-wide kontra as the player is about to play a card (×2/level).
-function applyFelkezesPlayKontra(state, playerId) {
-  if (!felkezesKontraEligible(state, playerId)) throw new Error('Cannot kontra now')
-  const bk = state.play.biddingKontra
-  bk.level += 1
-  bk.multiplier *= 2
-  bk.lastParty = playerId === state.play.declarerId ? 'declarer' : 'defenders'
-  return { level: bk.level, multiplier: bk.multiplier }
-}
-
 // ── Kontra (per component, tied to card-play timing) ───────────────────────────
 
 // The escalation step `d` (number of doublings so far) is raised by:
@@ -863,7 +873,7 @@ function biddingSnapshot(state) {
     phase: b.phase,
     mode: b.mode,
     redealMultiplier: state.redealMultiplier || 1,
-    kontra: b.kontra || { level: 0, multiplier: 1, lastParty: null },
+    kontra: b.kontra || {}, // per-component bidding kontra (client derives eligible options)
     currentHighBid: b.currentHighBid
       ? { playerId: b.currentHighBid.playerId, round: b.currentHighBid.round, declaration: publicDeclaration(b.currentHighBid.declaration) }
       : null,
@@ -902,8 +912,7 @@ module.exports = {
   applyFirstLead,
   applyKontra,
   applyBiddingKontra,
-  applyFelkezesPlayKontra,
-  felkezesKontraEligible,
+  biddingKontraOptions,
   applyPlayCard,
   startClaim,
   respondClaim,

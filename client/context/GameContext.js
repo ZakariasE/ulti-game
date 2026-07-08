@@ -42,7 +42,8 @@ const initialState = {
   biddingMode: null, // 'felkezes' | 'normal'
   currentHighBid: null, // { playerId, declaration }
   redealMultiplier: 1, // félkezes: ×2 per all-pass redeal
-  biddingKontra: { level: 0, multiplier: 1, lastParty: null }, // félkezes bidding-kontra chain
+  biddingKontra: {}, // félkezes per-component bidding kontra: { [comp]: { level, lastParty } }
+  pendingBidKontra: [], // components staged to kontra on my bidding turn
   // Play
   declaration: null, // public declaration once bidding resolves
   declarerId: null,
@@ -52,8 +53,6 @@ const initialState = {
   kontra: {}, // component -> { level, lastParty }
   kontraOptions: [], // components I may double right now
   pendingKontra: [], // components I've staged to double with my next card
-  felkezesKontraOk: false, // félkezes: I may escalate the hand-wide kontra now
-  pendingFelkezesKontra: false, // félkezes: staged escalation for my next card
   pendingDiscard: [], // cards staged to discard (combined discard+declare)
   marriageOptions: [], // suits I may announce right now (my first card)
   pendingMarriages: [], // suits I've toggled to announce with my next card
@@ -95,6 +94,8 @@ function resetForNewRound(state) {
     kontra: {},
     kontraOptions: [],
     pendingKontra: [],
+    biddingKontra: {},
+    pendingBidKontra: [],
     pendingDiscard: [],
     marriageOptions: [],
     pendingMarriages: [],
@@ -151,7 +152,8 @@ function gameReducer(state, action) {
         biddingMode: action.mode || state.biddingMode,
         currentHighBid: action.currentHighBid,
         redealMultiplier: action.redealMultiplier || 1,
-        biddingKontra: action.kontra || { level: 0, multiplier: 1, lastParty: null },
+        biddingKontra: action.kontra || {}, // per-component: { [comp]: { level, lastParty } }
+        pendingBidKontra: [], // clear staged bidding-kontra picks on any state change
         // Keep the discard selection only while a discard is in progress.
         pendingDiscard: (action.phase === 'DISCARD' || action.phase === 'POST_DEAL_DISCARD') ? state.pendingDiscard : [],
         handCounts: action.handCounts || state.handCounts,
@@ -223,6 +225,14 @@ function gameReducer(state, action) {
           : [...state.pendingKontra, action.component],
       }
 
+    case 'TOGGLE_BID_KONTRA':
+      return {
+        ...state,
+        pendingBidKontra: state.pendingBidKontra.includes(action.component)
+          ? state.pendingBidKontra.filter((c) => c !== action.component)
+          : [...state.pendingBidKontra, action.component],
+      }
+
     case 'TOGGLE_DISCARD':
       return {
         ...state,
@@ -253,25 +263,12 @@ function gameReducer(state, action) {
         needsOpeningLead: action.currentPlayerId === state.myPlayerId ? !!action.needsOpeningLead : false,
         kontraOptions: action.currentPlayerId === state.myPlayerId ? (action.kontraOptions || []) : [],
         pendingKontra: [],
-        felkezesKontraOk: action.currentPlayerId === state.myPlayerId ? !!action.felkezesKontra : false,
-        pendingFelkezesKontra: false,
-        biddingKontra: action.biddingKontra || state.biddingKontra,
         marriageOptions: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
         // Marriages are announced by default; the player opts out per suit.
         pendingMarriages: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
         kontra: action.kontra || state.kontra,
         trumpSuit: action.trumpSuit ?? state.trumpSuit,
         legalCardIds: action.currentPlayerId === state.myPlayerId ? action.legalCardIds : [],
-      }
-
-    case 'TOGGLE_FELKEZES_KONTRA':
-      return { ...state, pendingFelkezesKontra: !state.pendingFelkezesKontra }
-
-    case 'FELKEZES_PLAYKONTRA':
-      return {
-        ...state,
-        biddingKontra: { ...(state.biddingKontra || {}), level: action.level, multiplier: action.multiplier },
-        ...announce(state, `${nameOf(state, action.byId)} — ${kontraLevelName(2 ** action.level)} (×${action.multiplier})`, 'kontra'),
       }
 
     case 'CARD_PLAYED':
@@ -286,8 +283,6 @@ function gameReducer(state, action) {
         legalCardIds: [],
         kontraOptions: [],
         pendingKontra: [],
-        felkezesKontraOk: false,
-        pendingFelkezesKontra: false,
         marriageOptions: [],
         pendingMarriages: [],
         needsOpeningLead: false,

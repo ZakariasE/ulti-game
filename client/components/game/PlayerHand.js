@@ -11,7 +11,7 @@ export default function PlayerHand({ roomCode }) {
   const { state, dispatch } = useGame()
   const { myHand, legalCardIds, phase, biddingPhase, currentTurnId, myPlayerId,
     declaration, trumpSuit, pendingTrump, needsOpeningLead, pendingMarriages,
-    pendingKontra, pendingFelkezesKontra, pendingDiscard, talonCardIds } = state
+    pendingKontra, pendingDiscard, talonCardIds } = state
 
   const discardSel = pendingDiscard || []
 
@@ -43,12 +43,12 @@ export default function PlayerHand({ roomCode }) {
     if (openingLead) {
       emit('play:firstLead', {
         roomCode, cardId, trumpSuit: effectiveTrump,
-        announcedMarriages: pendingMarriages, kontra: pendingKontra, kontraEscalate: pendingFelkezesKontra,
+        announcedMarriages: pendingMarriages, kontra: pendingKontra,
       })
     } else {
       emit('card:play', {
         roomCode, cardId, announcedMarriages: pendingMarriages,
-        kontra: pendingKontra, kontraEscalate: pendingFelkezesKontra,
+        kontra: pendingKontra,
       })
     }
   }

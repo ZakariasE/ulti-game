@@ -11,17 +11,17 @@ import styles from '../../styles/BidPanel.module.css'
 const FELKEZES_SUITS = ['makk', 'zold', 'tok', 'piros']
 
 export default function BidPanel({ roomCode }) {
-  const { state } = useGame()
+  const { state, dispatch } = useGame()
   const { emit } = useSocket()
   const { currentTurnId, biddingPhase, biddingMode, currentHighBid, myPlayerId, players, options,
-    redealMultiplier, biddingKontra, pendingDiscard } = state
+    redealMultiplier, biddingKontra, pendingDiscard, pendingBidKontra } = state
 
   const [picked, setPicked] = useState([]) // chosen trump components
   const [color, setColor] = useState('normal')
   const [felkTrump, setFelkTrump] = useState(null) // félkezes: concrete trump suit
 
   const felkezes = !!options?.felkezes
-  const kontra = biddingKontra || { level: 0, multiplier: 1 }
+  const bkontra = biddingKontra || {} // per-component bidding kontra levels
   const redeal = redealMultiplier || 1
   // A bid made in the 5-card round is ×4; a bid in the reopened round is ×1.
   // (redeal doublings apply to the whole hand regardless.)
@@ -36,11 +36,24 @@ export default function BidPanel({ roomCode }) {
   // The standing bid's value uses ITS round's ×4 factor.
   const curMult = (currentHighBid?.round === 'felkezes' ? 4 : 1) * redeal
   const highBidText = currentDecl
-    ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl) * curMult * kontra.multiplier})${kontra.level > 0 ? ` ${kontraLevelName(2 ** kontra.level)}` : ''} — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
+    ? `${declarationLabel(currentDecl)} (${declarationValue(currentDecl) * curMult}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
-  // No bidding-time kontra: in every mode (incl. félkezes) kontra happens during
-  // play, per-component (see KontraBar), exactly like the base game.
+  // Per-component bidding kontra (félkezes 5-card round only): the components of
+  // the standing bid that MY side is next in line to double.
+  const myParty = currentHighBid && currentHighBid.playerId === myPlayerId ? 'declarer' : 'defenders'
+  const bidKontraOptions = (namedTrump && isMyTurn && biddingPhase === 'BID' && currentDecl)
+    ? currentDecl.scoring.filter((c) => {
+        const k = bkontra[c] || { level: 1, lastParty: null }
+        const next = k.lastParty === 'defenders' ? 'declarer' : 'defenders'
+        return next === myParty
+      })
+    : []
+  const staged = pendingBidKontra || []
+  const toggleBidKontra = (c) => dispatch({ type: 'TOGGLE_BID_KONTRA', component: c })
+  const commitBidKontra = () => {
+    if (staged.length) emit('bid:kontra', { roomCode, components: staged })
+  }
 
   if (!isMyTurn) {
     const bidder = players.find((p) => p.id === currentTurnId)
@@ -178,6 +191,32 @@ export default function BidPanel({ roomCode }) {
             : 'Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu.'}
         </p>
       </div>
+
+      {bidKontraOptions.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Vagy kontra komponensenként</div>
+          <div className={styles.chips}>
+            {bidKontraOptions.map((c) => {
+              const nextLevel = (bkontra[c]?.level || 1) * 2
+              return (
+                <button
+                  key={c}
+                  className={`${styles.chip} ${staged.includes(c) ? styles.chipOn : ''}`}
+                  onClick={() => toggleBidKontra(c)}
+                >
+                  {kontraLevelName(nextLevel)} {componentLabel(c)}
+                </button>
+              )
+            })}
+          </div>
+          <div className={styles.actions}>
+            <button className={styles.btnSecondary} disabled={staged.length === 0} onClick={commitBidKontra}>
+              Kontrázok
+            </button>
+          </div>
+          <p className={styles.hint}>A kontra komponensenként külön léptethető; a licit tovább is überelhető.</p>
+        </div>
+      )}
 
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Vagy adu nélküli játék</div>

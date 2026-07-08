@@ -92,11 +92,13 @@ Each component can be doubled **independently**. Timing follows each player's ow
 
 You may kontra all components or just individual ones.
 
-> Kontra is **per-component, during play, in every mode** (base game, félkezes,
-> reopened teljes-kéz round) — exactly like the base game. There is **no
-> bidding-time kontra** (the old félkez 5-card auction kontra button was removed);
-> `applyBiddingKontra` / the `bid:kontra` event still exist server-side but are
-> unreachable from the UI, so `play.biddingKontra` stays at level 0.
+> Kontra is **per-component** everywhere. In the base game (and the reopened
+> teljes-kéz round) it happens **during play**, per card-timing. In the **félkezes
+> 5-card round** it happens **during bidding**: on your turn you may pass, **kontra
+> any subset** of the standing bid's components, or outbid. That per-component
+> kontra chain is **carried into play** (seeded into `play.kontra`) and can
+> continue there per-component. ×2 per level, alternating defenders → declarer →
+> defenders; an outbid clears it.
 
 ### Trick-Taking Rules
 
@@ -138,12 +140,15 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
    - **Pre-bid redeal:** if the bidding goes **two full go-arounds with no bid**
      (2n passes), redeal and double the whole-hand value (`redealMultiplier`
      ×2, compounding; resets when a hand is actually played).
-   - **No bidding-time kontra.** Kontra happens only during play, per-component
-     (like the base game — see the Kontra section). Bids compare by **effective
-     value** = `rank × 4 (5-card only)`.
+   - **Per-component bidding-kontra.** On your turn you may **pass**, **kontra any
+     subset** of the standing bid's components, or **outbid**. Each kontra doubles
+     the chosen components (×2/level), alternating defenders → declarer. The chain
+     is seeded into `play.kontra` and continues in play. Bids compare by **effective
+     value** = `rank × 4 (5-card only)` (kontra does not gate outbidding; an outbid
+     clears it).
    - **Closing:** bidding ends when the current **high bidder (declarer) passes**
-     on their own turn — they always get the final say. Plain: declare → pass →
-     pass → declarer passes.
+     on their own turn — they always get the final say (raise/kontra/pass). Plain:
+     declare → pass → pass → declarer passes.
    - **Required-ulti reveal:** announcing an Ulti reveals the announcer's 5 cards
      to everyone until the second deal (kötelező games).
 3. **Second deal:** the winner gets +7 (→12), each defender +5 (→10); the winner
@@ -155,11 +160,12 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
    the **opening lead**, *not* at declaration (only the 5-card round names its suit
    upfront). A bid made here is a **normal (×1)** bid, but it must still exceed the
    standing bid's effective value (so a teljes red 40-100 [8] beats a félkez Parti
-   [4] but not a félkez Ulti [16]). **No bidding-kontra here.** Robbing combines
-   **discard + declaration** into one step (pick 2 to put down + your bid, confirm
-   once).
+   [4] but not a félkez Ulti [16]). **No bidding-kontra in this round** (kontra
+   resumes/continues in play). Robbing combines **discard + declaration** into one
+   step (pick 2 to put down + your bid, confirm once).
 5. **Play.** Kontra is **per-component** (exactly like the base game): a defender
-   kontra on their 1st card, the declarer's rekontra on their 2nd card, etc.
+   kontra on their 1st card, the declarer's rekontra on their 2nd card, etc. Any
+   kontra from the 5-card round is already seeded here and continues.
 6. **Scoring** = component × per-component kontra level × 4 (**only if won in the
    5-card round**) × 2^k (redeals).
 
@@ -211,16 +217,17 @@ plus a pairwise "who pays whom" breakdown.
     `options`, `scores`, `declaredScores`, `buli`, `reserve`, `redealMultiplier`.
   - `applyDeal` — base: 10 each + 2 talon (first bidder gets 12); félkezes: 5 each + 17 `reserve`.
   - Bidding: `applyDeclare`, `applyBidPass`, `applyBidDiscard`, `applyRob`,
-    `applyBiddingKontra` (dead — bidding-time kontra removed from UI), `_redealFelkezes`, `_felkezesSecondDeal`,
+    `applyBiddingKontra`/`biddingKontraOptions` (félkez per-component bidding kontra), `_redealFelkezes`, `_felkezesSecondDeal`,
     `_resolveBidding` → `_startPlay`. Helper `_felkezFactor(round)` = 4 for `'felkezes'` else 1.
   - Play: `applyFirstLead` (opening lead names the trump), `applyPlayCard`, `_getLegalCardIds`,
     `_autoRecordContractMarriage` (auto 40/20 for 40-100/20-100), claims (`startClaim`,
     `respondClaim`, "nincs több ütés").
-  - Kontra — per-component in **every mode**: `eligibleKontra`, `applyKontra`,
-    `_kontraExpectation`. There is **no bidding-time kontra**: `applyBiddingKontra`
-    and the `bid:kontra` event still exist but are unreachable from the UI, so
-    `play.biddingKontra` stays level 0. `felkezesKontraEligible` is retired (always
-    `false`); `applyFelkezesPlayKontra` is dead (kept only as a guard).
+  - Kontra — per-component in **every mode**. Play-time: `eligibleKontra`,
+    `applyKontra`, `_kontraExpectation` (card timing). Félkez 5-card **bidding**:
+    `biddingKontraOptions` (which components my side may double now) + `applyBiddingKontra`
+    (turn-based; `state.bidding.kontra` is a per-component `{ [comp]: { level, lastParty } }`
+    map). `_startPlay` seeds `play.kontra` from `bidding.kontra`, so the chain
+    continues into play.
   - Round end: `applyRoundEnd` — **branches on buli**. Buli tracks only
     `result.declarerRaw` (+ `_requiredUltiBonus`) into `declaredScores`/`buli.points`;
     non-buli adds pairwise `result.deltas` to `scores`. An **üres** hand (declarer
@@ -242,17 +249,17 @@ plus a pairwise "who pays whom" breakdown.
 - `phase`: `LOBBY | DEALING | BIDDING | PLAYING | SCORING | BULI_OVER`.
 - `options`: `{ felkezes, fourAces (Négy ász biddable; default on), buli:{on,handsPerBuli,premium}, kotelezo:{on,ultiPenalty,betliPenalty}, stake }`.
 - `bidding`: `{ mode:'felkezes'|'normal', phase:'BID'|'DISCARD'|'DECLARE'|'ROB_OFFER'|'POST_DEAL_DISCARD'|'DONE',
-  currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{level,multiplier,lastParty},
+  currentBidderSeat, currentHighBid:{playerId, round, declaration}, kontra:{ [comp]:{level,lastParty} } (per-component bidding kontra),
   consecutivePasses, history }`. Closing = **the current high bidder passes on their turn**.
 - `play`: `{ declarerId, defenderIds, declaration, felkezesBid (bool → drives ×4),
-  biddingKontra:{level,multiplier,lastParty} (dead — stays level 0), kontra{comp:{level,lastParty}} (per-component, all modes),
+  kontra{comp:{level,lastParty}} (per-component, all modes; seeded from bidding.kontra),
   cardsPlayed{pid}, marriages, currentTrick, completedTricks, declarerFive, openingLeadDone, claim }`.
 - Top-level: `scores` (non-buli), `declaredScores` (buli, RAW), `buli:{index,handsPlayed,points,kotelezo,over,history}`,
   `reserve`, `redealMultiplier`, `felkezesReveal`, `felkezesFives`, `talonInHand`, `roundResult`.
 
 ### Socket events
 - **client→server:** `room:create` (w/ options), `room:join`, `game:start`, `bid:declare`,
-  `bid:pass`, `bid:discard`, `bid:rob`, `bid:kontra` (dead — bidding-kontra removed), `play:firstLead`,
+  `bid:pass`, `bid:discard`, `bid:rob`, `bid:kontra` (félkez per-component bidding kontra; `{components}`), `play:firstLead`,
   `card:play`, `claim:start`, `claim:respond`, `round:continue`, `buli:next`.
 - **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
   `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,
@@ -263,16 +270,17 @@ plus a pairwise "who pays whom" breakdown.
 
 ### Client (`client/`)
 - **`context/GameContext.js`** — reducer + big `state`. Notable staging fields: `pendingKontra`
-  (per-component, all modes), `pendingFelkezesKontra` (dead — hand-wide play kontra retired),
+  (per-component play kontra), `pendingBidKontra` (per-component félkez **bidding** kontra),
   `pendingDiscard` (combined discard+declare),
   `pendingMarriages`. Bidding mirror: `biddingMode`, `biddingPhase`, `currentHighBid` (incl `round`),
-  `biddingKontra`, `redealMultiplier`. `declaredScores`, `buli`, `felkezesKontraOk`. Event→dispatch
-  wiring is in **`pages/game/[roomCode].js`**.
+  `biddingKontra` (per-component bidding kontra map), `redealMultiplier`. `declaredScores`, `buli`.
+  Event→dispatch wiring is in **`pages/game/[roomCode].js`**.
 - **Components (`components/game`):** `GameTable` (info bar shows the standing bid during bidding),
-  `BidPanel` (bidding + the combined discard+declare when phase is `DISCARD`; `mult` uses
-  `biddingMode`; standing bid value uses `currentHighBid.round`), `PlayerHand` (play + discard
+  `BidPanel` (bidding + the combined discard+declare when phase is `DISCARD`; also the
+  per-component **bidding-kontra** chips + `Kontrázok` in the félkez 5-card round via
+  `TOGGLE_BID_KONTRA`/`bid:kontra`), `PlayerHand` (play + discard
   selection via `TOGGLE_DISCARD`; opening-lead gate uses `effectiveTrump = trumpSuit||pendingTrump`),
-  `KontraBar` (per-component in all modes),
+  `KontraBar` (per-component play kontra; shows carried-over bidding kontra levels),
   `MarriageBar`, `TrumpChoice` (concrete-suit pick before the opening lead; shown for any
   hidden-trump Normal contract, incl. the reopened félkez round), `RoundResult` (buli mode shows `declarerRaw`), `BuliScoreboard`,
   `BuliResult`/`BULI_OVER`, `Elszamolas` (client-only settlement). Lobby: `GameOptionsModal`, `WaitingRoom`.
@@ -288,9 +296,11 @@ plus a pairwise "who pays whom" breakdown.
   client gates on `effectiveTrump = trumpSuit||pendingTrump`, not `pendingTrump` (else the
   declarer can't lead → freeze). In the **reopened round** trump is hidden and picked via
   `TrumpChoice` at the opening lead, exactly like the base game.
-- **Kontra is per-component in every mode, during play only.** `eligibleKontra` no longer
-  short-circuits on `options.felkezes`, and there is **no bidding-time kontra** — the félkez
-  5-card auction kontra button was removed, so `play.biddingKontra` stays level 0.
+- **Kontra is per-component in every mode.** Base game / reopened round: during **play**
+  (`eligibleKontra`/`applyKontra`, card timing). Félkez 5-card round: during **bidding**
+  (`biddingKontraOptions`/`applyBiddingKontra`, turn timing), then seeded into `play.kontra`
+  and continued in play. `state.bidding.kontra` and `state.play.kontra` are both per-component
+  `{ [comp]: { level, lastParty } }` maps — keep them in the same shape.
 
 ## Tech Stack
 
