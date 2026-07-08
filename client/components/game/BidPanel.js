@@ -3,7 +3,7 @@ import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import {
   CHOOSABLE, NO_TRUMP_CONTRACTS, TRUMP_COMPONENTS, componentLabel, makeDeclaration,
-  declarationValue, bidTotalValue, declarationLabel, isHigherDeclaration, kontraLevelName,
+  declarationValue, bidTotalValue, declarationLabel, beatsDeclaration, kontraLevelName,
 } from '../../lib/bids'
 import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/BidPanel.module.css'
@@ -33,8 +33,10 @@ export default function BidPanel({ roomCode }) {
   const effColor = namedTrump ? (felkTrump === 'piros' ? 'red' : 'normal') : color
   const isMyTurn = currentTurnId === myPlayerId
   const currentDecl = currentHighBid?.declaration
-  // The standing bid's value uses ITS round's ×4 factor.
+  // The standing bid's value uses ITS round's ×4 factor; a bid made now uses the
+  // current round's factor. Outbidding compares effective values across rounds.
   const curFelk = currentHighBid?.round === 'felkezes' ? 4 : 1
+  const myFelk = biddingMode === 'felkezes' ? 4 : 1
   const highBidText = currentDecl
     ? `${declarationLabel(currentDecl)} (${bidTotalValue(currentDecl, curFelk, redeal)}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
@@ -152,7 +154,7 @@ export default function BidPanel({ roomCode }) {
   // The 5-card round requires a named trump suit before you can declare.
   const suitReady = !namedTrump || !!felkTrump
   const candValid = !candidate.invalid && suitReady && discardReady
-  const candHigher = candValid && isHigherDeclaration(candidate, currentDecl)
+  const candHigher = candValid && beatsDeclaration(candidate, myFelk, currentDecl, curFelk)
 
   function toggle(comp) {
     setPicked((prev) => (prev.includes(comp) ? prev.filter((c) => c !== comp) : [...prev, comp]))
@@ -270,7 +272,7 @@ export default function BidPanel({ roomCode }) {
         <div className={styles.chips}>
           {Object.entries(NO_TRUMP_CONTRACTS).map(([key, info]) => {
             const d = makeDeclaration('notrump', { contract: key })
-            const higher = isHigherDeclaration(d, currentDecl)
+            const higher = beatsDeclaration(d, myFelk, currentDecl, curFelk)
             return (
               <button
                 key={key}
