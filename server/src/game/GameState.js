@@ -178,7 +178,7 @@ function applyBidDiscard(state, playerId, cardIds, hozam) {
 function _declarationFromPayload(payload) {
   if (payload.type === 'simple') return simpleDeclaration(payload.color, payload.trumpSuit)
   if (payload.type === 'notrump') return noTrumpDeclaration(payload.contract)
-  if (payload.type === 'trump') return buildDeclaration(payload.components, payload.color, payload.trumpSuit)
+  if (payload.type === 'trump') return buildDeclaration(payload.components, payload.color, payload.trumpSuit, { open: payload.open })
   throw new Error('Invalid declaration')
 }
 
@@ -577,7 +577,7 @@ function applyTrickEnd(state) {
 }
 
 const BETLI_KEYS = new Set(['betli', 'heart_betli', 'open_betli'])
-const DURCHMARS_KEYS = new Set(['durchmars', 'durchmars_nt', 'heart_durchmars', 'open_durchmars'])
+const DURCHMARS_KEYS = new Set(['durchmars', 'durchmars_nt', 'open_durchmars'])
 
 // A pure Betli fails the moment the declarer wins a trick; a pure Durchmars the
 // moment a defender does. (Durchmars combined with other components plays on.)

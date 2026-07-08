@@ -9,7 +9,7 @@ export const STRENGTH_NOTRUMP = { asz: 8, kiraly: 7, felso: 6, also: 5, '10': 4,
 // Contracts played without trumps, where the Ten is weak.
 export const NO_TRUMP_CONTRACTS = new Set([
   'betli', 'heart_betli', 'open_betli',
-  'durchmars', 'heart_durchmars', 'open_durchmars',
+  'durchmars_nt', 'open_durchmars',
 ])
 export function strengthMode(contract) {
   return contract && NO_TRUMP_CONTRACTS.has(contract) ? 'notrump' : 'trump'

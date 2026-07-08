@@ -14,14 +14,14 @@ const TRUMP_COMPONENTS = {
 const CHOOSABLE = ['ulti', 'four_aces', 'forty_hundred', 'twenty_hundred', 'durchmars']
 const PARTI_BEARERS = new Set(['ulti', 'four_aces'])
 
-// No-trump standalone contracts (cannot combine with anything).
+// No-trump standalone contracts (cannot combine with anything). The no-trump
+// durchmars has no color (no suit) — just the plain (12) and terített (24) forms.
 const NO_TRUMP_CONTRACTS = {
   betli:           { base: 5,  label: 'Betli' },
   heart_betli:     { base: 10, label: 'Piros betli' },
   open_betli:      { base: 20, label: 'Terített betli' },
   durchmars_nt:    { base: 12, label: 'Durchmars' },
-  heart_durchmars: { base: 24, label: 'Piros durchmars' },
-  open_durchmars:  { base: 48, label: 'Terített durchmars' },
+  open_durchmars:  { base: 24, label: 'Terített durchmars' },
 }
 
 function isNoTrumpContract(key) {
@@ -42,8 +42,10 @@ function _resolveTrump(color, trumpSuit) {
 }
 
 // Build & validate a trump declaration from chosen components + color/trump.
-// Throws on an illegal combination. Returns a normalized declaration.
-function buildDeclaration(components, color, trumpSuit) {
+// `opts.open` = terített (only a trump Durchmars may be open — it then doubles
+// the durchmars part and reveals the declarer's hand after trick 1). Throws on an
+// illegal combination. Returns a normalized declaration.
+function buildDeclaration(components, color, trumpSuit, opts = {}) {
   const comps = [...new Set(components)]
   if (comps.length === 0) throw new Error('Pick at least one contract')
   for (const c of comps) {
@@ -52,6 +54,8 @@ function buildDeclaration(components, color, trumpSuit) {
   if (comps.includes('forty_hundred') && comps.includes('twenty_hundred')) {
     throw new Error('Cannot declare both 40-100 and 20-100')
   }
+  const open = !!opts.open
+  if (open && !comps.includes('durchmars')) throw new Error('Csak a durchmars lehet terített')
 
   // Parti is bundled only when every chosen component is a parti-bearer.
   const hasParti = comps.every((c) => PARTI_BEARERS.has(c))
@@ -65,7 +69,7 @@ function buildDeclaration(components, color, trumpSuit) {
     color: t.color,
     trumpSuit: t.trumpSuit, // concrete in félkezes; minor chosen at first lead otherwise
     isNoTrump: false,
-    open: false,
+    open, // terített trump durchmars: doubles the durchmars part + reveals the hand
   }
 }
 
@@ -98,7 +102,7 @@ function expandDeclaration(baseDecl, addOns) {
     if (origChosen.includes(c)) throw new Error(`Már benne van: ${c}`)
   }
   const combined = [...origChosen, ...add]
-  const expanded = buildDeclaration(combined, baseDecl.color, baseDecl.trumpSuit)
+  const expanded = buildDeclaration(combined, baseDecl.color, baseDecl.trumpSuit, { open: baseDecl.open })
   expanded.hozam = add // the added components — each scores ×2
   return expanded
 }
@@ -110,7 +114,7 @@ function expandDeclaration(baseDecl, addOns) {
 // fewerComponents / isHigherDeclaration.
 function effectiveRankValue(decl, felkFactor) {
   const hozam = new Set(decl.hozam || [])
-  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color) * (hozam.has(c) ? 2 : felkFactor), 0)
+  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color, decl.open) * (hozam.has(c) ? 2 : felkFactor), 0)
 }
 
 function noTrumpDeclaration(key) {
@@ -126,12 +130,15 @@ function noTrumpDeclaration(key) {
   }
 }
 
-// Base points for one scoring component under a declaration's color.
-function componentBasePoints(component, color) {
+// Base points for one scoring component under a declaration's color. `open`
+// (terített) doubles ONLY a trump Durchmars component (6→12; ×2 again if red).
+function componentBasePoints(component, color, open = false) {
   if (isNoTrumpContract(component)) return NO_TRUMP_CONTRACTS[component].base
   const info = TRUMP_COMPONENTS[component]
   if (!info) throw new Error(`Unknown component: ${component}`)
-  return color === 'red' ? info.base * 2 : info.base
+  let base = info.base
+  if (open && component === 'durchmars') base *= 2
+  return color === 'red' ? base * 2 : base
 }
 
 function componentLabel(component) {
@@ -140,14 +147,14 @@ function componentLabel(component) {
 
 // Total point value of a declaration (incl. parti) — used for display.
 function declarationValue(decl) {
-  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color, decl.open), 0)
 }
 
 // Bidding rank is the FULL value INCLUDING the parti: an Ulti is 4+1 = 5, a
 // clean Betli is 5, a 40-100 is 4. So Ulti outranks 40-100 (5 > 4). Ties are
 // broken by fewerComponents.
 function rankValue(decl) {
-  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color, decl.open), 0)
 }
 
 // Tie-break for equal (effective) value: the bid with FEWER scoring components
@@ -167,7 +174,8 @@ function isHigherDeclaration(next, current) {
 // A short human label for a declaration, e.g. "Ulti + 40-100 (red)".
 function declarationLabel(decl) {
   if (decl.isNoTrump) return componentLabel(decl.components[0])
-  const parts = decl.components.map(componentLabel)
+  // Terített (open) trump durchmars is shown as "Terített durchmars".
+  const parts = decl.components.map((c) => (decl.open && c === 'durchmars' ? `Terített ${componentLabel(c).toLowerCase()}` : componentLabel(c)))
   const base = parts.join(' + ')
   return decl.color === 'red' ? `${base} (piros)` : base
 }

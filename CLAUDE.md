@@ -62,9 +62,9 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 | 4 Aces (Négy Ász) | 4 | Declarer wins all four aces in tricks |
 | 40-100 | 4 | Card points ≥ 100 incl. an announced 40 (K+O in trump) |
 | 20-100 | 8 | Card points ≥ 100 incl. an announced 20 (K+O non-trump) |
-| Durchmars | 6 | Declarer wins all 10 tricks |
+| Durchmars | 6 | Declarer wins all 10 tricks. **Terített (open)** doubles ONLY the durchmars part (6→12; red 12→24) and reveals the declarer's hand after trick 1 — an `open` flag on the trump declaration (partners in a bundle are not doubled by it). |
 
-**No-trump standalone contracts** (flat; cannot combine): Betli 5, Heart Betli 10, Open Betli 20, Durchmars 12, Heart Durchmars 24, Open Durchmars 48. Betli = win zero tricks; Durchmars = win all tricks. "Open" reveals the declarer's hand after trick 1.
+**No-trump standalone contracts** (flat; cannot combine): Betli 5, Heart Betli 10, Open Betli 20, Durchmars 12, Open Durchmars 24. The no-trump Durchmars has **no color** (no suit). Betli = win zero tricks; Durchmars = win all tricks. "Open" reveals the declarer's hand after trick 1.
 
 **Early termination:** a pure Betli or a pure Durchmars (trump or no-trump) ends the **instant its goal becomes impossible** — Betli the moment the declarer wins a trick, Durchmars the moment a defender wins one — and is scored as a loss without playing out the remaining tricks. (A Durchmars combined with other trump components plays on.)
 
@@ -73,7 +73,7 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 - Betli never combines.
 - At most **one** of {40-100, 20-100}.
 - **Parti** is bundled only when *every* component is a parti-bearer (Ulti / 4 Aces). Mixing a parti-bearer with a non-parti component drops the parti — e.g. `40-100 + Ulti = 4+4 = 8`, not 9. `Ulti + 4 Aces = 4+4+1 = 9`.
-- Trump Durchmars may be declared standalone (worth 6, or 12 in red) or combined with other trump components. The no-trump Durchmars (12 / 24 / 48) is a separate contract.
+- Trump Durchmars may be declared standalone (6, or 12 in red; **terített** 12 / red-terített 24) or combined with other trump components (the terített flag still doubles only the durchmars part). The no-trump Durchmars (12 / terített 24) is a separate contract.
 
 **Bid ranking** uses the **full declaration value, parti included** (×2 for Red): an Ulti is 4+1 = 5, a clean Betli is 5, a 40-100 is 4. So an **Ulti (5) outranks a 40-100 (4)** by value. **Ties break by component count** — the bid with **fewer scoring components** wins, so a clean **Betli [betli] (1 comp) outranks Ulti [ulti,parti] (2 comps)** even though both are worth 5 (and Heart Betli 10 still outranks Heart Ulti 8+2). Equal value **and** equal component count ⇒ neither out-ranks the other (cannot outbid). This tie-break is a **pure component count** — in cross-round félkez comparisons it must not re-compare raw value (a félkez zöld Parti [effective 4] and a teljes 40-100 [4] tie and cannot outbid each other). `rankValue` (same-round) and `fewerComponents` (the tie-break) in `bidding.js`/`bids.js`; `effectiveRankValue(decl, felkFactor)` applies the round factor and is compared in `applyDeclare`/`beatsDeclaration`.
 

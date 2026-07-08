@@ -17,8 +17,7 @@ export const NO_TRUMP_CONTRACTS = {
   heart_betli:     { base: 10, label: 'Piros betli' },
   open_betli:      { base: 20, label: 'Terített betli' },
   durchmars_nt:    { base: 12, label: 'Durchmars' },
-  heart_durchmars: { base: 24, label: 'Piros durchmars' },
-  open_durchmars:  { base: 48, label: 'Terített durchmars' },
+  open_durchmars:  { base: 24, label: 'Terített durchmars' },
 }
 
 export function componentLabel(component) {
@@ -33,10 +32,13 @@ export function kontraLevelName(level) {
   return KONTRA_LEVEL_NAME[level] || `×${level}`
 }
 
-function componentBasePoints(component, color) {
+// `open` (terített) doubles ONLY a trump Durchmars component (6→12; ×2 again if red).
+function componentBasePoints(component, color, open = false) {
   if (NO_TRUMP_CONTRACTS[component]) return NO_TRUMP_CONTRACTS[component].base
   const info = TRUMP_COMPONENTS[component]
-  return color === 'red' ? info.base * 2 : info.base
+  let base = info.base
+  if (open && component === 'durchmars') base *= 2
+  return color === 'red' ? base * 2 : base
 }
 
 // Validate a chosen trump bundle. Returns { ok, error, scoring, hasParti }.
@@ -53,10 +55,10 @@ export function validateBundle(components) {
 
 // Build a normalized declaration object (matches server's public shape).
 // `trumpSuit` (félkezes) names the concrete suit and determines the color.
-export function makeDeclaration(type, { components, color, contract, trumpSuit } = {}) {
+export function makeDeclaration(type, { components, color, contract, trumpSuit, open } = {}) {
   const c = trumpSuit ? (trumpSuit === 'piros' ? 'red' : 'normal') : color
   if (type === 'simple') {
-    return { components: ['parti'], scoring: ['parti'], hasParti: true, color: c, trumpSuit: trumpSuit || null, isNoTrump: false }
+    return { components: ['parti'], scoring: ['parti'], hasParti: true, color: c, trumpSuit: trumpSuit || null, isNoTrump: false, open: false }
   }
   if (type === 'notrump') {
     return {
@@ -66,12 +68,14 @@ export function makeDeclaration(type, { components, color, contract, trumpSuit }
   }
   const v = validateBundle(components)
   if (!v.ok) return { invalid: true, error: v.error }
-  return { components: [...components], scoring: v.scoring, hasParti: v.hasParti, color: c, trumpSuit: trumpSuit || null, isNoTrump: false }
+  // Terített (open) only applies to a trump durchmars.
+  const isOpen = !!open && components.includes('durchmars')
+  return { components: [...components], scoring: v.scoring, hasParti: v.hasParti, color: c, trumpSuit: trumpSuit || null, isNoTrump: false, open: isOpen }
 }
 
 export function declarationValue(decl) {
   if (!decl || decl.invalid) return -1
-  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color, decl.open), 0)
 }
 
 // Full point value incl. per-component multipliers: original components use
@@ -84,14 +88,14 @@ export function bidTotalValue(decl, felkFactor = 1, redeal = 1, kontra = {}) {
   return decl.scoring.reduce((sum, c) => {
     const mult = (hozam.has(c) ? 2 : felkFactor) * redeal
     const kl = (kontra[c] && kontra[c].level) || 1
-    return sum + componentBasePoints(c, decl.color) * mult * kl
+    return sum + componentBasePoints(c, decl.color, decl.open) * mult * kl
   }, 0)
 }
 
 // Bidding rank is the FULL value INCLUDING the parti (Ulti 4+1=5 outranks 40-100 4).
 export function rankValue(decl) {
   if (!decl || decl.invalid) return -1
-  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color), 0)
+  return decl.scoring.reduce((sum, c) => sum + componentBasePoints(c, decl.color, decl.open), 0)
 }
 
 // Effective value-to-beat (mirror of server effectiveRankValue). Original
@@ -100,7 +104,7 @@ export function rankValue(decl) {
 export function effectiveRankValue(decl, felkFactor = 1) {
   if (!decl || decl.invalid) return -1
   const hozam = new Set(decl.hozam || [])
-  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color) * (hozam.has(c) ? 2 : felkFactor), 0)
+  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color, decl.open) * (hozam.has(c) ? 2 : felkFactor), 0)
 }
 
 // Tie-break for equal (effective) value: fewer scoring components ranks higher
@@ -131,7 +135,9 @@ export function isHigherDeclaration(next, current) {
 export function declarationLabel(decl) {
   if (!decl || decl.invalid) return '—'
   if (decl.isNoTrump) return componentLabel(decl.components[0])
-  const base = decl.components.map(componentLabel).join(' + ')
+  const base = decl.components
+    .map((c) => (decl.open && c === 'durchmars' ? `Terített ${componentLabel(c).toLowerCase()}` : componentLabel(c)))
+    .join(' + ')
   return decl.color === 'red' ? `${base} (piros)` : base
 }
 

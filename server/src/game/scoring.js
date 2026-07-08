@@ -45,7 +45,6 @@ function componentWon(component, ctx) {
     case 'open_betli':
       return declTricks === 0
     case 'durchmars_nt':
-    case 'heart_durchmars':
     case 'open_durchmars':
       return declTricks === completedTricks.length
     default:
@@ -116,7 +115,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   const hozamSet = new Set(declaration.hozam || [])
   const components = declaration.scoring.map((key) => {
     const won = componentWon(key, ctx)
-    const basePoints = componentBasePoints(key, declaration.color)
+    const basePoints = componentBasePoints(key, declaration.color, declaration.open)
     const kontraLevel = (kontra[key] && kontra[key].level) || 1
     // Reaching 100 card points doubles the Parti stake — for whichever side won it.
     const hundred = key === 'parti' && (won ? declarerTotal : defenderTotal) >= 100

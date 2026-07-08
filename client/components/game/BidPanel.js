@@ -19,6 +19,7 @@ export default function BidPanel({ roomCode }) {
   const [picked, setPicked] = useState([]) // chosen trump components
   const [color, setColor] = useState('normal')
   const [felkTrump, setFelkTrump] = useState(null) // félkezes: concrete trump suit
+  const [open, setOpen] = useState(false) // terített: only for a trump durchmars
 
   const felkezes = !!options?.felkezes
   const bkontra = biddingKontra || {} // per-component bidding kontra levels
@@ -150,10 +151,13 @@ export default function BidPanel({ roomCode }) {
   const needDiscard = biddingPhase === 'DISCARD'
   const discardReady = !needDiscard || (pendingDiscard || []).length === 2
 
+  // Terített only applies to a trump durchmars.
+  const canOpen = picked.includes('durchmars')
+  const openNow = open && canOpen
   // Build the candidate trump declaration from the current picks.
   const candidate = picked.length === 0
     ? makeDeclaration('simple', { color: effColor })
-    : makeDeclaration('trump', { components: picked, color: effColor })
+    : makeDeclaration('trump', { components: picked, color: effColor, open: openNow })
   // The 5-card round requires a named trump suit before you can declare.
   const suitReady = !namedTrump || !!felkTrump
   const candValid = !candidate.invalid && suitReady && discardReady
@@ -173,9 +177,10 @@ export default function BidPanel({ roomCode }) {
     const trumpSuit = namedTrump ? felkTrump : undefined
     commitDiscardIfNeeded()
     if (picked.length === 0) emit('bid:declare', { roomCode, type: 'simple', color: effColor, trumpSuit })
-    else emit('bid:declare', { roomCode, type: 'trump', components: picked, color: effColor, trumpSuit })
+    else emit('bid:declare', { roomCode, type: 'trump', components: picked, color: effColor, trumpSuit, open: openNow })
     setPicked([])
     setFelkTrump(null)
+    setOpen(false)
   }
 
   function declareNoTrump(contract) {
@@ -217,6 +222,16 @@ export default function BidPanel({ roomCode }) {
           <div className={styles.colorRow}>
             <button className={`${styles.chip} ${color === 'normal' ? styles.chipOn : ''}`} onClick={() => setColor('normal')}>Sima</button>
             <button className={`${styles.chip} ${styles.red} ${color === 'red' ? styles.chipOn : ''}`} onClick={() => setColor('red')}>Piros ♥ (×2)</button>
+          </div>
+        )}
+        {canOpen && (
+          <div className={styles.colorRow}>
+            <button
+              className={`${styles.chip} ${openNow ? styles.chipOn : ''}`}
+              onClick={() => setOpen((v) => !v)}
+            >
+              Terített durchmars (×2)
+            </button>
           </div>
         )}
         <div className={styles.preview}>
