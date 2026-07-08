@@ -19,8 +19,8 @@ function normalizeOptions(options = {}) {
     fourAces: o.fourAces !== false, // Négy ász bemondás available (default on)
     buli: {
       on: !!buli.on,
-      handsPerBuli: Number(buli.handsPerBuli) > 0 ? Math.floor(Number(buli.handsPerBuli)) : 6,
-      premium: Number.isFinite(Number(buli.premium)) ? Number(buli.premium) : 100,
+      handsPerBuli: Number(buli.handsPerBuli) > 0 ? Math.floor(Number(buli.handsPerBuli)) : 18,
+      premium: Number.isFinite(Number(buli.premium)) ? Number(buli.premium) : 50,
     },
     kotelezo: {
       on: !!kotelezo.on,
