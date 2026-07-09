@@ -73,6 +73,29 @@ function _kontraLanes(declaration, defenderIds) {
   return isIndividualKontra(declaration) ? [...defenderIds] : [...declaration.scoring]
 }
 
+// ── Seating / first dealer ───────────────────────────────────────────────────
+
+// Randomly permute the seat order (turn order) and pick a random first dealer.
+// Done once, before the very first buli / first hand. Later bulis keep the same
+// seating; their first dealer is the previous buli's winner (see handlers).
+function randomizeSeating(state) {
+  const n = state.players.length
+  const seats = shuffle(state.players.map((_, i) => i)) // a permutation of 0..n-1
+  state.players.forEach((p, i) => { p.seatIndex = seats[i] })
+  state.dealerIndex = Math.floor(Math.random() * n)
+}
+
+// The reveal payload for the "draw" screen: seat order + who deals / bids first.
+function drawInfo(state) {
+  const n = state.players.length
+  const firstDealer = _seatToPlayer(state, state.dealerIndex)
+  const firstBidder = _seatToPlayer(state, getInitialBidderSeat(state.dealerIndex, n))
+  const order = [...state.players]
+    .sort((a, b) => a.seatIndex - b.seatIndex)
+    .map((p) => ({ id: p.id, name: p.name, seatIndex: p.seatIndex }))
+  return { order, firstDealerId: firstDealer.id, firstBidderId: firstBidder.id }
+}
+
 // ── Dealing ────────────────────────────────────────────────────────────────
 
 function applyDeal(state) {
@@ -858,6 +881,12 @@ function _settleBuli(state) {
     projected[p.id] = (state.declaredScores[p.id] || 0) + premiums[p.id] + penalties[p.id]
   })
 
+  // The buli winner (1st on the penalty-adjusted score) deals first in the next
+  // buli. Stable tie-break: the first player (seat order in the array) at the max.
+  const winnerId = state.players.reduce(
+    (best, p) => (adjusted[p.id] > adjusted[best.id] ? p : best), state.players[0]
+  ).id
+
   const result = {
     index: state.buli.index,
     points: { ...points },
@@ -865,6 +894,7 @@ function _settleBuli(state) {
     penalties,
     kotelezo: JSON.parse(JSON.stringify(state.buli.kotelezo)),
     declaredScores: projected,
+    winnerId,
   }
   state.buli.over = true
   state.buli.settled = false
@@ -1115,6 +1145,8 @@ function handCounts(state) {
 
 module.exports = {
   createGameState,
+  randomizeSeating,
+  drawInfo,
   applyDeal,
   applyBidDiscard,
   applyDeclare,

@@ -5,6 +5,7 @@ import { useSocket } from '../../context/SocketContext'
 import { useGame } from '../../context/GameContext'
 import WaitingRoom from '../../components/lobby/WaitingRoom'
 import GameTable from '../../components/game/GameTable'
+import DrawScreen from '../../components/game/DrawScreen'
 
 export default function GamePage() {
   const router = useRouter()
@@ -68,6 +69,7 @@ export default function GamePage() {
       ) : (
         <GameTable roomCode={roomCode} />
       )}
+      {state.draw && <DrawScreen />}
     </>
   )
 }

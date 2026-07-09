@@ -3,7 +3,7 @@ const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
   applyFirstLead, applyKontra, applyBiddingKontra,
   applyPlayCard, startClaim, respondClaim, applyConcede, prepareNextRound,
-  startBuli, commitBuliSettlement, buliSnapshot,
+  startBuli, commitBuliSettlement, buliSnapshot, randomizeSeating, drawInfo,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
@@ -44,9 +44,12 @@ function registerHandlers(io, socket) {
       if (!state) throw new Error('Room not found')
       if (state.players.length !== 3) throw new Error('Need exactly 3 players')
       if (state.phase !== 'LOBBY') throw new Error('Game already started')
+      // Randomize seat order + first dealer, then reveal it with a draw screen —
+      // once, before the very first buli / first hand.
+      randomizeSeating(state)
       if (state.options.buli.on) startBuli(state)
       applyDeal(state)
-      _dealAndAnnounce(io, roomCode, state)
+      _dealAndAnnounce(io, roomCode, state, drawInfo(state))
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }
@@ -247,8 +250,12 @@ function registerHandlers(io, socket) {
 
       if (state._readyForBuli.size >= connected) {
         state._readyForBuli = null
+        // The previous buli's winner deals first in the new buli (seats unchanged).
+        const prevWinnerId = state.buli.result && state.buli.result.winnerId
         startBuli(state)
-        prepareNextRound(state)
+        prepareNextRound(state) // rotates dealerIndex — overridden below to the winner
+        const winnerSeat = state.players.find((p) => p.id === prevWinnerId)?.seatIndex
+        if (winnerSeat != null) state.dealerIndex = winnerSeat
         applyDeal(state)
         _dealAndAnnounce(io, roomCode, state)
       }
@@ -296,10 +303,11 @@ function _commitKontra(io, roomCode, state, playerId, components) {
   if (raised.length) io.to(roomCode).emit('kontra:updated', { kontra, raised, byId: playerId })
 }
 
-function _dealAndAnnounce(io, roomCode, state) {
+function _dealAndAnnounce(io, roomCode, state, draw = null) {
   io.to(roomCode).emit('game:started', {
     dealerIndex: state.dealerIndex, players: state.players, options: state.options,
     buli: buliSnapshot(state), declaredScores: state.declaredScores, sidePairs: state.sidePairs,
+    draw, // present only on the first deal: seat order + first dealer to reveal
   })
   state.players.forEach((p) => _sendHand(io, state, p.id))
   // Tell the first bidder which two of their cards came from the talon.

@@ -1,0 +1,145 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 20, 12, 0.86);
+  backdrop-filter: blur(3px);
+}
+
+.card {
+  background: #143824;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  padding: 28px 32px;
+  min-width: 320px;
+  max-width: 92vw;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+.title {
+  font-size: 22px;
+  color: #f1c40f;
+  margin-bottom: 18px;
+}
+
+.sub {
+  margin-top: 16px;
+  font-size: 13px;
+  color: #9fb4a6;
+}
+
+/* ── Shuffle ── */
+.deck {
+  position: relative;
+  height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.shuffleCard {
+  position: absolute;
+  width: 92px;
+  height: 148px;
+  border-radius: 8px;
+  box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.5);
+  animation: shuffle 0.9s ease-in-out infinite;
+}
+
+@keyframes shuffle {
+  0%   { transform: translateX(0) rotate(0deg); }
+  25%  { transform: translateX(-46px) rotate(-9deg); }
+  50%  { transform: translateX(0) rotate(0deg); }
+  75%  { transform: translateX(46px) rotate(9deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+
+/* ── Reveal ── */
+.order {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.seat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  opacity: 0;
+  animation: pop 0.35s ease-out forwards;
+}
+
+.dealer {
+  border-color: #f1c40f;
+  box-shadow: 0 0 14px rgba(241, 196, 15, 0.35);
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.seatNum {
+  font-size: 15px;
+  font-weight: 700;
+  color: #8fa3b0;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.seatName {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  flex: 1;
+  text-align: left;
+}
+
+.tags {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tagDealer,
+.tagFirst {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.tagDealer {
+  background: #f1c40f;
+  color: #2a2200;
+}
+
+.tagFirst {
+  background: rgba(66, 165, 245, 0.25);
+  color: #90caf9;
+}
+
+.go {
+  margin-top: 22px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 26px;
+  border-radius: 10px;
+}
+
+.go:hover { background: #388e3c; }

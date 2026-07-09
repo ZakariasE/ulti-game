@@ -30,6 +30,7 @@ const initialState = {
   players: [],
   phase: 'LOBBY',
   dealerIndex: null,
+  draw: null, // { order:[{id,name,seatIndex}], firstDealerId, firstBidderId } — first-hand seat/dealer reveal
   handCounts: {},
   talonCardIds: [], // ids of the two cards I just picked up from the talon
   // House rules
@@ -136,12 +137,16 @@ function gameReducer(state, action) {
       return {
         ...resetForNewRound(state),
         dealerIndex: action.dealerIndex,
+        draw: action.draw || null, // set only on the first deal; null on later deals
         players: action.players || state.players,
         options: action.options || state.options,
         buli: action.buli !== undefined ? action.buli : state.buli,
         declaredScores: action.declaredScores || state.declaredScores,
         sidePairs: action.sidePairs || state.sidePairs,
       }
+
+    case 'DRAW_DISMISS':
+      return { ...state, draw: null }
 
     case 'HAND_DEALT':
       return { ...state, myHand: action.hand }
