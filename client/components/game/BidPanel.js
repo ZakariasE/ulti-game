@@ -71,7 +71,21 @@ export default function BidPanel({ roomCode }) {
     ? `${componentLabel(currentDecl.scoring[0])} (${lane === myPlayerId ? 'Te' : players.find((p) => p.id === lane)?.name || '?'})`
     : componentLabel(lane))
   const staged = pendingBidKontra || []
-  const toggleBidKontra = (c) => dispatch({ type: 'TOGGLE_BID_KONTRA', component: c })
+  // Toggle a group of lanes together (a single lane, or the combined declarer rekontra).
+  const toggleBidKontraGroup = (lanes) => {
+    const allStaged = lanes.every((l) => staged.includes(l))
+    lanes.forEach((l) => { if (allStaged || !staged.includes(l)) dispatch({ type: 'TOGGLE_BID_KONTRA', component: l }) })
+  }
+  // When the DECLARER answers an individual-kontra bid (betli / nt-durchmars) and
+  // BOTH defender lanes stand at the same level — i.e. both defenders kontrázott
+  // equally, so it is effectively a uniform kontra — offer ONE combined rekontra
+  // button that raises both lanes together, instead of one button per defender.
+  const declarerCombinesLanes = individualBid && myParty === 'declarer' &&
+    bidKontraOptions.length > 1 &&
+    new Set(bidKontraOptions.map((l) => bkontra[l]?.level || 1)).size === 1
+  const kontraChips = declarerCombinesLanes
+    ? [{ key: 'combined', lanes: bidKontraOptions, step: bkontra[bidKontraOptions[0]]?.step || 0, label: componentLabel(currentDecl.scoring[0]) }]
+    : bidKontraOptions.map((lane) => ({ key: lane, lanes: [lane], step: bkontra[lane]?.step || 0, label: laneLabel(lane) }))
   // Mandatory kontra: a defender facing the required-completing betli must kontra
   // their own line (or outbid) — they may not pass until it is doubled.
   const myLaneDoubled = (bkontra[myPlayerId]?.level || 1) > 1
@@ -353,16 +367,17 @@ export default function BidPanel({ roomCode }) {
           )}
           {/* Per-component bidding kontra (félkez 5-card round): individual chips
               right next to Bemondom/Passz. Toggle any subset, then Kontrázok. */}
-          {bidKontraOptions.map((lane) => {
+          {kontraChips.map((chip) => {
             // Name by step (Kontra/Rekontra/…); a 5-card kontra multiplies ×4.
-            const nextName = kontraLevelName(2 ** ((bkontra[lane]?.step || 0) + 1))
+            const nextName = kontraLevelName(2 ** (chip.step + 1))
+            const on = chip.lanes.every((l) => staged.includes(l))
             return (
               <button
-                key={lane}
-                className={`${styles.btnKontra} ${staged.includes(lane) ? styles.btnKontraOn : ''}`}
-                onClick={() => toggleBidKontra(lane)}
+                key={chip.key}
+                className={`${styles.btnKontra} ${on ? styles.btnKontraOn : ''}`}
+                onClick={() => toggleBidKontraGroup(chip.lanes)}
               >
-                {nextName} {laneLabel(lane)}
+                {nextName} {chip.label}
               </button>
             )
           })}
