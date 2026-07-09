@@ -387,15 +387,20 @@ function _sendHand(io, state, playerId) {
 }
 
 function _afterPlay(io, roomCode, state, playerId, result) {
+  // On the trick-completing card, applyTrickEnd has already reset currentTrick,
+  // so read the just-completed trick to keep all three cards on the table for
+  // everyone to see during the 2s freeze.
+  const lastTrick = result.trickComplete
+    ? state.play.completedTricks[state.play.completedTricks.length - 1]
+    : null
   io.to(roomCode).emit('card:played', {
     playerId,
     card: result.playedCard,
-    trickSoFar: state.play.currentTrick.cards,
+    trickSoFar: lastTrick ? lastTrick.cards : state.play.currentTrick.cards,
     handCounts: handCounts(state),
   })
 
   if (result.trickComplete) {
-    const lastTrick = state.play.completedTricks[state.play.completedTricks.length - 1]
     io.to(roomCode).emit('trick:completed', {
       winnerId: result.winnerId,
       points: result.points,
