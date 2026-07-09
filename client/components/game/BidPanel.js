@@ -9,6 +9,7 @@ import { SUIT_NAMES } from '../../lib/cards'
 import styles from '../../styles/BidPanel.module.css'
 
 const FELKEZES_SUITS = ['makk', 'zold', 'tok', 'piros']
+const ELLEN_LABEL = { ellen_ulti: 'Ellen ulti', ellen_negy_asz: 'Ellen négy ász' }
 // Sayings that require a trump suit (cleared when Színtelen / no-trump is chosen).
 // Durchmars is NOT here — it works both as a trump component and no-trump.
 const TRUMP_ONLY = ['ulti', 'four_aces', 'forty_hundred', 'twenty_hundred']
@@ -67,9 +68,21 @@ export default function BidPanel({ roomCode }) {
         return true
       }).map(([lane]) => lane)
     : []
-  const laneLabel = (lane) => (individualBid
-    ? `${componentLabel(currentDecl.scoring[0])} (${lane === myPlayerId ? 'Te' : players.find((p) => p.id === lane)?.name || '?'})`
-    : componentLabel(lane))
+  // Ellen mondások (defense) a defender may DECLARE on their turn: trump contract,
+  // for a component the declarer did NOT bid, not already declared.
+  const availableEllen = (namedTrump && isMyTurn && biddingPhase === 'BID' && currentDecl && myParty === 'defenders' && currentDecl.trumpSuit)
+    ? ['ellen_ulti', 'ellen_negy_asz'].filter((lane) =>
+        !currentDecl.scoring.includes(lane === 'ellen_ulti' ? 'ulti' : 'four_aces') && !bkontra[lane])
+    : []
+  const ellenValue = (lane) => {
+    const base = TRUMP_COMPONENTS[lane === 'ellen_ulti' ? 'ulti' : 'four_aces']?.base || 4
+    return base * (currentDecl?.color === 'red' ? 2 : 1) * 2 * mult // ellen = ×2 base
+  }
+  const laneLabel = (lane) => (ELLEN_LABEL[lane]
+    ? ELLEN_LABEL[lane]
+    : individualBid
+      ? `${componentLabel(currentDecl.scoring[0])} (${lane === myPlayerId ? 'Te' : players.find((p) => p.id === lane)?.name || '?'})`
+      : componentLabel(lane))
   const staged = pendingBidKontra || []
   // Toggle a group of lanes together (a single lane, or the combined declarer rekontra).
   const toggleBidKontraGroup = (lanes) => {
@@ -378,6 +391,20 @@ export default function BidPanel({ roomCode }) {
                 onClick={() => toggleBidKontraGroup(chip.lanes)}
               >
                 {nextName} {chip.label}
+              </button>
+            )
+          })}
+          {/* Ellen mondások (defense): declare ellen ulti / ellen négy ász (only for
+              a component the declarer did not bid). Staged like a bidding kontra. */}
+          {availableEllen.map((lane) => {
+            const on = staged.includes(lane)
+            return (
+              <button
+                key={lane}
+                className={`${styles.btnKontra} ${on ? styles.btnKontraOn : ''}`}
+                onClick={() => dispatch({ type: 'TOGGLE_BID_KONTRA', component: lane })}
+              >
+                {ELLEN_LABEL[lane]} ({ellenValue(lane)})
               </button>
             )
           })}

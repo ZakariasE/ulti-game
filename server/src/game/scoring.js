@@ -11,9 +11,14 @@ function declarerTrickCount(completedTricks, declarerId) {
 }
 
 function acesWonByDeclarer(completedTricks, declarerId) {
+  return acesWonBy(completedTricks, [declarerId])
+}
+
+// Aces captured in tricks won by any of `ids`.
+function acesWonBy(completedTricks, ids) {
   let aces = 0
   for (const t of completedTricks) {
-    if (t.winnerId !== declarerId) continue
+    if (!ids.includes(t.winnerId)) continue
     aces += t.cards.filter((c) => c.card.rank === 'asz').length
   }
   return aces
@@ -224,7 +229,9 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
   // Csendes ulti (silent ulti) — only when the trump 7 was played in the last
   // trick. An extra declarer-vs-defenders row: declarer wins/pays the (halved) ulti
   // value, doubled on a defeated attempt (see _csendesUlti).
-  const csendes = _csendesUlti({ declaration, declarerId, completedTricks, felkezesBid, redealMultiplier, conceded })
+  // An announced ellen ulti supersedes the automatic csendes ulti — the same
+  // trump-7-last-trick event is already captured by the ellen_ulti row below.
+  const csendes = kontra.ellen_ulti ? null : _csendesUlti({ declaration, declarerId, completedTricks, felkezesBid, redealMultiplier, conceded })
   if (csendes) {
     const { won, amount, baseUnit, success } = csendes
     if (won) {
@@ -241,6 +248,43 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
       redealMult: redealMultiplier, lossMult: success ? 1 : 2,
       csendes: true, attemptFailed: !success, delta: won ? amount : -amount,
     })
+  }
+
+  // Ellen mondások — a defense-declared ellen ulti / ellen négy ász. A defense-side
+  // claim worth 2× the normal component (ulti 4→8 / négy ász 4→8; ×2 red; ×4 in
+  // félkez), scored declarer-vs-BOTH-defenders (so it feeds declarerRaw exactly like
+  // csendes ulti). Present only when a defender declared it (a lane in `kontra`, with
+  // `ellen`). Requires all 10 tricks and not conceded. Ellen ulti loss-doubles (a
+  // failed defense attempt pays the declarer 2×); ellen négy ász does not.
+  if (!conceded && completedTricks.length === 10) {
+    const felkMult = felkezesBid ? 4 : 1
+    const redealMult = redealMultiplier
+    const addEllen = (laneKey, baseComp, defenseWon, lossMult, label) => {
+      const k = kontra[laneKey]
+      if (!k || !k.ellen) return
+      const base = componentBasePoints(baseComp, declaration.color) // 4, or 8 red
+      const level = k.level || 1
+      const unit = base * 2 * felkMult * level * redealMult // ellen = ×2 base
+      const amount = defenseWon ? unit : unit * lossMult
+      if (defenseWon) { // defense achieved it ⇒ declarer pays each defender
+        deltas[declarerId] -= amount * defenderIds.length
+        defenderIds.forEach((id) => { deltas[id] += amount })
+      } else { // defense failed ⇒ each defender pays the declarer (×lossMult)
+        deltas[declarerId] += amount * defenderIds.length
+        defenderIds.forEach((id) => { deltas[id] -= amount })
+      }
+      components.push({
+        key: laneKey, label, won: !defenseWon, ellen: true, defenseWon,
+        basePoints: base * 2, kontraLevel: level, hundred: false, mult: felkMult,
+        redealMult, hozam: false, lossMult, delta: defenseWon ? -amount : amount,
+      })
+    }
+    // Ellen ulti: the defense wins the last trick with the trump 7.
+    const ellenUltiWon = !!trumpSuit && defenderIds.some((d) => isUltiWinCondition(completedTricks, d, trumpSuit))
+    addEllen('ellen_ulti', 'ulti', ellenUltiWon, 2, 'Ellen ulti')
+    // Ellen négy ász: the two defenders together capture all four aces in tricks.
+    const ellenAcesWon = acesWonBy(completedTricks, defenderIds) === 4
+    addEllen('ellen_negy_asz', 'four_aces', ellenAcesWon, 1, 'Ellen négy ász')
   }
 
   // Kötelező ulti premium (lean-trump <3 in the 5-card hand): a flat declarer

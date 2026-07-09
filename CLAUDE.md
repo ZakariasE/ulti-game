@@ -176,6 +176,45 @@ excess never affects the buli standing/premium. (`calculateRoundScore` returns
 > multiplier), step (escalation count, drives timing + Kontra/Rekontra/… naming),
 > lastParty }`. `scoring.js` multiplies by `level`; timing/naming use `step`.
 
+### Ellen mondások (defender counter-sayings)
+
+Two defender-side claims — **ellen ulti** and **ellen négy ász** — declared at the
+same moment a defender would kontra (félkez bidding turn, or the defender's 1st
+card in teljes). They live in the same per-lane kontra maps (`bidding.kontra` /
+`play.kontra`) as ordinary kontra, keyed `ellen_ulti` / `ellen_negy_asz` and marked
+`ellen:true`, but are **owned by the defense**.
+
+- **Availability:** trump contracts only (needs the trump suit), and **only for a
+  component the declarer did NOT bid** — if the declarer declared ulti, the
+  defenders simply kontra it (ellen ulti is unavailable); same for négy ász. The
+  two are declared **independently** (separate buttons/lanes).
+- **Goal (defense-SIDE):** ellen ulti succeeds if **either** defender wins the last
+  trick with the trump 7; ellen négy ász if the two defenders **combined** capture
+  all four aces in tricks. Scored **declarer-vs-BOTH-defenders** uniformly (feeds
+  `declarerRaw`, so buli tracks it exactly like csendes ulti — no side-ledger).
+- **Value:** **2× the normal component** — ulti 4→8, négy ász 4→8 (×2 red; ×4 in
+  félkez → 32/8). The 2× is baked into the scoring base at kontra level 1; the
+  `level` then escalates through the same ladder. A **failed ellen ulti loss-doubles**
+  (the defense pays the declarer 2×, like a lost declared ulti); **ellen négy ász
+  does not**.
+- **Declaring ellen ulti supersedes csendes ulti** (the same trump-7-last-trick
+  event is captured by the ellen_ulti row, so the automatic csendes row is
+  suppressed). Never scored on a concede or a hand that didn't play all 10 tricks;
+  an ellen mondás also disables the quick-félkez-parti shortcut (it must play out).
+- **Escalation ladder** reuses the existing negotiation/bidding kontra machinery: a
+  defender declares (level 1, `lastParty:'defenders'`); then at the point the
+  declarer would rekontra they may **kontra ellen ulti / kontra ellen négy ász** (or
+  Mehet); then the defenders may rekontra the ellen mondás (or Mehet); alternating
+  until a side says Mehet. In teljes this is the **post-trick-1 `kontraNego`**; in
+  félkez it is the **5-card bidding kontra** chain (seeded into `play.kontra`).
+  `_availableEllenLanes` + `eligibleEllen` (teljes, defender's 1st card) gate
+  declaration; `applyKontra` / `applyBiddingKontra` create the lane; `_openKontraNego`
+  / `_negoDueLanes` / `kontraNegoLanesFor` treat an ellen lane as active from level 1;
+  `eligibleKontra` excludes ellen lanes. Scoring rows in `scoring.js`
+  (`ellen_ulti` / `ellen_negy_asz`). Client: ellen buttons in `BidPanel` (félkez) and
+  `KontraBar` (teljes 1st card), escalation in `KontraNegoBar`, display in
+  `RoundResult`. **No kötelező credit** (defender claims, not the declarer's sayings).
+
 ### Trick-Taking Rules
 
 1. Must follow the led suit if possible.

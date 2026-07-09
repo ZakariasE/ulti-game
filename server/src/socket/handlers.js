@@ -6,7 +6,7 @@ const {
   applyPlayCard, startClaim, respondClaim, applyConcede,
   startConcede, respondConcede, decideConcede, prepareNextRound,
   startBuli, commitBuliSettlement, buliSnapshot, randomizeSeating, drawInfo,
-  availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
+  availableMarriages, marriageOptionsFor, eligibleKontra, eligibleEllen, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
 } = require('../game/GameState')
 
@@ -462,6 +462,7 @@ function _promptNextTurn(io, roomCode, state) {
     legalCardIds: _getLegalCardIds(state, player.id),
     needsOpeningLead: !state.play.openingLeadDone && player.id === state.play.declarerId,
     kontraOptions: eligibleKontra(state, player.id),
+    ellenOptions: eligibleEllen(state, player.id),
     marriageOptions: marriageOptionsFor(state, player.id),
     kontra: state.play.kontra,
     trumpSuit: state.play.declaration.trumpSuit,

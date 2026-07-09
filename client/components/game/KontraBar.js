@@ -8,7 +8,7 @@ function nextName(k) { return kontraLevelName(2 ** (((k && k.step) || 0) + 1)) }
 
 export default function KontraBar() {
   const { state, dispatch } = useGame()
-  const { phase, declaration, kontra, kontraOptions, pendingKontra, currentTurnId, myPlayerId, players } = state
+  const { phase, declaration, kontra, kontraOptions, ellenOptions, pendingKontra, currentTurnId, myPlayerId, players } = state
 
   if (phase !== 'PLAYING' || !declaration) return null
 
@@ -21,13 +21,15 @@ export default function KontraBar() {
     ? `${componentLabel(declaration.scoring[0])} (${nameOf(lane)})`
     : componentLabel(lane))
 
-  // Lanes currently above ×1, for display (includes any kontra carried over from
-  // the félkezes bidding round — it lives in play.kontra).
-  const doubled = Object.entries(kontra || {}).filter(([, k]) => k.level > 1)
+  // Lanes to display: those above ×1 (kontra carried over from bidding lives in
+  // play.kontra too), plus any declared ellen mondás (active from ×1).
+  const doubled = Object.entries(kontra || {}).filter(([, k]) => k.level > 1 || k.ellen)
   const myTurn = currentTurnId === myPlayerId
   const options = myTurn ? (kontraOptions || []) : []
+  // Ellen mondások I (a defender) may declare with my first card.
+  const ellen = myTurn ? (ellenOptions || []) : []
 
-  if (doubled.length === 0 && options.length === 0) return null
+  if (doubled.length === 0 && options.length === 0 && ellen.length === 0) return null
 
   const toggle = (c) => dispatch({ type: 'TOGGLE_KONTRA', component: c })
   const allStaged = options.length > 0 && options.every((c) => pendingKontra.includes(c))
@@ -41,9 +43,26 @@ export default function KontraBar() {
         <span className={styles.levels}>
           {doubled.map(([lane, k]) => (
             <span key={lane} className={styles.levelTag}>
-              {laneLabel(lane)} ×{k.level}
+              {laneLabel(lane)}{k.level > 1 ? ` ×${k.level}` : ''}
             </span>
           ))}
+        </span>
+      )}
+      {ellen.length > 0 && (
+        <span className={styles.actions}>
+          {ellen.map((lane) => {
+            const on = pendingKontra.includes(lane)
+            return (
+              <button
+                key={lane}
+                className={`${styles.btn} ${on ? styles.btnOn : ''}`}
+                onClick={() => toggle(lane)}
+              >
+                {componentLabel(lane)}
+              </button>
+            )
+          })}
+          <span className={styles.hint}>kártya lerakásakor véglegesül</span>
         </span>
       )}
       {options.length > 0 && (

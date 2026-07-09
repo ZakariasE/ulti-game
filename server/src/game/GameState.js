@@ -73,6 +73,24 @@ function _kontraLanes(declaration, defenderIds) {
   return isIndividualKontra(declaration) ? [...defenderIds] : [...declaration.scoring]
 }
 
+// Ellen mondások — defense-declared ellen ulti / ellen négy ász. They live in the
+// same per-lane kontra maps (`bidding.kontra` / `play.kontra`) as ordinary kontra,
+// marked with `ellen: true`, but are OWNED by the defense: a defender declares one
+// (level 1, the 2× base is applied at scoring), then it escalates through the same
+// negotiation/bidding ladder (declarer "kontra ellen …", defenders "rekontra …").
+const ELLEN_LANES = new Set(['ellen_ulti', 'ellen_negy_asz'])
+
+// Which ellen lanes a defender may still DECLARE for this standing declaration:
+// trump contract only, and only for a component the declarer did NOT bid (if the
+// declarer bid ulti, the defenders simply kontra it), not already declared.
+function _availableEllenLanes(declaration, kontraMap) {
+  if (!declaration || !declaration.trumpSuit) return []
+  const out = []
+  if (!declaration.scoring.includes('ulti') && !(kontraMap && kontraMap.ellen_ulti)) out.push('ellen_ulti')
+  if (!declaration.scoring.includes('four_aces') && !(kontraMap && kontraMap.ellen_negy_asz)) out.push('ellen_negy_asz')
+  return out
+}
+
 // ── Seating / first dealer ───────────────────────────────────────────────────
 
 // Randomly permute the seat order (turn order) and pick a random first dealer.
@@ -371,9 +389,14 @@ function biddingKontraOptions(state, playerId) {
   const current = state.bidding.currentHighBid
   if (!current) return []
   const myParty = playerId === current.playerId ? 'declarer' : 'defenders'
-  return Object.entries(state.bidding.kontra)
+  const escalate = Object.entries(state.bidding.kontra)
     .filter(([lane, k]) => _biddingKontraNextParty(k) === myParty && _biddingLaneOk(current, playerId, lane, myParty))
     .map(([lane]) => lane)
+  // Defenders may also DECLARE a fresh ellen mondás on their turn.
+  if (myParty === 'defenders') {
+    return [...escalate, ..._availableEllenLanes(current.declaration, state.bidding.kontra)]
+  }
+  return escalate
 }
 
 // Félkezes per-lane bidding-kontra: on your turn (5-card round) you may double any
@@ -394,9 +417,20 @@ function applyBiddingKontra(state, playerId, lanes) {
   const myParty = playerId === current.playerId ? 'declarer' : 'defenders'
   const list = lanes && lanes.length ? lanes : []
   if (!list.length) throw new Error('Pick at least one component to kontra')
+  const availEllen = myParty === 'defenders'
+    ? new Set(_availableEllenLanes(current.declaration, state.bidding.kontra)) : new Set()
 
   const raised = []
   for (const lane of list) {
+    // Declaring a fresh ellen mondás (defense side): create at level 1 (the 2× base
+    // is applied at scoring), owned by the defenders. Only a defender, only if
+    // available for this declaration.
+    if (ELLEN_LANES.has(lane) && !state.bidding.kontra[lane]) {
+      if (!availEllen.has(lane)) throw new Error('Ezt az ellen mondást most nem mondhatod')
+      state.bidding.kontra[lane] = { level: 1, step: 0, lastParty: 'defenders', ellen: true }
+      raised.push(lane)
+      continue
+    }
     const k = state.bidding.kontra[lane]
     if (!k) throw new Error(`Not part of this bid: ${lane}`)
     if (_biddingKontraNextParty(k) !== myParty) throw new Error('Not your side to double this now')
@@ -466,6 +500,12 @@ function _startPlay(state, declarerId, declaration) {
       step: bk ? (bk.step || 0) : 0,
       lastParty: bk ? bk.lastParty : null,
     }
+  }
+  // Carry over any ellen mondás declared during the félkez 5-card round — the ladder
+  // continues in play (post-trick-1 negotiation).
+  for (const lane of ELLEN_LANES) {
+    const bk = state.bidding.kontra && state.bidding.kontra[lane]
+    if (bk) kontra[lane] = { level: bk.level, step: bk.step || 0, lastParty: bk.lastParty, ellen: true }
   }
 
   const cardsPlayed = {}
@@ -666,6 +706,8 @@ function _isQuickPartiWin(state) {
   if (!state.play.felkezesBid) return false
   const decl = state.play.declaration
   if (!(decl.scoring.length === 1 && decl.scoring[0] === 'parti')) return false
+  // An ellen mondás must play out to resolve — never a quick one-trick parti.
+  if (Object.values(state.play.kontra).some((k) => k.ellen)) return false
   const k = state.play.kontra.parti
   return !k || k.level === 1
 }
@@ -1132,8 +1174,17 @@ function applyKontra(state, playerId, lanes) {
   const myCardNum = state.play.cardsPlayed[playerId] + 1 // the card they are about to play
 
   const list = lanes && lanes.length ? lanes : eligibleKontra(state, playerId)
+  const ellenOK = new Set(eligibleEllen(state, playerId))
   const raised = []
   for (const lane of list) {
+    // Declaring a fresh ellen mondás (defense side, on the defender's first card):
+    // create at level 1 (2× base applied at scoring), owned by the defenders.
+    if (ELLEN_LANES.has(lane) && !state.play.kontra[lane]) {
+      if (!ellenOK.has(lane)) throw new Error('Ezt az ellen mondást most nem mondhatod')
+      state.play.kontra[lane] = { level: 1, step: 0, lastParty: 'defenders', ellen: true }
+      raised.push(lane)
+      continue
+    }
     const k = state.play.kontra[lane]
     if (!k) throw new Error(`Not part of this declaration: ${lane}`)
     // Card-timed kontra is the defenders' INITIAL kontra only (step 0); escalation
@@ -1166,7 +1217,9 @@ function applyKontra(state, playerId, lanes) {
 function _negoDueLanes(state, party, playerId) {
   const individual = isIndividualKontra(state.play.declaration)
   return Object.entries(state.play.kontra).filter(([lane, k]) => {
-    if (!(k.level > 1)) return false
+    // Ellen lanes are "active" from level 1 (owned by the defenders); ordinary
+    // lanes only once they have been kontrázott (level > 1).
+    if (!(k.ellen || k.level > 1)) return false
     if (party === 'declarer') return k.lastParty === 'defenders'
     if (k.lastParty !== 'declarer') return false
     if (individual && lane !== playerId) return false
@@ -1178,9 +1231,10 @@ function _negoDueLanes(state, party, playerId) {
 // whichever side is due (declarer first when any lane awaits their rekontra).
 function _openKontraNego(state) {
   const lanes = Object.values(state.play.kontra)
-  if (!lanes.some((k) => (k.level || 1) > 1)) return false
-  const declarerDue = lanes.some((k) => k.level > 1 && k.lastParty === 'defenders')
-  const defendersDue = lanes.some((k) => k.level > 1 && k.lastParty === 'declarer')
+  const active = (k) => k.ellen || (k.level || 1) > 1
+  if (!lanes.some(active)) return false
+  const declarerDue = lanes.some((k) => active(k) && k.lastParty === 'defenders')
+  const defendersDue = lanes.some((k) => active(k) && k.lastParty === 'declarer')
   const turn = declarerDue ? 'declarer' : (defendersDue ? 'defenders' : null)
   if (!turn) return false
   state.play.kontraNego = { turn, acted: {} }
@@ -1293,12 +1347,28 @@ function eligibleKontra(state, playerId) {
   // post-trick-1 negotiation instead (see kontraNego), not by card timing.
   return Object.entries(state.play.kontra)
     .filter(([lane, k]) => {
+      if (k.ellen) return false // ellen lanes are declared/escalated separately
       if ((k.step || 0) !== 0) return false
       const exp = _kontraExpectation(0)
       return exp.party === party && exp.cardNum === myCardNum && k.lastParty !== party &&
         _playLaneOk(state, playerId, lane, party)
     })
     .map(([lane]) => lane)
+}
+
+// Ellen mondások a defender may DECLARE right now during play: on their first card
+// (the same window as their initial kontra), in a trump contract, for a component the
+// declarer did not bid. Never offered to the declarer.
+function eligibleEllen(state, playerId) {
+  if (!state.play || state.phase !== 'PLAYING') return []
+  if (state.play.kontraNego || state.play.kontraLocked) return []
+  if (playerId === state.play.declarerId) return []
+  if (state.play.cardsPlayed[playerId] !== 0) return [] // first card only
+  const player = state.players.find((p) => p.id === playerId)
+  const { currentTrick } = state.play
+  const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
+  if (!player || player.seatIndex !== expectedSeat) return []
+  return _availableEllenLanes(state.play.declaration, state.play.kontra)
 }
 
 function prepareNextRound(state) {
@@ -1394,6 +1464,7 @@ module.exports = {
   availableMarriages,
   marriageOptionsFor,
   eligibleKontra,
+  eligibleEllen,
   biddingSnapshot,
   publicDeclaration,
   handCounts,

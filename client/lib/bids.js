@@ -20,8 +20,12 @@ export const NO_TRUMP_CONTRACTS = {
   open_durchmars:  { base: 24, label: 'Terített durchmars' },
 }
 
+// Ellen mondások (defense-declared ellen ulti / ellen négy ász) live in the kontra
+// maps as lanes, marked `ellen: true`.
+export const ELLEN_LABELS = { ellen_ulti: 'Ellen ulti', ellen_negy_asz: 'Ellen négy ász' }
+
 export function componentLabel(component) {
-  return (TRUMP_COMPONENTS[component] || NO_TRUMP_CONTRACTS[component] || {}).label || component
+  return ELLEN_LABELS[component] || (TRUMP_COMPONENTS[component] || NO_TRUMP_CONTRACTS[component] || {}).label || component
 }
 
 // Contracts with INDIVIDUAL (per-defender) kontra — betli (all iterations) and
@@ -38,7 +42,9 @@ export function isIndividualKontra(decl) {
 export function kontraNegoLanesFor(declaration, kontra, party, playerId) {
   const individual = isIndividualKontra(declaration)
   return Object.entries(kontra || {}).filter(([lane, k]) => {
-    if (!(k.level > 1)) return false
+    // Ellen lanes are active from level 1 (owned by defenders); ordinary lanes only
+    // once kontrázott (level > 1).
+    if (!(k.ellen || k.level > 1)) return false
     if (party === 'declarer') return k.lastParty === 'defenders'
     if (k.lastParty !== 'declarer') return false
     if (individual && lane !== playerId) return false

@@ -86,7 +86,11 @@ export default function RoundResult({ roomCode }) {
                       // declarer win (a defender's failed attempt) — so show ×2 (bukó)
                       // whenever the attempt failed, not only on a declarer loss.
                       ? <>{c.basePoints}{c.attemptFailed ? ' ×2 (bukó)' : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}</>
-                      : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
+                      : c.ellen
+                        // Ellen mondás: the loss-doubling (ellen ulti) applies when the
+                        // DEFENSE fails (= declarer wins), so key the bukó on defenseWon.
+                        ? <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}{!c.defenseWon && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>
+                        : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
                 </td>
                 <td className={`${styles.numCol} ${c.delta >= 0 ? styles.pos : styles.neg}`}>
                   {c.delta >= 0 ? '+' : ''}{c.delta}

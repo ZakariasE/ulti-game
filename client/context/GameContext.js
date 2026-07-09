@@ -56,7 +56,8 @@ const initialState = {
   felkezesBid: false, // was the winning bid made in the 5-card round (×4)? drives info-bar stake
   kontra: {}, // component -> { level, lastParty }
   kontraOptions: [], // components I may double right now
-  pendingKontra: [], // components I've staged to double with my next card
+  ellenOptions: [], // ellen mondások I (a defender) may declare with my first card
+  pendingKontra: [], // components I've staged to double / ellen lanes to declare with my next card
   kontraNego: null, // { turn:'declarer'|'defenders', pending:[ids] } post-trick-1 negotiation
   kontraNegoStaged: [], // lanes I've toggled to raise on my negotiation turn
   pendingDiscard: [], // cards staged to discard (combined discard+declare)
@@ -130,6 +131,7 @@ function resetForNewRound(state) {
     announcedMarriages: [],
     kontra: {},
     kontraOptions: [],
+    ellenOptions: [],
     pendingKontra: [],
     kontraNego: null,
     kontraNegoStaged: [],
@@ -354,6 +356,7 @@ function gameReducer(state, action) {
         lastTrickWinnerId: null,
         needsOpeningLead: action.currentPlayerId === state.myPlayerId ? !!action.needsOpeningLead : false,
         kontraOptions: action.currentPlayerId === state.myPlayerId ? (action.kontraOptions || []) : [],
+        ellenOptions: action.currentPlayerId === state.myPlayerId ? (action.ellenOptions || []) : [],
         pendingKontra: [],
         marriageOptions: action.currentPlayerId === state.myPlayerId ? (action.marriageOptions || []) : [],
         // Marriages are announced by default; the player opts out per suit.
@@ -374,6 +377,7 @@ function gameReducer(state, action) {
             : state.myHand,
         legalCardIds: [],
         kontraOptions: [],
+        ellenOptions: [],
         pendingKontra: [],
         marriageOptions: [],
         pendingMarriages: [],
