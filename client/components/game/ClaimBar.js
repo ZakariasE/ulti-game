@@ -7,16 +7,69 @@ const BETLI = new Set(['betli', 'heart_betli', 'open_betli'])
 
 // "Nincs több ütés": the declarer claims all remaining tricks; both defenders
 // must agree, then the round ends immediately with the declarer winning.
-// "Bedobom": the declarer throws in — the hand ends immediately as a loss.
+// "Bedobom": the declarer throws in.
+//   • Parti-less contracts concede immediately as a loss.
+//   • Parti contracts open a negotiation (no card is played): each defender
+//     answers rendben / csak százzal; if either demands százzal, the declarer
+//     chooses rendben (concede with 100) or lejátszom (cancel, play continues).
 export default function ClaimBar({ roomCode }) {
   const { state, dispatch } = useGame()
   const { emit } = useSocket()
-  const { phase, declaration, declarerId, myPlayerId, currentTrick, completedTricks, claim, claimVote } = state
-  const [confirming, setConfirming] = useState(null) // null | 'plain' | '100'
+  const {
+    phase, declaration, declarerId, myPlayerId, currentTrick, completedTricks,
+    claim, claimVote, concede, concedeVote,
+  } = state
+  const [confirming, setConfirming] = useState(false) // declarer's initial Bedobom confirm
 
   if (phase !== 'PLAYING' || !declaration) return null
   const amDeclarer = declarerId === myPlayerId
 
+  // ── Bedobás negotiation (parti contracts) ──────────────────────────────────
+  if (concede) {
+    if (concede.stage === 'defenders') {
+      if (amDeclarer) {
+        return <div className={styles.bar}><span className={styles.waiting}>Várakozás az ellenfelek válaszára…</span></div>
+      }
+      const vote = (v) => {
+        dispatch({ type: 'SET_CONCEDE_VOTE', vote: v })
+        emit('concede:respond', { roomCode, choice: v === 'hundred' ? 'hundred' : 'ok' })
+      }
+      return (
+        <div className={`${styles.bar} ${styles.vote}`}>
+          <span>A felvevő bedobná a partit. Elfogadod?</span>
+          <button
+            className={`${styles.yes} ${concedeVote === 'ok' ? styles.chosen : ''} ${concedeVote === 'hundred' ? styles.dim : ''}`}
+            disabled={!!concedeVote}
+            onClick={() => vote('ok')}
+          >
+            {concedeVote === 'ok' ? '✓ Rendben' : 'Rendben'}
+          </button>
+          <button
+            className={`${styles.no} ${concedeVote === 'hundred' ? styles.chosen : ''} ${concedeVote === 'ok' ? styles.dim : ''}`}
+            disabled={!!concedeVote}
+            onClick={() => vote('hundred')}
+          >
+            {concedeVote === 'hundred' ? '✓ Csak százzal' : 'Csak százzal'}
+          </button>
+          {concedeVote && <span className={styles.waiting}>a másik játékosra várunk…</span>}
+        </div>
+      )
+    }
+
+    // stage === 'declarer': at least one defender demanded százzal.
+    if (amDeclarer) {
+      return (
+        <div className={styles.bar}>
+          <span className={styles.confirm}>Az egyik ellenfél csak százzal fogadja el. Rendben, vagy lejátszod?</span>
+          <button className={styles.no} onClick={() => emit('concede:decide', { roomCode, playOn: false })}>Rendben (százzal)</button>
+          <button className={styles.cancel} onClick={() => emit('concede:decide', { roomCode, playOn: true })}>Lejátszom</button>
+        </div>
+      )
+    }
+    return <div className={styles.bar}><span className={styles.waiting}>Várakozás a felvevő döntésére…</span></div>
+  }
+
+  // ── Claim: "nincs több ütés" ───────────────────────────────────────────────
   // A defender voting on a pending claim.
   if (claim && !amDeclarer) {
     function vote(v) {
@@ -56,13 +109,16 @@ export default function ClaimBar({ roomCode }) {
   const canOffer = !declaration.scoring.some((k) => BETLI.has(k)) &&
     currentTrick.length === 0 && completedTricks.length >= 1 && completedTricks.length < 10
 
-  // Bedobás is available any time the declarer is at play (even before the opening
-  // lead) — confirmed once, since it forfeits the hand. Once tricks have begun, a
-  // parti-bearing contract also offers "Bedobom, százzal": pay the parti as if the
-  // defenders reached 100.
-  const tricksBegun = (completedTricks?.length || 0) > 0 || (currentTrick?.length || 0) > 0
-  const canHundred = tricksBegun && declaration.hasParti
-  const doConcede = (hundred) => { emit('play:concede', { roomCode, hundred }); setConfirming(null) }
+  // Bedobás is available any time the declarer is at play (even before the
+  // opening lead). Parti contracts open the negotiation; others concede at once.
+  const startBedobas = () => {
+    if (declaration.hasParti) emit('concede:start', { roomCode })
+    else emit('play:concede', { roomCode, hundred: false })
+    setConfirming(false)
+  }
+  const confirmText = declaration.hasParti
+    ? 'Biztosan bedobod? Az ellenfelek döntenek, hogy százzal számoljon-e.'
+    : 'Biztosan bedobod? Elveszíted a leosztást.'
 
   return (
     <div className={styles.bar}>
@@ -71,21 +127,12 @@ export default function ClaimBar({ roomCode }) {
       )}
       {confirming ? (
         <>
-          <span className={styles.confirm}>
-            {confirming === '100'
-              ? 'Biztosan bedobod (százzal)? Elveszíted a leosztást, a parti 100-zal számol.'
-              : 'Biztosan bedobod? Elveszíted a leosztást.'}
-          </span>
-          <button className={styles.no} onClick={() => doConcede(confirming === '100')}>Igen</button>
-          <button className={styles.cancel} onClick={() => setConfirming(null)}>Mégse</button>
+          <span className={styles.confirm}>{confirmText}</span>
+          <button className={styles.no} onClick={startBedobas}>Igen</button>
+          <button className={styles.cancel} onClick={() => setConfirming(false)}>Mégse</button>
         </>
       ) : (
-        <>
-          <button className={styles.concede} onClick={() => setConfirming('plain')}>Bedobom</button>
-          {canHundred && (
-            <button className={styles.concede} onClick={() => setConfirming('100')}>Bedobom, százzal</button>
-          )}
-        </>
+        <button className={styles.concede} onClick={() => setConfirming(true)}>Bedobom</button>
       )}
     </div>
   )

@@ -479,6 +479,7 @@ function _startPlay(state, declarerId, declaration) {
     cardsPlayed,
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
     claim: null, // { responses } while a "nincs több ütés" claim is pending
+    concede: null, // { stage, responses } while a parti bedobás negotiation is pending
     declarerFive: (state.felkezesFives && state.felkezesFives[declarerId]) || null, // félkezes 5-card hand
     // The winning bid gets the ×4 félkezes multiplier only if it was declared in
     // the 5-card round; a bid won in the reopened round is a normal (teljes) bid.
@@ -1004,6 +1005,48 @@ function applyConcede(state, playerId, hundred) {
   return applyRoundEnd(state)
 }
 
+// ── Bedobás negotiation (parti contracts only) ────────────────────────────────
+//
+// In a parti-bearing contract the declarer does not concede unilaterally. Pressing
+// Bedobom opens a negotiation (no card is played):
+//   1. each defender answers "rendben" (accept a plain concede) or "csak százzal"
+//      (only accept if the parti is paid as if they reached 100).
+//   2. if BOTH say rendben → plain concede.
+//      if EITHER says csak százzal → the declarer chooses "rendben" (concede with
+//      100) or "lejátszom" (cancel — play continues as if nothing happened).
+// Parti-less contracts skip all of this and concede immediately via applyConcede.
+function startConcede(state, playerId) {
+  if (state.phase !== 'PLAYING') throw new Error('Not in play')
+  if (playerId !== state.play.declarerId) throw new Error('Only the declarer can concede')
+  state.play.concede = { stage: 'defenders', responses: {} }
+  return { stage: 'defenders' }
+}
+
+function respondConcede(state, playerId, choice) {
+  if (!state.play || !state.play.concede) throw new Error('No pending concede')
+  if (state.play.concede.stage !== 'defenders') throw new Error('Not awaiting defenders')
+  if (!state.play.defenderIds.includes(playerId)) throw new Error('Only defenders may respond')
+  state.play.concede.responses[playerId] = choice === 'hundred' ? 'hundred' : 'ok'
+  const allResponded = state.play.defenderIds.every((id) => state.play.concede.responses[id])
+  if (!allResponded) return { pending: true }
+  const anyHundred = state.play.defenderIds.some((id) => state.play.concede.responses[id] === 'hundred')
+  if (!anyHundred) {
+    state.play.concede = null
+    return { resolved: true, ...applyConcede(state, state.play.declarerId, false) }
+  }
+  state.play.concede.stage = 'declarer'
+  return { stage: 'declarer' }
+}
+
+function decideConcede(state, playerId, playOn) {
+  if (!state.play || !state.play.concede) throw new Error('No pending concede')
+  if (state.play.concede.stage !== 'declarer') throw new Error('Not awaiting the declarer')
+  if (playerId !== state.play.declarerId) throw new Error('Only the declarer can decide')
+  state.play.concede = null
+  if (playOn) return { cancelled: true }
+  return { resolved: true, ...applyConcede(state, state.play.declarerId, true) }
+}
+
 // ── Kontra (per component, tied to card-play timing) ───────────────────────────
 
 // Each kontra state is { level (scoring multiplier), step (escalation count),
@@ -1160,6 +1203,9 @@ module.exports = {
   startClaim,
   respondClaim,
   applyConcede,
+  startConcede,
+  respondConcede,
+  decideConcede,
   applyRoundEnd,
   startBuli,
   commitBuliSettlement,

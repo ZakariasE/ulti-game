@@ -66,6 +66,8 @@ const initialState = {
   felkezesReveal: null, // { playerId, cards } — required-ulti 5-card reveal
   claim: null, // { declarerId } while a "nincs több ütés" claim awaits defender votes
   claimVote: null, // this player's own vote ('yes' | 'no') on a pending claim
+  concede: null, // { stage:'defenders'|'declarer', declarerId } during a parti bedobás negotiation
+  concedeVote: null, // this defender's own choice ('ok' | 'hundred')
   currentTrick: [],
   completedTricks: [], // [{ winnerId, cards }]
   lastTrickWinnerId: null,
@@ -110,6 +112,8 @@ function resetForNewRound(state) {
     felkezesReveal: null,
     claim: null,
     claimVote: null,
+    concede: null,
+    concedeVote: null,
     readyState: null,
     announcements: [],
     talonCardIds: [],
@@ -333,6 +337,26 @@ function gameReducer(state, action) {
     case 'SET_CLAIM_VOTE':
       return { ...state, claimVote: action.vote }
 
+    case 'CONCEDE_PENDING':
+      return {
+        ...state,
+        concede: { stage: action.stage, declarerId: action.declarerId },
+        // reset my vote when a fresh defender round opens; keep it once we move on
+        concedeVote: action.stage === 'defenders' ? null : state.concedeVote,
+      }
+
+    case 'SET_CONCEDE_VOTE':
+      return { ...state, concedeVote: action.vote }
+
+    case 'CONCEDE_CANCELLED':
+      // Declarer chose "lejátszom" — drop the negotiation, play continues.
+      return {
+        ...state,
+        concede: null,
+        concedeVote: null,
+        ...announce(state, 'A felvevő mégis lejátssza a leosztást', 'kontra'),
+      }
+
     case 'CLAIM_RESULT':
       // Accepted → round:completed follows. Rejected → drop the claim; the
       // reveal is withdrawn and play continues.
@@ -356,6 +380,8 @@ function gameReducer(state, action) {
         sidePairs: action.sidePairs || state.sidePairs,
         buli: action.buli || state.buli,
         claim: null,
+        concede: null,
+        concedeVote: null,
         currentTrick: [],
         readyState: null,
       }

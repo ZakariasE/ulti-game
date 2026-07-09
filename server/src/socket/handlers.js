@@ -2,7 +2,8 @@ const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
   applyFirstLead, applyKontra, applyBiddingKontra,
-  applyPlayCard, startClaim, respondClaim, applyConcede, prepareNextRound,
+  applyPlayCard, startClaim, respondClaim, applyConcede,
+  startConcede, respondConcede, decideConcede, prepareNextRound,
   startBuli, commitBuliSettlement, buliSnapshot, randomizeSeating, drawInfo,
   availableMarriages, marriageOptionsFor, eligibleKontra, biddingSnapshot,
   publicDeclaration, handCounts, _getLegalCardIds,
@@ -195,12 +196,53 @@ function registerHandlers(io, socket) {
     }
   })
 
-  // Bedobás: the declarer throws in — the hand ends immediately as a loss.
+  // Bedobás (parti-less contracts): the declarer throws in — the hand ends
+  // immediately as a loss.
   socket.on('play:concede', ({ roomCode, hundred }) => {
     try {
       const state = rooms.getRoom(roomCode)
       applyConcede(state, socket.id, hundred)
       io.to(roomCode).emit('round:completed', _roundCompleted(state))
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  // Bedobás negotiation (parti contracts): declarer opens it, defenders answer
+  // rendben / csak százzal, then — if any demanded százzal — the declarer decides.
+  socket.on('concede:start', ({ roomCode }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const { stage } = startConcede(state, socket.id)
+      io.to(roomCode).emit('concede:pending', { stage, declarerId: socket.id })
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  socket.on('concede:respond', ({ roomCode, choice }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const res = respondConcede(state, socket.id, choice)
+      if (res.resolved) {
+        io.to(roomCode).emit('round:completed', _roundCompleted(state))
+      } else if (res.stage === 'declarer') {
+        io.to(roomCode).emit('concede:pending', { stage: 'declarer', declarerId: state.play.declarerId })
+      }
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
+  socket.on('concede:decide', ({ roomCode, playOn }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const res = decideConcede(state, socket.id, playOn)
+      if (res.cancelled) {
+        io.to(roomCode).emit('concede:cancelled', {})
+      } else if (res.resolved) {
+        io.to(roomCode).emit('round:completed', _roundCompleted(state))
+      }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }

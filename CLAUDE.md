@@ -68,7 +68,15 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 
 **Early termination:** a pure Betli or a pure Durchmars (trump or no-trump) ends the **instant its goal becomes impossible** — Betli the moment the declarer wins a trick, Durchmars the moment a defender wins one — and is scored as a loss without playing out the remaining tricks. (A Durchmars combined with other trump components plays on.)
 
-**Bedobás (concede):** the declarer may **throw in** at any point once play has begun (even before the opening lead) via a *Bedobom* button. The hand ends immediately, the defenders win, and **every component is scored as a loss** using whatever **kontra** levels were reached before the concede (a lost Ulti still doubles). The **2-card required-ulti premium and the kötelező saying acknowledgement both still stand** on a concede (they reward the committed félkez bid, not the play). **Once tricks have begun**, a parti-bearing contract also offers **"Bedobom, százzal"** (`play:concede {hundred:true}` → `conceded100`): the Parti is paid **as if the defenders reached 100** (parti stake doubled) — for cases where the defenders had already collected 100 in cards. `applyConcede(state, id, hundred)` sets `play.conceded`/`conceded100`; `calculateRoundScore({ conceded, conceded100 })` forces every component lost (parti doubled only when `conceded100`) but still adds the `ulti_bonus`; `_markKotelezo` runs at hand end as usual. Client: the *Bedobom* / *Bedobom, százzal* buttons in `ClaimBar` (one-step confirm).
+**Bedobás (concede):** the declarer may **throw in** at any point once play has begun (even before the opening lead) via a *Bedobom* button (no card is played). The hand ends immediately, the defenders win, and **every component is scored as a loss** using whatever **kontra** levels were reached before the concede (a lost Ulti still doubles). The **2-card required-ulti premium and the kötelező saying acknowledgement both still stand** on a concede (they reward the committed félkez bid, not the play).
+
+- **Parti-less contract:** *Bedobom* concedes immediately (`play:concede {hundred:false}` → `applyConcede`).
+- **Parti contract:** *Bedobom* instead opens a **negotiation** (still no card played) — `applyConcede` is never called unilaterally here:
+  1. `startConcede(state, declarer)` sets `play.concede = { stage:'defenders', responses:{} }` (`concede:start` → broadcast `concede:pending {stage:'defenders'}`).
+  2. Each defender answers **rendben** (`ok`) or **csak százzal** (`hundred`) via `concede:respond {choice}` → `respondConcede`. Independent per defender (client keeps a local `concedeVote`, like the claim vote); resolves only once both have answered.
+  3. If **both** said `ok` → plain concede (`applyConcede(hundred:false)`). If **either** said `hundred` → `stage:'declarer'` (`concede:pending {stage:'declarer'}`) and the declarer decides via `concede:decide {playOn}` → `decideConcede`: **Rendben** (`playOn:false`) → concede with 100 (`applyConcede(hundred:true)` → `conceded100`, parti paid as if defenders reached 100); **Lejátszom** (`playOn:true`) → `play.concede=null`, `concede:cancelled` broadcast, **play continues as if nothing happened**.
+
+`applyConcede(state, id, hundred)` sets `play.conceded`/`conceded100`; `calculateRoundScore({ conceded, conceded100 })` forces every component lost (parti doubled only when `conceded100`) but still adds the `ulti_bonus`; `_markKotelezo` runs at hand end as usual. Server: `startConcede`/`respondConcede`/`decideConcede` in `GameState.js` (state on `play.concede`). Client: `ClaimBar` renders the whole negotiation (declarer confirm + defender rendben/csak-százzal vote + declarer rendben/lejátszom); `concede`/`concedeVote` staging in `GameContext`.
 
 **Quick félkez parti:** if the winning bid is a **pure Parti won in the 5-card félkez round** (only the parti component — no hozám / no teljes-kéz outbid, so `felkezesBid && scoring==['parti']`), the first trick is played and then, **if neither defender kontrázott the parti** (its kontra level is still 1, whether from bidding or the first trick's cards), the declarer **auto-wins the parti** and the round ends after that single trick. If either defender kontrázott, it plays out normally. `_isQuickPartiWin` (checked at trick 1 in `applyTrickEnd`) sets `play.quickPartiWin` → `calculateRoundScore({ forcePartiWon:true })`.
 
@@ -357,12 +365,13 @@ through the all-pairs expansion.
 ### Socket events
 - **client→server:** `room:create` (w/ options), `room:join`, `game:start`, `bid:declare`,
   `bid:pass`, `bid:discard` (`{cardIds, hozam?, hozamOpen?}` — hozám add-ons at POST_DEAL_DISCARD; `hozamOpen` = terített durchmars add-on), `bid:rob`, `bid:kontra` (félkez per-component bidding kontra; `{components}`), `play:firstLead`,
-  `card:play`, `claim:start`, `claim:respond`, `play:concede` (declarer bedobás — hand ends as a loss), `round:continue`, `buli:next`.
+  `card:play`, `claim:start`, `claim:respond`, `play:concede` (parti-less bedobás — hand ends as a loss),
+  `concede:start`/`concede:respond` (`{choice:'ok'|'hundred'}`)/`concede:decide` (`{playOn}`) — parti bedobás negotiation, `round:continue`, `buli:next`.
 - **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
   `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,
   `marriage:announced`, `kontra:updated`, `opening:info` (declarer only), `play:turnStart`,
   `card:played`, `trick:completed`, `round:completed`, `buli:completed`, `round:ready`, `claim:pending/result`,
-  `game:error`/`room:error`.
+  `concede:pending` (`{stage:'defenders'|'declarer'}`)/`concede:cancelled` (parti bedobás negotiation), `game:error`/`room:error`.
 - Robbing sends **`bid:discard` then `bid:declare` back-to-back** (combined discard+declare UI).
 
 ### Client (`client/`)
