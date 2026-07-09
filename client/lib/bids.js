@@ -119,9 +119,16 @@ export function declarationValue(decl) {
 export function bidTotalValue(decl, felkFactor = 1, redeal = 1, kontra = {}) {
   if (!decl || decl.invalid) return 0
   const hozam = new Set(decl.hozam || [])
+  // Individual-kontra contracts (betli / nt-durchmars) key the kontra map by
+  // DEFENDER id, not component. The displayed stake uses the COMMON level — the
+  // level both defenders share (their minimum) — so it climbs only once BOTH have
+  // kontrázott, matching how scoring's standing treats it as a uniform kontra.
+  const individual = isIndividualKontra(decl)
+  const levels = Object.values(kontra || {}).map((k) => (k && k.level) || 1)
+  const commonLevel = individual && levels.length ? Math.min(...levels) : 1
   return decl.scoring.reduce((sum, c) => {
     const mult = (hozam.has(c) ? 2 : felkFactor) * redeal
-    const kl = (kontra[c] && kontra[c].level) || 1
+    const kl = individual ? commonLevel : ((kontra[c] && kontra[c].level) || 1)
     return sum + componentBasePoints(c, decl.color, decl.open) * mult * kl
   }, 0)
 }

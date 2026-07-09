@@ -42,6 +42,23 @@ export default function KontraNegoBar({ roomCode }) {
   const mehet = () => emit('kontra:nego', { roomCode, lanes: [] })
   const raiseWord = myParty === 'declarer' ? 'Rekontra' : 'Szubkontra'
 
+  // Individual-kontra contracts (betli / nt-durchmars): no per-defender split —
+  // a single Rekontra/Szubkontra button raises every lane the player is due (both
+  // defenders' lanes for the declarer, their own for a defender), so an all-kontra'd
+  // contract behaves like a normal uniform kontra.
+  if (individual) {
+    return (
+      <div className={styles.bar}>
+        <span className={styles.actions}>
+          {options.length > 0 && (
+            <button className={styles.btnAll} onClick={() => emit('kontra:nego', { roomCode, lanes: options })}>{raiseWord}</button>
+          )}
+          <button className={styles.btnAll} onClick={mehet}>Mehet</button>
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.bar}>
       <span className={styles.actions}>
