@@ -229,8 +229,11 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
    - **Closing:** bidding ends when the current **high bidder (declarer) passes**
      on their own turn — they always get the final say (raise/kontra/pass). Plain:
      declare → pass → pass → declarer passes.
-   - **Required-ulti reveal:** announcing an Ulti reveals the announcer's 5 cards
-     to everyone until the second deal (kötelező games).
+   - **Required-ulti reveal:** announcing a *qualifying* required Ulti reveals the
+     announcer's 5 cards to everyone until the second deal (kötelező games). Only
+     an ulti with **≤3 trump cards** in the 5-card hand AND from a player who
+     **hasn't already satisfied** their ulti requirement this buli reveals — a 4-5
+     trump ulti, or any ulti after the requirement is met, shows nothing.
 3. **Second deal:** the winner gets +7 (→12), each defender +5 (→10); the winner
    discards 2 (their talon).
 4. **Reopened bidding round** (`bidding.mode='normal'`): plays out **exactly like
@@ -307,8 +310,12 @@ Unmet at buli end costs **−220** (Ulti) / **−110** (Betli/40-100), individua
   mandatory. `_isMandatoryBetli` sets `state.bidding.mandatoryBetli` on every
   (out)bid; `applyBidPass` blocks a defender's pass while their lane is ×1;
   cleared at the second deal; the client disables Passz + shows a hint.
-- **Credit is for *saying* it in the FÉLKEZ (5-card) round** — trump count is
-  irrelevant to credit. A saying declared in **teljes kéz** (reopened round or a
+- **Credit is for *saying* it in the FÉLKEZ (5-card) round.** For the **Ulti**
+  specifically, credit requires holding **≤3 trump cards** of the named suit in
+  the 5-card hand — a 4-5 trump ulti does **not** satisfy the requirement (and
+  doesn't reveal). Once satisfied, later ultis don't change it (sticky
+  `buli.kotelezo`). (The Betli/40-100 saying has no trump-count gate.) A saying
+  declared in **teljes kéz** (reopened round or a
   hozámondott add-on) does **not** earn credit, so **outbidding someone's félkez
   ulti in teljes kéz gives the outbidder nothing** (only the original félkez
   declarer is credited). You keep the credit if another player **outbids** you

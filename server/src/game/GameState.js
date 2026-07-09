@@ -265,12 +265,17 @@ function applyDeclare(state, playerId, payload) {
   state.bidding.mandatoryBetli = _isMandatoryBetli(state, playerId, declaration)
   state.bidding.history.push({ playerId, action: 'declare', label: declarationLabel(declaration) })
 
-  // Required ulti: reveal the announcer's 5-card hand until the second deal
-  // (only in the 5-card round).
+  // Required ulti: reveal the announcer's 5-card hand until the second deal (only
+  // in the 5-card round). Only a qualifying required ulti reveals — ≤3 trump cards
+  // AND the player hasn't already satisfied their ulti requirement this buli; a
+  // 4-5 trump ulti or a further ulti after the requirement is met shows nothing.
   let revealed = false
   if (felkezesRound && state.options.kotelezo.on && declaration.scoring.includes('ulti')) {
-    state.felkezesReveal = { playerId, cards: state.hands[playerId].slice() }
-    revealed = true
+    const trumps = _felkezTrumpCount(state, playerId, declaration)
+    if (trumps !== null && trumps <= 3 && !_ultiRequirementDone(state, playerId)) {
+      state.felkezesReveal = { playerId, cards: state.hands[playerId].slice() }
+      revealed = true
+    }
   }
 
   state.bidding.currentBidderSeat = getNextBidderSeat(player.seatIndex, state.players.length)
@@ -802,6 +807,21 @@ function _ultiTrumpCount(state, declaration) {
   return five.filter((c) => c.suit === declaration.trumpSuit).length
 }
 
+// Trumps of the ulti's (named) suit in a player's CURRENT félkez 5-card hand —
+// used during bidding to gate the required-ulti credit/reveal (a required ulti
+// only counts with ≤3 trumps). Null if the ulti has no named trump suit.
+function _felkezTrumpCount(state, playerId, declaration) {
+  if (!declaration.trumpSuit) return null
+  return (state.hands[playerId] || []).filter((c) => c.suit === declaration.trumpSuit).length
+}
+
+// Has this player already satisfied their required Ulti earlier in the buli?
+// (Sticky across the buli's hands — once satisfied, later ultis don't re-trigger
+// the credit/reveal.)
+function _ultiRequirementDone(state, playerId) {
+  return !!(state.buli && state.buli.kotelezo[playerId] && state.buli.kotelezo[playerId].ulti)
+}
+
 // A committed FÉLKEZ ulti with <3 trump cards in the 5-card hand pays +10 (+20 red)
 // to the declarer who plays it. Only counts when the bid was won in the 5-card
 // round and the ulti is original (not a hozámondott add-on) — so it never goes to
@@ -815,9 +835,10 @@ function _requiredUltiBonus(state, declaration) {
   return declaration.color === 'red' ? 20 : 10
 }
 
-// Kötelező mondások — record what a player commits to as they declare. Credit is
-// for *saying* it (trump count is irrelevant to credit; it only gates the +10/+20
-// premium on a played ulti). A player's LATEST own bid defines their commitment,
+// Kötelező mondások — record what a player commits to as they declare. Ulti
+// credit requires *saying* it in félkez AND holding ≤3 trump cards (4-5 doesn't
+// satisfy it); the tighter ≤2 gate is only for the +10/+20 premium on a played
+// ulti (_requiredUltiBonus). A player's LATEST own bid defines their commitment,
 // so switching your own bid to something without the ulti drops the ulti (félkez).
 // Being outbid by ANOTHER player doesn't touch your flags → you keep credit.
 // `ultiLocked` (set when you pick your own talon back up in teljes kéz) forfeits
@@ -829,7 +850,12 @@ function _recordKotelezoSaid(state, playerId, declaration) {
   // outbidding someone's félkez ulti in teljes kéz gives the outbidder no credit.
   if (state.bidding.mode !== 'felkezes') return
   const b = state.bidding
-  if (!b.ultiLocked[playerId]) b.saidUlti[playerId] = declaration.scoring.includes('ulti')
+  if (!b.ultiLocked[playerId]) {
+    // A required ulti only counts with ≤3 trump cards in the 5-card hand — 4 or 5
+    // trumps does NOT satisfy the requirement.
+    const trumps = _felkezTrumpCount(state, playerId, declaration)
+    b.saidUlti[playerId] = declaration.scoring.includes('ulti') && trumps !== null && trumps <= 3
+  }
   b.saidBetli[playerId] = declaration.scoring.some((s) => KOTELEZO_BETLI_KEYS.has(s))
 }
 
