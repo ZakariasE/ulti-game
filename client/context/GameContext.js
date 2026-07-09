@@ -85,20 +85,27 @@ const initialState = {
   error: null,
 }
 
-// Build the toast fields for a single bidding-history action (declare/kontra).
-// Passes/robs get no banner (rob is always followed by a declare). `decl` is the
-// standing declaration, needed to label individual-kontra lanes (defender ids).
+// Build the toast fields for a single bidding-history action. Every action gets a
+// banner (declare / pass / rob / kontra), in both the félkez and normal rounds.
+// `decl` is the standing declaration, needed to label individual-kontra lanes.
 function bidActionToast(state, entry, decl) {
   if (!entry) return null
+  const who = nameOf(state, entry.playerId)
   if (entry.action === 'declare') {
-    return { text: `${nameOf(state, entry.playerId)} bemondta: ${entry.label}`, kind: 'contract' }
+    return { text: `${who} bemondta: ${entry.label}`, kind: 'contract' }
+  }
+  if (entry.action === 'pass') {
+    return { text: `${who} passzolt`, kind: 'pass' }
+  }
+  if (entry.action === 'rob') {
+    return { text: `${who} felvette a talont`, kind: 'contract' }
   }
   if (entry.action === 'kontra' && entry.components?.length) {
     const individual = decl && isIndividualKontra(decl)
     const comps = entry.components
       .map((lane) => (individual ? `${componentLabel(decl.scoring[0])} (${nameOf(state, lane)})` : componentLabel(lane)))
       .join(', ')
-    return { text: `${nameOf(state, entry.playerId)} — kontra: ${comps}`, kind: 'kontra' }
+    return { text: `${who} — kontra: ${comps}`, kind: 'kontra' }
   }
   return null
 }

@@ -14,15 +14,15 @@
 }
 
 .toast {
-  padding: 22px 44px;
-  border-radius: 18px;
+  padding: 30px 60px;
+  border-radius: 22px;
   font-weight: 800;
-  font-size: 34px;
-  line-height: 1.15;
+  font-size: 52px;
+  line-height: 1.12;
   letter-spacing: 0.2px;
   color: #fff;
   background: rgba(20, 20, 24, 0.95);
-  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 16px 56px rgba(0, 0, 0, 0.65);
   border: 2px solid rgba(255, 255, 255, 0.18);
   text-align: center;
   animation: flash 1s ease-out forwards;
@@ -38,7 +38,7 @@
 }
 
 @media (max-width: 640px) {
-  .toast { font-size: 24px; padding: 16px 28px; }
+  .toast { font-size: 32px; padding: 20px 34px; }
 }
 
 /* Per-kind accents */
@@ -46,3 +46,4 @@
 .trump    { background: #6a1b9a; }
 .marriage { background: #ad1457; }
 .kontra   { background: #c62828; }
+.pass     { background: #455a64; }
