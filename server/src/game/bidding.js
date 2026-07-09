@@ -123,9 +123,22 @@ function expandDeclaration(baseDecl, addOns, opts = {}) {
 // hozámondott add-on uses ×2. The parti IS included (it counts toward the value,
 // e.g. a félkez Ulti is (4+1)×4 = 20). Ties are broken by component count — see
 // fewerComponents / isHigherDeclaration.
-function effectiveRankValue(decl, felkFactor) {
+//
+// `kontra` (per-lane map, optional) makes the kontra PROTECT the bid: a kontrázott
+// bid must be exceeded including its kontra multiplier, so e.g. a kontrázott red
+// parti (2×4×4 = 32) cannot be taken over by a plain teljes red durchmars (12).
+// Individual-kontra contracts (betli / nt-durchmars) use the common (min) level,
+// matching how the stake is displayed & scored.
+function effectiveRankValue(decl, felkFactor, kontra = null) {
   const hozam = new Set(decl.hozam || [])
-  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color, decl.open) * (hozam.has(c) ? 2 : felkFactor), 0)
+  const individual = kontra && isIndividualKontra(decl)
+  const levels = kontra ? Object.values(kontra).map((k) => (k && k.level) || 1) : []
+  const commonLevel = individual && levels.length ? Math.min(...levels) : 1
+  return decl.scoring.reduce((s, c) => {
+    const mult = hozam.has(c) ? 2 : felkFactor
+    const kl = kontra ? (individual ? commonLevel : ((kontra[c] && kontra[c].level) || 1)) : 1
+    return s + componentBasePoints(c, decl.color, decl.open) * mult * kl
+  }, 0)
 }
 
 function noTrumpDeclaration(key) {

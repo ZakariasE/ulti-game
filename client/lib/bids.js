@@ -142,10 +142,20 @@ export function rankValue(decl) {
 // Effective value-to-beat (mirror of server effectiveRankValue). Original
 // components use `felkFactor` (×4 in the 5-card round, else ×1); hozámondott
 // add-ons use ×2; the parti IS included (a félkez Ulti is (4+1)×4 = 20).
-export function effectiveRankValue(decl, felkFactor = 1) {
+// `kontra` (per-lane map, optional) makes the kontra PROTECT the bid: a kontrázott
+// bid's value-to-beat includes its kontra multiplier (individual-kontra contracts
+// use the common/min level, matching the displayed stake).
+export function effectiveRankValue(decl, felkFactor = 1, kontra = null) {
   if (!decl || decl.invalid) return -1
   const hozam = new Set(decl.hozam || [])
-  return decl.scoring.reduce((s, c) => s + componentBasePoints(c, decl.color, decl.open) * (hozam.has(c) ? 2 : felkFactor), 0)
+  const individual = kontra && isIndividualKontra(decl)
+  const levels = kontra ? Object.values(kontra).map((k) => (k && k.level) || 1) : []
+  const commonLevel = individual && levels.length ? Math.min(...levels) : 1
+  return decl.scoring.reduce((s, c) => {
+    const mult = hozam.has(c) ? 2 : felkFactor
+    const kl = kontra ? (individual ? commonLevel : ((kontra[c] && kontra[c].level) || 1)) : 1
+    return s + componentBasePoints(c, decl.color, decl.open) * mult * kl
+  }, 0)
 }
 
 // Tie-break for equal (effective) value: fewer scoring components ranks higher
@@ -158,10 +168,12 @@ export function fewerComponents(next, current) {
 // `current` (declared in its own round → curFelk)? Mirrors server applyDeclare:
 // compare effective values, then break ties by component count (a pure count —
 // NOT a raw rankValue re-compare, which would be wrong across rounds).
-export function beatsDeclaration(next, nextFelk, current, curFelk) {
+export function beatsDeclaration(next, nextFelk, current, curFelk, curKontra = null) {
   if (!current) return true
   if (!next || next.invalid) return false
-  const curVal = effectiveRankValue(current, curFelk)
+  // The standing bid's kontra protects it (value-to-beat includes it); a fresh
+  // outbid carries no kontra yet, so `next` is compared un-kontrázott.
+  const curVal = effectiveRankValue(current, curFelk, curKontra)
   const newVal = effectiveRankValue(next, nextFelk)
   return newVal > curVal || (newVal === curVal && fewerComponents(next, current))
 }

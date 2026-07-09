@@ -216,7 +216,7 @@ export default function BidPanel({ roomCode }) {
   // The 5-card round requires a named trump suit before a TRUMP bid (no-trump has none).
   const suitReady = isNt || !namedTrump || !!felkTrump
   const candValid = !candidate.invalid && suitReady && discardReady
-  const candHigher = candValid && beatsDeclaration(candidate, myFelk, currentDecl, curFelk)
+  const candHigher = candValid && beatsDeclaration(candidate, myFelk, currentDecl, curFelk, bkontra)
 
   // Picking a trump-only saying leaves no-trump mode; picking any component clears
   // a betli choice.

@@ -157,7 +157,13 @@ excess never affects the buli standing/premium. (`calculateRoundScore` returns
 > any subset** of the standing bid's components, or outbid. That per-component
 > kontra chain is **carried into play** (seeded into `play.kontra`) and can
 > continue there per-component. Alternates defenders → declarer → defenders; an
-> outbid clears it.
+> outbid clears it. **Kontra PROTECTS the standing bid:** the value a rival must
+> beat **includes the standing bid's kontra multiplier**, so a kontrázott red
+> parti (2 × ×4 félkez × ×4 kontra = 32) cannot be taken over by a plain teljes
+> red durchmars (12) or even a terített one (24). A fresh outbid carries no kontra
+> yet, so the new bid is compared un-kontrázott. (`effectiveRankValue(decl,
+> felkFactor, kontra)` folds in the kontra; individual-kontra contracts use the
+> common/min level.)
 >
 > **Multiplier depends on when the kontra is made:** a kontra made while still in
 > the **5-card félkez round quadruples (×4)** the component; a kontra made in
@@ -214,8 +220,10 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
      subset** of the standing bid's components, or **outbid**. A kontra here is
      **×4** per level (vs ×2 in play — see the Kontra section), alternating
      defenders → declarer. The chain is seeded into `play.kontra` and continues in
-     play. Bids compare by **effective value** = `rank × 4 (5-card only)` (kontra
-     does not gate outbidding; an outbid clears it).
+     play. Bids compare by **effective value** = `rank × 4 (5-card only) ×
+     standing kontra` — **kontra protects the standing bid** (a rival must beat
+     its kontra-inflated value); an outbid clears the kontra and the new bid
+     carries none.
    - **Closing:** bidding ends when the current **high bidder (declarer) passes**
      on their own turn — they always get the final say (raise/kontra/pass). Plain:
      declare → pass → pass → declarer passes.

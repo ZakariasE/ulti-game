@@ -240,9 +240,10 @@ function applyDeclare(state, playerId, payload) {
     // Effective value (incl. parti): components × the round's félkez factor (×4
     // in the 5-card round, ×1 in the reopened round), plus any hozámondott add-ons
     // ×2. On a tie, the bid with fewer components wins (pure count — NOT a raw
-    // rankValue re-compare, which would be wrong across rounds). Kontra is
-    // per-component and does not gate outbidding — an outbid clears it.
-    const curVal = effectiveRankValue(current.declaration, _felkezFactor(current.round))
+    // rankValue re-compare, which would be wrong across rounds). Kontra PROTECTS
+    // the standing bid: its value-to-beat includes the kontra multiplier (a fresh
+    // outbid carries no kontra yet, so the new bid is compared un-kontrázott).
+    const curVal = effectiveRankValue(current.declaration, _felkezFactor(current.round), state.bidding.kontra)
     const newVal = effectiveRankValue(declaration, _felkezFactor(state.bidding.mode))
     const beats = newVal > curVal ||
       (newVal === curVal && fewerComponents(declaration, current.declaration))
