@@ -32,6 +32,20 @@ export function isIndividualKontra(decl) {
   return !!decl && (decl.scoring || []).some((k) => INDIVIDUAL_KONTRA_KEYS.has(k))
 }
 
+// Post-trick-1 negotiation: the kontra lanes `party`/`playerId` may raise now — a
+// level>1 lane whose last raise came from the OTHER side (a defender may raise only
+// their own lane in an individual-kontra contract). Mirror of server _negoDueLanes.
+export function kontraNegoLanesFor(declaration, kontra, party, playerId) {
+  const individual = isIndividualKontra(declaration)
+  return Object.entries(kontra || {}).filter(([lane, k]) => {
+    if (!(k.level > 1)) return false
+    if (party === 'declarer') return k.lastParty === 'defenders'
+    if (k.lastParty !== 'declarer') return false
+    if (individual && lane !== playerId) return false
+    return true
+  }).map(([lane]) => lane)
+}
+
 // Per-player net of the individual-kontra side-ledger (sidePairs: "a|b" -> amount
 // a owes b). Positive = that player is owed; negative = they owe.
 export function sideNet(sidePairs, playerId) {

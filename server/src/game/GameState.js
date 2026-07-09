@@ -480,6 +480,8 @@ function _startPlay(state, declarerId, declaration) {
     marriages: {}, // playerId -> [{ suit, value }] announced on that player's first card
     claim: null, // { responses } while a "nincs több ütés" claim is pending
     concede: null, // { stage, responses } while a parti bedobás negotiation is pending
+    kontraNego: null, // { turn, acted } — post-trick-1 rekontra/szubkontra negotiation
+    kontraLocked: false, // once the trick-1 negotiation resolves, kontra is fixed
     declarerFive: (state.felkezesFives && state.felkezesFives[declarerId]) || null, // félkezes 5-card hand
     // The winning bid gets the ×4 félkezes multiplier only if it was declared in
     // the 5-card round; a bid won in the reopened round is a normal (teljes) bid.
@@ -588,6 +590,7 @@ function applyPlayCard(state, playerId, cardId, announcedSuits) {
 }
 
 function _playCardCore(state, playerId, cardId) {
+  if (state.play.kontraNego) throw new Error('Kontra-egyeztetés folyamatban')
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
 
@@ -641,6 +644,10 @@ function applyTrickEnd(state) {
   // Pure Betli / Durchmars end the instant the goal becomes impossible.
   if (_goalFailed(state, winner.playerId)) {
     return { winnerId: winner.playerId, points, roundComplete: true, ...applyRoundEnd(state) }
+  }
+  // After trick 1, any kontra escalation is negotiated before trick 2 begins.
+  if (state.play.trickCount === 1 && _openKontraNego(state)) {
+    return { winnerId: winner.playerId, points, roundComplete: false, kontraNego: true }
   }
   return { winnerId: winner.playerId, points, roundComplete: false }
 }
@@ -750,7 +757,15 @@ function applyRoundEnd(state) {
   state.roundResult = result
   state.phase = 'SCORING'
 
-  if (buliOn && state.buli.handsPlayed >= state.options.buli.handsPerBuli) {
+  // The buli ends when the planned hand count is reached, OR (kötelező games) as
+  // soon as every player has satisfied BOTH required sayings — _markKotelezo above
+  // has already folded this hand's sayings in, so the check is up to date.
+  const kotelezoAllDone = buliOn && state.options.kotelezo.on &&
+    state.players.every((p) => {
+      const k = state.buli.kotelezo[p.id]
+      return k && k.ulti && k.betli
+    })
+  if (buliOn && (state.buli.handsPlayed >= state.options.buli.handsPerBuli || kotelezoAllDone)) {
     _settleBuli(state) // marks buli.over; round:continue will show the buli result
   }
   return { roundResult: result }
@@ -1070,6 +1085,7 @@ function _playLaneOk(state, playerId, lane, party) {
 
 function applyKontra(state, playerId, lanes) {
   if (state.phase !== 'PLAYING') throw new Error('Not in play')
+  if (state.play.kontraNego || state.play.kontraLocked) throw new Error('Kontra már nem léptethető')
   const player = state.players.find((p) => p.id === playerId)
   if (!player) throw new Error('Player not in game')
 
@@ -1087,7 +1103,10 @@ function applyKontra(state, playerId, lanes) {
   for (const lane of list) {
     const k = state.play.kontra[lane]
     if (!k) throw new Error(`Not part of this declaration: ${lane}`)
-    const exp = _kontraExpectation(k.step || 0)
+    // Card-timed kontra is the defenders' INITIAL kontra only (step 0); escalation
+    // is handled by the post-trick-1 negotiation.
+    if ((k.step || 0) !== 0) throw new Error('A rekontra a leosztás kontra-egyeztetésén dől el')
+    const exp = _kontraExpectation(0)
     if (exp.party !== party) throw new Error('Not your side to double this now')
     if (exp.cardNum !== myCardNum) throw new Error('Not the right moment to double')
     if (k.lastParty === party) throw new Error('Waiting for the other side')
@@ -1098,6 +1117,122 @@ function applyKontra(state, playerId, lanes) {
     raised.push(lane)
   }
   return { raised, kontra: state.play.kontra }
+}
+
+// ── Post-trick-1 kontra negotiation ─────────────────────────────────────────────
+// After the first trick (teljes kéz), all kontra ESCALATION is decided in a
+// dedicated turn-based negotiation rather than by card timing: the declarer may
+// rekontra or say "mehet", then the defenders may szubkontra or "mehet", and so on,
+// alternating until a side declines — at which point kontra is locked for the hand
+// and trick 2 begins. The defenders' INITIAL kontra still happens on their 1st card
+// (see eligibleKontra); this negotiation only carries it further.
+
+// The kontra lanes `party`/`playerId` is due to escalate now: a level>1 lane whose
+// last raise came from the OTHER side. For an individual-kontra contract a defender
+// may only escalate their own lane.
+function _negoDueLanes(state, party, playerId) {
+  const individual = isIndividualKontra(state.play.declaration)
+  return Object.entries(state.play.kontra).filter(([lane, k]) => {
+    if (!(k.level > 1)) return false
+    if (party === 'declarer') return k.lastParty === 'defenders'
+    if (k.lastParty !== 'declarer') return false
+    if (individual && lane !== playerId) return false
+    return true
+  }).map(([lane]) => lane)
+}
+
+// Open the negotiation after trick 1 iff there is a kontra to escalate. Start with
+// whichever side is due (declarer first when any lane awaits their rekontra).
+function _openKontraNego(state) {
+  const lanes = Object.values(state.play.kontra)
+  if (!lanes.some((k) => (k.level || 1) > 1)) return false
+  const declarerDue = lanes.some((k) => k.level > 1 && k.lastParty === 'defenders')
+  const defendersDue = lanes.some((k) => k.level > 1 && k.lastParty === 'declarer')
+  const turn = declarerDue ? 'declarer' : (defendersDue ? 'defenders' : null)
+  if (!turn) return false
+  state.play.kontraNego = { turn, acted: {} }
+  return true
+}
+
+// The lanes the given player may raise on their negotiation turn (empty if it is
+// not their turn, or a defender who has already answered this round).
+function kontraNegoOptions(state, playerId) {
+  const nego = state.play && state.play.kontraNego
+  if (!nego) return []
+  const party = playerId === state.play.declarerId ? 'declarer' : 'defenders'
+  if (nego.turn !== party) return []
+  if (party === 'defenders' && nego.acted[playerId]) return []
+  return _negoDueLanes(state, party, playerId)
+}
+
+// Who still needs to act: the declarer on a declarer turn, the not-yet-answered
+// defenders on a defenders turn.
+function kontraNegoPending(state) {
+  const nego = state.play && state.play.kontraNego
+  if (!nego) return []
+  if (nego.turn === 'declarer') return [state.play.declarerId]
+  return state.play.defenderIds.filter((id) => !nego.acted[id])
+}
+
+function _applyNegoRaises(state, lanes, party) {
+  const raised = []
+  for (const lane of lanes) {
+    const k = state.play.kontra[lane]
+    if (!k) continue
+    k.level *= 2 // teljes kéz play kontra doubles
+    k.step = (k.step || 0) + 1
+    k.lastParty = party
+    raised.push(lane)
+  }
+  return raised
+}
+
+function _closeKontraNego(state) {
+  state.play.kontraNego = null
+  state.play.kontraLocked = true // kontra is fixed for the rest of the hand
+  return { resolved: true, kontra: state.play.kontra }
+}
+
+// A player answers the negotiation: `lanes` are the lanes they raise (empty = mehet).
+// Returns { resolved } when the negotiation ends (→ trick 2), { advanced, turn } when
+// it flips to the other side, or { waiting } when the other defender still owes an
+// answer.
+function respondKontraNego(state, playerId, lanes) {
+  const nego = state.play && state.play.kontraNego
+  if (!nego) throw new Error('Nincs folyamatban kontra-egyeztetés')
+  if (playerId !== state.play.declarerId && !state.play.defenderIds.includes(playerId)) {
+    throw new Error('Player not in game')
+  }
+  const party = playerId === state.play.declarerId ? 'declarer' : 'defenders'
+  if (nego.turn !== party) throw new Error('Nem a te köröd')
+  if (party === 'defenders' && nego.acted[playerId]) throw new Error('Már válaszoltál')
+
+  const allowed = new Set(_negoDueLanes(state, party, playerId))
+  const list = (lanes || []).filter((l) => allowed.has(l))
+  if ((lanes || []).some((l) => !allowed.has(l))) throw new Error('Ezt a kontrát most nem léptetheted')
+
+  if (party === 'declarer') {
+    const raised = _applyNegoRaises(state, list, 'declarer')
+    if (!raised.length) return _closeKontraNego(state) // mehet
+    nego.turn = 'defenders'
+    nego.acted = {}
+    return { advanced: true, turn: 'defenders', raised, kontra: state.play.kontra }
+  }
+
+  // Defenders each answer independently; resolve once both have.
+  nego.acted[playerId] = list
+  if (!state.play.defenderIds.every((id) => nego.acted[id])) {
+    return { waiting: true, turn: 'defenders', kontra: state.play.kontra }
+  }
+  const union = []
+  for (const id of state.play.defenderIds) {
+    for (const l of nego.acted[id]) if (!union.includes(l)) union.push(l)
+  }
+  const raised = _applyNegoRaises(state, union, 'defenders')
+  if (!raised.length) return _closeKontraNego(state) // both said mehet
+  nego.turn = 'declarer'
+  nego.acted = {}
+  return { advanced: true, turn: 'declarer', raised, kontra: state.play.kontra }
 }
 
 // Marriages (jelentés) a player may announce right now: only on their own first
@@ -1113,15 +1248,20 @@ function marriageOptionsFor(state, playerId) {
 // their own defender line for an individual-kontra contract).
 function eligibleKontra(state, playerId) {
   if (!state.play || state.phase !== 'PLAYING') return []
+  if (state.play.kontraNego || state.play.kontraLocked) return []
   const player = state.players.find((p) => p.id === playerId)
   const { currentTrick } = state.play
   const expectedSeat = (currentTrick.leaderSeat + currentTrick.cards.length) % state.players.length
   if (!player || player.seatIndex !== expectedSeat) return []
   const party = playerId === state.play.declarerId ? 'declarer' : 'defenders'
   const myCardNum = state.play.cardsPlayed[playerId] + 1
+  // Only the defenders' INITIAL kontra happens during card play (their 1st card,
+  // step 0). Every escalation — rekontra, szubkontra, … — is decided in the
+  // post-trick-1 negotiation instead (see kontraNego), not by card timing.
   return Object.entries(state.play.kontra)
     .filter(([lane, k]) => {
-      const exp = _kontraExpectation(k.step || 0)
+      if ((k.step || 0) !== 0) return false
+      const exp = _kontraExpectation(0)
       return exp.party === party && exp.cardNum === myCardNum && k.lastParty !== party &&
         _playLaneOk(state, playerId, lane, party)
     })
@@ -1197,6 +1337,9 @@ module.exports = {
   applyBidPass,
   applyFirstLead,
   applyKontra,
+  respondKontraNego,
+  kontraNegoOptions,
+  kontraNegoPending,
   applyBiddingKontra,
   biddingKontraOptions,
   applyPlayCard,

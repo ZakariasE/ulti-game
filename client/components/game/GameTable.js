@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { SUIT_NAMES } from '../../lib/cards'
-import { declarationLabel } from '../../lib/bids'
+import { declarationLabel, bidTotalValue } from '../../lib/bids'
 import OpponentArea from './OpponentArea'
 import TrickArea from './TrickArea'
 import TrickPile from './TrickPile'
@@ -13,6 +13,7 @@ import BuliResult from './BuliResult'
 import BuliScoreboard from './BuliScoreboard'
 import Elszamolas from './Elszamolas'
 import KontraBar from './KontraBar'
+import KontraNegoBar from './KontraNegoBar'
 import MarriageBar from './MarriageBar'
 import ClaimBar from './ClaimBar'
 import RevealedHand from './RevealedHand'
@@ -25,7 +26,10 @@ export default function GameTable({ roomCode }) {
   const { state } = useGame()
   const [showElszamolas, setShowElszamolas] = useState(false)
   const { players, myPlayerId, scores, phase, declaration, declarerId, trumpSuit,
-    currentTurnId, lastTrickWinnerId, currentHighBid } = state
+    currentTurnId, lastTrickWinnerId, currentHighBid, felkezesBid, kontra } = state
+  // Running stake of the contract in play, reflecting every per-component kontra
+  // level (kontra / rekontra / szubkontra …). Original félkez components are ×4.
+  const playStake = declaration ? bidTotalValue(declaration, felkezesBid ? 4 : 1, 1, kontra) : 0
   const handCounts = state.handCounts || {}
   const marriagesByPlayer = state.marriagesByPlayer || {}
   // Public jelentés display hides the suit — only the value (20/40) is shown.
@@ -86,6 +90,7 @@ export default function GameTable({ roomCode }) {
             <strong className={styles.goalContract}>{declarationLabel(declaration)}</strong>
             <span className={styles.goalMeta}>
               {trumpSuit ? `adu: ${SUIT_NAMES[trumpSuit]}` : 'adu rejtve'}
+              {' · érték: '}<strong>{playStake}</strong>
               {' · felvevő: '}<strong>{declarerPlayer?.id === myPlayerId ? 'te' : declarerPlayer?.name}</strong>
             </span>
           </span>
@@ -110,6 +115,7 @@ export default function GameTable({ roomCode }) {
       {banner && <div className={`${styles.banner} ${bannerClass}`}>{banner}</div>}
 
       <KontraBar roomCode={roomCode} />
+      <KontraNegoBar roomCode={roomCode} />
       <MarriageBar />
       <ClaimBar roomCode={roomCode} />
       <RevealedHand />

@@ -2,6 +2,7 @@ const rooms = require('../rooms/RoomManager')
 const {
   applyDeal, applyBidDiscard, applyDeclare, applyRob, applyBidPass,
   applyFirstLead, applyKontra, applyBiddingKontra,
+  respondKontraNego, kontraNegoPending,
   applyPlayCard, startClaim, respondClaim, applyConcede,
   startConcede, respondConcede, decideConcede, prepareNextRound,
   startBuli, commitBuliSettlement, buliSnapshot, randomizeSeating, drawInfo,
@@ -168,6 +169,27 @@ function registerHandlers(io, socket) {
     }
   })
 
+  // ── Post-trick-1 kontra negotiation ────────────────────────────────────────
+  // `lanes` are the lanes the player raises (empty = mehet). On resolution the
+  // freeze runs and trick 2 begins; otherwise the turn flips to the other side.
+  socket.on('kontra:nego', ({ roomCode, lanes }) => {
+    try {
+      const state = rooms.getRoom(roomCode)
+      const res = respondKontraNego(state, socket.id, lanes)
+      if (res.raised && res.raised.length) {
+        io.to(roomCode).emit('kontra:updated', { kontra: res.kontra, raised: res.raised, byId: socket.id })
+      }
+      if (res.resolved) {
+        io.to(roomCode).emit('kontra:nego', { turn: null, pending: [], kontra: res.kontra })
+        setTimeout(() => _promptNextTurn(io, roomCode, state), 2000)
+      } else {
+        _emitKontraNego(io, roomCode, state)
+      }
+    } catch (err) {
+      socket.emit('game:error', { message: err.message })
+    }
+  })
+
   // ── Claim: "nincs több ütés" ───────────────────────────────────────────────
 
   socket.on('claim:start', ({ roomCode }) => {
@@ -329,6 +351,7 @@ function _announceResolved(io, roomCode, state, result) {
   io.to(roomCode).emit('bid:resolved', {
     declarerId: result.declarerId,
     declaration: publicDeclaration(result.declaration),
+    felkezesBid: !!state.play.felkezesBid, // drives the play info-bar stake (×4)
   })
   const decl = state.play.declaration
   io.to(result.declarerId).emit('opening:info', {
@@ -388,12 +411,27 @@ function _afterPlay(io, roomCode, state, playerId, result) {
 
     if (result.roundComplete) {
       io.to(roomCode).emit('round:completed', _roundCompleted(state))
+    } else if (result.kontraNego) {
+      // Trick 1 ended with a kontra to escalate — run the negotiation before trick 2.
+      _emitKontraNego(io, roomCode, state)
     } else {
-      setTimeout(() => _promptNextTurn(io, roomCode, state), 1200)
+      // Hold the completed trick on the table so everyone sees all three cards
+      // before the next lead is allowed (2s freeze).
+      setTimeout(() => _promptNextTurn(io, roomCode, state), 2000)
     }
   } else {
     _promptNextTurn(io, roomCode, state)
   }
+}
+
+// Broadcast the current state of the post-trick-1 kontra negotiation. `turn` is
+// null once it has resolved; clients then wait for the next lead.
+function _emitKontraNego(io, roomCode, state) {
+  io.to(roomCode).emit('kontra:nego', {
+    turn: state.play.kontraNego ? state.play.kontraNego.turn : null,
+    pending: kontraNegoPending(state),
+    kontra: state.play.kontra,
+  })
 }
 
 function _promptNextTurn(io, roomCode, state) {

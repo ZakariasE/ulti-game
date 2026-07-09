@@ -95,12 +95,22 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 
 **Payout:** per component — on win each defender pays `base × kontra`; on loss the declarer pays each defender. **A lost Ulti is doubled** (win +N per defender, lose −2N) — `lossMult` in `scoring.js`.
 
-### Kontra (per component, tied to card plays)
+### Kontra (per component)
 
-Each component can be doubled **independently**. Timing follows each player's own card count:
-- A **defender** may Kontra (×2) a component as they play their **1st** card.
-- The **declarer** answers Rekontra (×4) as they play their **2nd** card.
-- Defenders Szubkontra (×8) on their **2nd** cards, and so on — each step only if the previous was made.
+Each component can be doubled **independently**. In teljes kéz (10-card play) the
+timing is:
+- **Initial kontra (×2):** a **defender** may Kontra a component as they play their
+  **1st** card (still card-timed — `eligibleKontra`/`applyKontra`, gated to `step===0`).
+- **Escalation (rekontra, szubkontra, …):** decided in a **post-trick-1
+  negotiation**, NOT by card timing. After the first trick, before the second
+  begins, the **declarer** may Rekontra any subset (or say **Mehet**); then the
+  **defenders** may Szubkontra (each on their own eligible lanes) or Mehet; this
+  alternates until a side says Mehet, at which point **kontra is locked for the
+  rest of the hand** and trick 2 begins. State: `play.kontraNego = { turn, acted }`
+  and `play.kontraLocked`; `respondKontraNego`/`kontraNegoOptions`/`kontraNegoPending`
+  in `GameState.js`; the negotiation only opens if some lane was actually kontrázott
+  (in trick 1 or seeded from bidding). Card play is blocked while it is open.
+  Client: `KontraNegoBar` + `kontra:nego` socket event (`{ lanes }`, empty = Mehet).
 
 You may kontra all components or just individual ones.
 
@@ -122,7 +132,9 @@ excess never affects the buli standing/premium. (`calculateRoundScore` returns
 `sidePairs`; `applyRoundEnd` accumulates it in buli mode.)
 
 > Kontra is **per-component** everywhere. In the base game (and the reopened
-> teljes-kéz round) it happens **during play**, per card-timing. In the **félkezes
+> teljes-kéz round) the **initial** kontra happens **during play** on the defender's
+> 1st card; every **escalation** is handled in the **post-trick-1 negotiation**
+> (see above). In the **félkezes
 > 5-card round** it happens **during bidding**: on your turn you may pass, **kontra
 > any subset** of the standing bid's components, or outbid. That per-component
 > kontra chain is **carried into play** (seeded into `play.kontra`) and can
@@ -227,7 +239,7 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
 
 ### Buli (a "party" of hands)
 
-A chain of `handsPerBuli` hands. Scoring differs:
+A chain of `handsPerBuli` hands (but see the early end below). Scoring differs:
 - Only the **declarer's own RAW** result (one unit, per defender) is tracked per
   hand in `declaredScores` — a won zöld parti in félkezes is **4, not 8**. The
   pairwise ×2 is applied **only at Elszámolás**. Defender results are not
@@ -238,6 +250,11 @@ A chain of `handsPerBuli` hands. Scoring differs:
   required saying can drop to last and lose the premium. **Ties split the
   premium:** a 2-way tie for 1st (or last) splits +premium (−premium) between the
   two; a full 3-way tie pays nothing. Stays zero-sum.
+- **Early auto-end:** in kötelező games the buli **ends as soon as every player has
+  satisfied BOTH required sayings** (`buli.kotelezo[p].ulti && .betli` for all),
+  even if `handsPerBuli` hasn't been reached — it settles at the end of the hand
+  that completes the last outstanding saying (`kotelezoAllDone` in `applyRoundEnd`,
+  checked after `_markKotelezo`).
 - **Settlement is deferred:** `_settleBuli` (at round end) only **computes** the
   premiums/penalties and marks `buli.over` — it does **not** fold them into
   `declaredScores` yet, so the last hand's SCORING screen still shows
@@ -319,8 +336,11 @@ through the all-pairs expansion.
     `respondClaim`, "nincs több ütés").
   - Kontra — per-component in **every mode**, state `{ level, step, lastParty }`
     (`level` = scoring multiplier, `step` = escalation count for timing/naming).
-    Play-time (×2): `eligibleKontra`, `applyKontra`, `_kontraExpectation(step)` (card
-    timing). Félkez 5-card **bidding** (×4): `biddingKontraOptions` (which components
+    Play-time (×2): the **initial** defender kontra is card-timed
+    (`eligibleKontra`/`applyKontra`, gated to `step===0`); all **escalation** is the
+    post-trick-1 negotiation (`_openKontraNego`/`respondKontraNego`/`kontraNegoOptions`/
+    `kontraNegoPending`, `_negoDueLanes`), which sets `play.kontraLocked` on resolve.
+    Félkez 5-card **bidding** (×4): `biddingKontraOptions` (which components
     my side may double now) + `applyBiddingKontra` (turn-based). `_startPlay` seeds
     `play.kontra` from `bidding.kontra`, so the chain continues into play. `scoring.js`
     multiplies by `level`.

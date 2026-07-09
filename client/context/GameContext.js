@@ -53,9 +53,12 @@ const initialState = {
   trumpSuit: null, // revealed at the opening lead
   pendingTrump: null, // declarer's chosen minor trump before leading (normal contracts)
   announcedMarriages: [],
+  felkezesBid: false, // was the winning bid made in the 5-card round (×4)? drives info-bar stake
   kontra: {}, // component -> { level, lastParty }
   kontraOptions: [], // components I may double right now
   pendingKontra: [], // components I've staged to double with my next card
+  kontraNego: null, // { turn:'declarer'|'defenders', pending:[ids] } post-trick-1 negotiation
+  kontraNegoStaged: [], // lanes I've toggled to raise on my negotiation turn
   pendingDiscard: [], // cards staged to discard (combined discard+declare)
   pendingHozam: [], // félkez winner's hozámondás add-on components (POST_DEAL_DISCARD)
   marriageOptions: [], // suits I may announce right now (my first card)
@@ -94,12 +97,15 @@ function resetForNewRound(state) {
     currentHighBid: null,
     declaration: null,
     declarerId: null,
+    felkezesBid: false,
     trumpSuit: null,
     pendingTrump: null,
     announcedMarriages: [],
     kontra: {},
     kontraOptions: [],
     pendingKontra: [],
+    kontraNego: null,
+    kontraNegoStaged: [],
     biddingKontra: {},
     pendingBidKontra: [],
     pendingDiscard: [],
@@ -185,6 +191,7 @@ function gameReducer(state, action) {
         biddingPhase: 'DONE',
         declaration: action.declaration,
         declarerId: action.declarerId,
+        felkezesBid: !!action.felkezesBid,
         trumpSuit: action.declaration?.trumpSuit || null,
         ...announce(
           state,
@@ -281,6 +288,23 @@ function gameReducer(state, action) {
       }
       return { ...state, kontra: action.kontra, ...toast }
     }
+
+    case 'KONTRA_NEGO':
+      // Post-trick-1 negotiation state; turn=null means it resolved (→ trick 2).
+      return {
+        ...state,
+        kontraNego: action.turn ? { turn: action.turn, pending: action.pending || [] } : null,
+        kontra: action.kontra || state.kontra,
+        kontraNegoStaged: [], // clear staged picks whenever the negotiation state changes
+      }
+
+    case 'TOGGLE_KONTRA_NEGO':
+      return {
+        ...state,
+        kontraNegoStaged: state.kontraNegoStaged.includes(action.lane)
+          ? state.kontraNegoStaged.filter((l) => l !== action.lane)
+          : [...state.kontraNegoStaged, action.lane],
+      }
 
     case 'DISMISS_ANNOUNCEMENT':
       return { ...state, announcements: state.announcements.filter((a) => a.id !== action.id) }
@@ -382,6 +406,8 @@ function gameReducer(state, action) {
         claim: null,
         concede: null,
         concedeVote: null,
+        kontraNego: null,
+        kontraNegoStaged: [],
         currentTrick: [],
         readyState: null,
       }

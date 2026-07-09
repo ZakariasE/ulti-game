@@ -36,6 +36,7 @@ export default function GamePage() {
       'declarer:marriages':(d) => dispatch({ type: 'DECLARER_MARRIAGES', ...d }),
       'marriage:announced':(d) => dispatch({ type: 'MARRIAGE_ANNOUNCED', ...d }),
       'kontra:updated':    (d) => dispatch({ type: 'KONTRA_UPDATED', ...d }),
+      'kontra:nego':       (d) => dispatch({ type: 'KONTRA_NEGO', ...d }),
       'declarer:revealed': (d) => dispatch({ type: 'DECLARER_REVEALED', ...d }),
       'felkezes:reveal':   (d) => dispatch({ type: 'FELKEZES_REVEAL', ...d }),
       'claim:pending':     (d) => dispatch({ type: 'CLAIM_PENDING', ...d }),
