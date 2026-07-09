@@ -199,8 +199,15 @@ card in teljes). They live in the same per-lane kontra maps (`bidding.kontra` /
   does not**.
 - **Declaring ellen ulti supersedes csendes ulti** (the same trump-7-last-trick
   event is captured by the ellen_ulti row, so the automatic csendes row is
-  suppressed). Never scored on a concede or a hand that didn't play all 10 tricks;
-  an ellen mondás also disables the quick-félkez-parti shortcut (it must play out).
+  suppressed). An ellen mondás also disables the quick-félkez-parti shortcut (it
+  must play out).
+- **Termination:** on a **concede (bedobás)** the defenders **win** both mondások
+  (at whatever kontra level was reached). On a **claim (nincs több ütés)** the
+  declarer sweeps every remaining trick/card, so ellen ulti **fails** and ellen
+  négy ász **wins only if the defense had already captured all four aces** before
+  the claim — this falls out of the normal card evaluation (`applyClaimAll` fills
+  all 10 tricks to the declarer). A hand that ends early *without* a concede (e.g. a
+  standalone durchmars losing a trick) leaves an ellen mondás unscored.
 - **Escalation ladder** reuses the existing negotiation/bidding kontra machinery: a
   defender declares (level 1, `lastParty:'defenders'`); then at the point the
   declarer would rekontra they may **kontra ellen ulti / kontra ellen négy ász** (or
