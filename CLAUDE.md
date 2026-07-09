@@ -176,7 +176,10 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
      (Makk/Zöld/Tök/Piros) **at declaration** — no hidden trump. Piros = red (×2).
    - **Pre-bid redeal:** if the bidding goes **two full go-arounds with no bid**
      (2n passes), redeal and double the whole-hand value (`redealMultiplier`
-     ×2, compounding; resets when a hand is actually played).
+     ×2, compounding; resets when a hand is actually played). The multiplier is
+     applied **only at scoring** (shown as `×2 (dupla)` / `×4 (négyszeres)` / …
+     in the round-over breakdown) — it is **not** reflected in the bidding
+     display or rank, since it doubles every bid equally.
    - **Per-component bidding-kontra.** On your turn you may **pass**, **kontra any
      subset** of the standing bid's components, or **outbid**. A kontra here is
      **×4** per level (vs ×2 in play — see the Kontra section), alternating
@@ -339,10 +342,14 @@ through the all-pairs expansion.
     `buliSnapshot`, `publicDeclaration`, `handCounts`.
 - **`game/scoring.js`** — `calculateRoundScore({..., felkezesBid, redealMultiplier, ultiBonus})` → `{ components[],
   deltas{pid}, declarerRaw, cardTotal, partiDetail, declarerId, color }`. Per-component
-  `mult = (hozam ? 2 : felkezesBid ? 4 : 1) × redealMultiplier`; `payout = base × kontraLevel ×
-  (hundred?2:1) × mult`; a **lost Ulti** uses `payout × lossMult(2)`; `deltas[declarer] = Σ amount ×
-  nDef`. `ultiBonus>0` adds a flat `ulti_bonus` component (not in `deltas`). Each component carries
-  `mult`/`hozam`/`lossMult` for display. **`declarerRaw = Σ component.delta`** (per-defender total —
+  `mult = (hozam ? 2 : felkezesBid ? 4 : 1)` and a **separate** `redealMult = redealMultiplier`;
+  `payout = base × kontraLevel × (hundred?2:1) × mult × redealMult`; a **lost Ulti** uses `payout ×
+  lossMult(2)`; `deltas[declarer] = Σ amount × nDef`. `ultiBonus>0` adds a flat `ulti_bonus` component
+  (not in `deltas`). Each component carries `mult`/`redealMult`/`hozam`/`lossMult` for display. The
+  **redeal multiplier is kept out of `mult`** so the round-over breakdown can show it as its own
+  labelled term — `×2 (dupla)` / `×4 (négyszeres)` / `×8 (nyolcszoros)` (`redealWord` in
+  `RoundResult.js`). It applies **only at scoring**, never in bidding: the "Jelenlegi bemondás"
+  value and all rank comparisons exclude it (it doubles every bid equally, so ranks never change). **`declarerRaw = Σ component.delta`** (per-defender total —
   what buli tracks, and what the round-over **"Összesen (felvevő)"** row shows — not pairwise `deltas`).
 - **`game/bidding.js`** — declaration build/validate/rank (server mirror of `client/lib/bids.js`).
   `expandDeclaration(baseDecl, addOns)` (hozámondás: rebuild on the same trump, set `hozam`) and

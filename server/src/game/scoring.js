@@ -125,8 +125,9 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     const key = declaration.scoring[0]
     const won = conceded ? false : componentWon(key, ctx)
     const base = componentBasePoints(key, declaration.color, declaration.open)
-    const mult = (felkezesBid ? 4 : 1) * redealMultiplier
-    const baseUnit = base * mult
+    const mult = felkezesBid ? 4 : 1
+    const redealMult = redealMultiplier // shown separately (dupla/négyszeres/…), not folded into mult
+    const baseUnit = base * mult * redealMult
     const levels = defenderIds.map((d) => (kontra[d] && kontra[d].level) || 1)
     const commonLevel = levels.length ? Math.min(...levels) : 1 // shared kontra ⇒ standing
     const sidePairs = {}
@@ -151,7 +152,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     const delta = (won ? baseUnit : -baseUnit) * commonLevel
     const components = [{
       key, label: componentLabel(key), won, basePoints: base,
-      kontraLevel: commonLevel, hundred: false, lossMult: 1, mult, hozam: false,
+      kontraLevel: commonLevel, hundred: false, lossMult: 1, mult, redealMult, hozam: false,
       individual: true, perDefender, delta,
     }]
     return { components, deltas, declarerRaw: delta, cardTotal, partiDetail: null, declarerId, color: declaration.color, sidePairs }
@@ -173,10 +174,13 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     }
     // Per-component multiplier: a hozámondott add-on scores ×2; an original
     // félkez component ×4 (only if the bid was won in the 5-card round); a normal
-    // teljes-kéz component ×1. Redeal doublings apply to the whole hand.
+    // teljes-kéz component ×1. Redeal doublings apply to the whole hand and are
+    // tracked separately (redealMult) so the breakdown can label them (dupla/…) —
+    // they were never part of the bid's rank, only the final score.
     const isHozam = hozamSet.has(key)
-    const mult = (isHozam ? 2 : (felkezesBid ? 4 : 1)) * redealMultiplier
-    const payout = basePoints * kontraLevel * (hundred ? 2 : 1) * mult
+    const mult = isHozam ? 2 : (felkezesBid ? 4 : 1)
+    const redealMult = redealMultiplier
+    const payout = basePoints * kontraLevel * (hundred ? 2 : 1) * mult * redealMult
     // A lost Ulti costs the declarer double (win +N, lose −2N).
     const lossMult = key === 'ulti' ? 2 : 1
     const amount = won ? payout : payout * lossMult
@@ -188,7 +192,7 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
       deltas[declarerId] -= amount * defenderIds.length
       defenderIds.forEach((id) => { deltas[id] += amount })
     }
-    return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, lossMult, mult, hozam: isHozam, delta: won ? amount : -amount }
+    return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, lossMult, mult, redealMult, hozam: isHozam, delta: won ? amount : -amount }
   })
 
   // Kötelező ulti premium (lean-trump <3 in the 5-card hand): a flat declarer

@@ -3,6 +3,11 @@ import { useGame } from '../../context/GameContext'
 import { useSocket } from '../../context/SocketContext'
 import styles from '../../styles/RoundResult.module.css'
 
+// Hungarian word for a redeal multiplier (all-pass félkez redeals double the
+// whole hand's final score — applied only here, never in the bid's rank).
+const REDEAL_WORDS = { 2: 'dupla', 4: 'négyszeres', 8: 'nyolcszoros', 16: 'tizenhatszoros', 32: 'harminckétszeres' }
+const redealWord = (n) => REDEAL_WORDS[n] || `${n}-szeres`
+
 export default function RoundResult({ roomCode }) {
   const { state } = useGame()
   const { emit } = useSocket()
@@ -76,7 +81,7 @@ export default function RoundResult({ roomCode }) {
                 <td>
                   {c.flat
                     ? '—'
-                    : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
+                    : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
                 </td>
                 <td className={`${styles.numCol} ${c.delta >= 0 ? styles.pos : styles.neg}`}>
                   {c.delta >= 0 ? '+' : ''}{c.delta}

@@ -20,7 +20,7 @@ export default function BidPanel({ roomCode }) {
   const { state, dispatch } = useGame()
   const { emit } = useSocket()
   const { currentTurnId, biddingPhase, biddingMode, currentHighBid, myPlayerId, players, options,
-    redealMultiplier, biddingKontra, pendingDiscard, pendingBidKontra, pendingHozam, mandatoryBetli } = state
+    biddingKontra, pendingDiscard, pendingBidKontra, pendingHozam, mandatoryBetli } = state
 
   const [picked, setPicked] = useState([]) // chosen trump components
   const [ntContract, setNtContract] = useState(null) // chosen no-trump contract (exclusive)
@@ -31,10 +31,10 @@ export default function BidPanel({ roomCode }) {
 
   const felkezes = !!options?.felkezes
   const bkontra = biddingKontra || {} // per-component bidding kontra levels
-  const redeal = redealMultiplier || 1
-  // A bid made in the 5-card round is ×4; a bid in the reopened round is ×1.
-  // (redeal doublings apply to the whole hand regardless.)
-  const mult = (biddingMode === 'felkezes' ? 4 : 1) * redeal
+  // A bid made in the 5-card round is ×4; a bid in the reopened round is ×1. Redeal
+  // doublings are NOT shown here — they never affect the bid's rank, only the final
+  // score at the leosztás vége screen (see RoundResult / scoring redealMult).
+  const mult = biddingMode === 'felkezes' ? 4 : 1
   // Only the 5-card félkezes round names the concrete trump at declaration; the
   // reopened round works like the base game (color only, suit at first lead).
   const namedTrump = felkezes && biddingMode === 'felkezes'
@@ -50,7 +50,7 @@ export default function BidPanel({ roomCode }) {
   // félkez round (bkontra), so the displayed worth reflects the real stake.
   const curKontrázva = Object.values(bkontra).some((k) => (k?.level || 1) > 1)
   const highBidText = currentDecl
-    ? `${declarationLabel(currentDecl)} (${bidTotalValue(currentDecl, curFelk, redeal, bkontra)}${curKontrázva ? ', kontrázva' : ''}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
+    ? `${declarationLabel(currentDecl)} (${bidTotalValue(currentDecl, curFelk, 1, bkontra)}${curKontrázva ? ', kontrázva' : ''}) — ${players.find((p) => p.id === currentHighBid.playerId)?.name || '?'}`
     : null
 
   // Per-lane bidding kontra (félkezes 5-card round only): the lanes of the
