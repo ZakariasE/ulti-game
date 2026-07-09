@@ -342,6 +342,24 @@ export default function BidPanel({ roomCode }) {
           {biddingPhase === 'BID' && (
             <button className={styles.btnSecondary} disabled={mustKontra} onClick={() => emit('bid:pass', { roomCode })}>Passz</button>
           )}
+          {/* Per-component bidding kontra (félkez 5-card round): individual chips
+              right next to Bemondom/Passz. Toggle any subset, then Kontrázok. */}
+          {bidKontraOptions.map((lane) => {
+            // Name by step (Kontra/Rekontra/…); a 5-card kontra multiplies ×4.
+            const nextName = kontraLevelName(2 ** ((bkontra[lane]?.step || 0) + 1))
+            return (
+              <button
+                key={lane}
+                className={`${styles.btnKontra} ${staged.includes(lane) ? styles.btnKontraOn : ''}`}
+                onClick={() => toggleBidKontra(lane)}
+              >
+                {nextName} {laneLabel(lane)}
+              </button>
+            )
+          })}
+          {staged.length > 0 && (
+            <button className={styles.btnKontraGo} onClick={commitBidKontra}>Kontrázok ({staged.length})</button>
+          )}
         </div>
         {mustKontra && (
           <p className={styles.hint}><strong>Kötelező kontrázni vagy überelni ezt a betlit</strong> (a bemondó betlije befejezi a kötelező mondását).</p>
@@ -354,33 +372,6 @@ export default function BidPanel({ roomCode }) {
           </p>
         )}
       </div>
-
-      {bidKontraOptions.length > 0 && (
-        <div className={styles.section}>
-          <div className={styles.sectionTitle}>Vagy kontra komponensenként</div>
-          <div className={styles.chips}>
-            {bidKontraOptions.map((lane) => {
-              // Name by step (Kontra/Rekontra/…); a 5-card kontra multiplies ×4.
-              const nextName = kontraLevelName(2 ** ((bkontra[lane]?.step || 0) + 1))
-              return (
-                <button
-                  key={lane}
-                  className={`${styles.chip} ${staged.includes(lane) ? styles.chipOn : ''}`}
-                  onClick={() => toggleBidKontra(lane)}
-                >
-                  {nextName} {laneLabel(lane)} (×4)
-                </button>
-              )
-            })}
-          </div>
-          <div className={styles.actions}>
-            <button className={styles.btnSecondary} disabled={staged.length === 0} onClick={commitBidKontra}>
-              Kontrázok
-            </button>
-          </div>
-          <p className={styles.hint}>A kontra komponensenként külön léptethető; a licit tovább is überelhető.</p>
-        </div>
-      )}
     </div>
   )
 }

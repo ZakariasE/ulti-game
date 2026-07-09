@@ -39,8 +39,34 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
+
+.btnKontra {
+  background: #6d4c41;
+  color: #ffccbc;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.btnKontra:hover:not(:disabled) { background: #8d6e63; }
+
+.btnKontraOn {
+  background: #c62828;
+  color: #fff;
+  outline: 2px solid #ef5350;
+}
+
+.btnKontraGo {
+  background: #c62828;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 8px;
+}
+
+.btnKontraGo:hover { background: #d32f2f; }
 
 .btnPrimary {
   background: #2e7d32;

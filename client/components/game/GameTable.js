@@ -115,7 +115,7 @@ export default function GameTable({ roomCode }) {
       <RevealedHand />
       <FelkezesReveal />
 
-      <TrickArea />
+      {phase !== 'BIDDING' && <TrickArea />}
 
       {phase === 'BIDDING' && <BidPanel roomCode={roomCode} />}
       <TrumpChoice />
