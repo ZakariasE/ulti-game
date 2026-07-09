@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../../context/GameContext'
-import { SUIT_NAMES } from '../../lib/cards'
-import { declarationLabel, bidTotalValue } from '../../lib/bids'
+import { SUIT_NAMES, sortHand } from '../../lib/cards'
+import { declarationLabel, bidTotalValue, declarationMode } from '../../lib/bids'
 import OpponentArea from './OpponentArea'
 import TrickArea from './TrickArea'
 import TrickPile from './TrickPile'
@@ -32,6 +32,10 @@ export default function GameTable({ roomCode }) {
   const playStake = declaration ? bidTotalValue(declaration, felkezesBid ? 4 : 1, 1, kontra) : 0
   const handCounts = state.handCounts || {}
   const marriagesByPlayer = state.marriagesByPlayer || {}
+  // Terített: all hands are revealed after trick 1; show each opponent's cards
+  // (face-up, larger) in place of the card backs, sorted like a hand.
+  const revealedHands = state.revealedHands
+  const revealMode = declarationMode(declaration)
   // Public jelentés display hides the suit — only the value (20/40) is shown.
   const fmtMarriages = (list) => {
     if (!list || !list.length) return ''
@@ -78,6 +82,7 @@ export default function GameTable({ roomCode }) {
             isActive={currentTurnId === opp.id}
             wonTrick={lastTrickWinnerId === opp.id}
             revealable={mySide.includes(opp.id)}
+            revealedCards={revealedHands?.[opp.id] ? sortHand(revealedHands[opp.id], revealMode) : null}
             marriages={fmtMarriages(marriagesByPlayer[opp.id])}
           />
         ))}

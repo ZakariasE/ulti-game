@@ -38,6 +38,7 @@ export default function GamePage() {
       'kontra:updated':    (d) => dispatch({ type: 'KONTRA_UPDATED', ...d }),
       'kontra:nego':       (d) => dispatch({ type: 'KONTRA_NEGO', ...d }),
       'declarer:revealed': (d) => dispatch({ type: 'DECLARER_REVEALED', ...d }),
+      'hands:revealed':    (d) => dispatch({ type: 'HANDS_REVEALED', ...d }),
       'felkezes:reveal':   (d) => dispatch({ type: 'FELKEZES_REVEAL', ...d }),
       'claim:pending':     (d) => dispatch({ type: 'CLAIM_PENDING', ...d }),
       'claim:result':      (d) => dispatch({ type: 'CLAIM_RESULT', ...d }),

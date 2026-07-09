@@ -59,3 +59,19 @@
 .cards > *:first-child {
   margin-left: 0;
 }
+
+/* Terített: face-up cards need to stay readable — less overlap, wrap if needed. */
+.revealed {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 0;
+  max-width: 360px;
+}
+
+.revealed > * {
+  margin-left: -8px;
+}
+
+.revealed > *:first-child {
+  margin-left: 0;
+}

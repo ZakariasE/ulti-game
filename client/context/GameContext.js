@@ -66,6 +66,7 @@ const initialState = {
   marriagesByPlayer: {}, // playerId -> [{suit,value}]
   needsOpeningLead: false,
   revealedHand: null,
+  revealedHands: null, // terített: { playerId -> [cards] } all hands, updated as cards are played
   felkezesReveal: null, // { playerId, cards } — required-ulti 5-card reveal
   claim: null, // { declarerId } while a "nincs több ütés" claim awaits defender votes
   claimVote: null, // this player's own vote ('yes' | 'no') on a pending claim
@@ -135,6 +136,7 @@ function resetForNewRound(state) {
     marriagesByPlayer: {},
     needsOpeningLead: false,
     revealedHand: null,
+    revealedHands: null,
     felkezesReveal: null,
     claim: null,
     claimVote: null,
@@ -369,6 +371,13 @@ function gameReducer(state, action) {
         marriageOptions: [],
         pendingMarriages: [],
         needsOpeningLead: false,
+        // Terített reveal: drop the just-played card from the shown hand.
+        revealedHands: state.revealedHands
+          ? {
+              ...state.revealedHands,
+              [action.playerId]: (state.revealedHands[action.playerId] || []).filter((c) => c.id !== action.card.id),
+            }
+          : state.revealedHands,
       }
 
     case 'TRICK_COMPLETED':
@@ -380,6 +389,9 @@ function gameReducer(state, action) {
 
     case 'DECLARER_REVEALED':
       return { ...state, revealedHand: action.hand }
+
+    case 'HANDS_REVEALED':
+      return { ...state, revealedHands: action.hands || null }
 
     case 'FELKEZES_REVEAL':
       return { ...state, felkezesReveal: action.cards ? { playerId: action.playerId, cards: action.cards } : null }
@@ -438,6 +450,7 @@ function gameReducer(state, action) {
         kontraNego: null,
         kontraNegoStaged: [],
         currentTrick: [],
+        revealedHands: null,
         readyState: null,
       }
 

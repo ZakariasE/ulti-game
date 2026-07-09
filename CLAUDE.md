@@ -62,9 +62,11 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 | 4 Aces (Négy Ász) | 4 | Declarer wins all four aces in tricks |
 | 40-100 | 4 | Card points ≥ 100 incl. an announced 40 (K+O in trump) |
 | 20-100 | 8 | Card points ≥ 100 incl. an announced 20 (K+O non-trump) |
-| Durchmars | 6 | Declarer wins all 10 tricks. **Terített (open)** doubles ONLY the durchmars part (6→12; red 12→24) and reveals the declarer's hand after trick 1 — an `open` flag on the trump declaration (partners in a bundle are not doubled by it). |
+| Durchmars | 6 | Declarer wins all 10 tricks. **Terített (open)** doubles ONLY the durchmars part (6→12; red 12→24) and reveals **every player's hand** after trick 1 — an `open` flag on the trump declaration (partners in a bundle are not doubled by it). |
 
-**No-trump standalone contracts** (flat; cannot combine): Betli 5, Heart Betli 10, Open Betli 20, Durchmars 12, Open Durchmars 24. The no-trump Durchmars has **no color** (no suit). Betli = win zero tricks; Durchmars = win all tricks. "Open" reveals the declarer's hand after trick 1.
+**No-trump standalone contracts** (flat; cannot combine): Betli 5, Heart Betli 10, Open Betli 20, Durchmars 12, Open Durchmars 24. The no-trump Durchmars has **no color** (no suit). Betli = win zero tricks; Durchmars = win all tricks. "Open" reveals **every player's hand** after trick 1.
+
+**Terített reveal (all `open` contracts — terített betli / trump durchmars / no-trump durchmars):** once **trick 1 is complete AND any post-trick-1 kontra negotiation has resolved (Mehet)**, the server emits `hands:revealed { hands: {pid→cards} }` with every player's remaining cards. Clients render each opponent's cards **face-up (larger) in place of the card backs** (`OpponentArea`, `revealedHands` in `GameContext`) and **strip each played card** as `card:played` arrives. `_revealAllHands` (gated to `declaration.open` + `trickCount===1`) in `handlers.js`, called from both the no-kontra `_afterPlay` path and the `kontra:nego` resolution. In the bid UI, **Terített durchmars is its own button** (selects durchmars + terített; color row still picks trump/piros/Színtelen).
 
 **Early termination:** a pure Betli or a pure Durchmars (trump or no-trump) ends the **instant its goal becomes impossible** — Betli the moment the declarer wins a trick, Durchmars the moment a defender wins one — and is scored as a loss without playing out the remaining tricks. (A Durchmars combined with other trump components plays on.)
 
@@ -254,7 +256,7 @@ normal Parti = 4, red = 8); a bid won in the reopened round is a **normal** bid.
      per-component kontrázható in play (×2). Always on in félkez; no toggle. The
      **durchmars add-on may be terített** (`hozamOpen` on `bid:discard` →
      `expandDeclaration(base, addOns, { open })`): it then doubles the durchmars
-     part (6→12) and reveals the hand after trick 1.
+     part (6→12) and reveals every hand after trick 1 (terített reveal, above).
      (`expandDeclaration`/`effectiveRankValue` in `bidding.js`; `declaration.hozam`
      lists the add-ons.)
 5. **Play.** Kontra is **per-component** (exactly like the base game): a defender
@@ -422,6 +424,7 @@ through the all-pairs expansion.
   `concede:start`/`concede:respond` (`{choice:'ok'|'hundred'}`)/`concede:decide` (`{playOn}`) — parti bedobás negotiation, `round:continue`, `buli:next`.
 - **server→client:** `room:created/joined`, `game:started`, `hand:dealt`, `talon:held`,
   `bid:state`, `bid:resolved`, `felkezes:redeal/reveal/playkontra`, `declarer:trump/marriages/revealed`,
+  `hands:revealed` (`{hands:{pid→cards}}` — terített all-hand reveal after trick 1),
   `marriage:announced`, `kontra:updated`, `opening:info` (declarer only), `play:turnStart`,
   `card:played`, `trick:completed`, `round:completed`, `buli:completed`, `round:ready`, `claim:pending/result`,
   `concede:pending` (`{stage:'defenders'|'declarer'}`)/`concede:cancelled` (parti bedobás negotiation), `game:error`/`room:error`.

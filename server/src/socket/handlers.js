@@ -181,6 +181,8 @@ function registerHandlers(io, socket) {
       }
       if (res.resolved) {
         io.to(roomCode).emit('kontra:nego', { turn: null, pending: [], kontra: res.kontra })
+        // Terített: reveal every hand now the post-trick-1 kontra is settled (Mehet).
+        _revealAllHands(io, roomCode, state)
         setTimeout(() => _promptNextTurn(io, roomCode, state), 2000)
       } else {
         _emitKontraNego(io, roomCode, state)
@@ -407,19 +409,15 @@ function _afterPlay(io, roomCode, state, playerId, result) {
       cards: lastTrick.cards,
     })
 
-    if (state.play.declaration.open && state.play.trickCount === 1) {
-      io.to(roomCode).emit('declarer:revealed', {
-        declarerId: state.play.declarerId,
-        hand: state.hands[state.play.declarerId],
-      })
-    }
-
     if (result.roundComplete) {
       io.to(roomCode).emit('round:completed', _roundCompleted(state))
     } else if (result.kontraNego) {
-      // Trick 1 ended with a kontra to escalate — run the negotiation before trick 2.
+      // Trick 1 ended with a kontra to escalate — run the negotiation before trick
+      // 2. The terített reveal waits until the negotiation resolves (see kontra:nego).
       _emitKontraNego(io, roomCode, state)
     } else {
+      // Terített: after trick 1 (no kontra to negotiate) every hand is revealed.
+      _revealAllHands(io, roomCode, state)
       // Hold the completed trick on the table so everyone sees all three cards
       // before the next lead is allowed (2s freeze).
       setTimeout(() => _promptNextTurn(io, roomCode, state), 2000)
@@ -427,6 +425,17 @@ function _afterPlay(io, roomCode, state, playerId, result) {
   } else {
     _promptNextTurn(io, roomCode, state)
   }
+}
+
+// Terített (open) contracts: once trick 1 is done (and any post-trick-1 kontra is
+// settled) every player's remaining hand is shown to everyone. Emitted once at
+// trick 1; clients then strip each played card as card:played arrives.
+function _revealAllHands(io, roomCode, state) {
+  if (!state.play || !state.play.declaration || !state.play.declaration.open) return
+  if (state.play.trickCount !== 1) return
+  const hands = {}
+  for (const p of state.players) hands[p.id] = state.hands[p.id]
+  io.to(roomCode).emit('hands:revealed', { hands })
 }
 
 // Broadcast the current state of the post-trick-1 kontra negotiation. `turn` is

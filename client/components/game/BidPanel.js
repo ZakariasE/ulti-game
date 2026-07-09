@@ -234,6 +234,17 @@ export default function BidPanel({ roomCode }) {
     setOpen(false)
     setFelkTrump(null)
   }
+  // Terített durchmars contract button: toggle terített + ensure durchmars is
+  // among the picks (so it works without pre-selecting the durchmars chip).
+  function toggleTeritett() {
+    setNtContract(null)
+    if (openNow) {
+      setOpen(false)
+    } else {
+      setOpen(true)
+      setPicked((prev) => (prev.includes('durchmars') ? prev : [...prev, 'durchmars']))
+    }
+  }
   // Choosing a color/suit; Színtelen (no-trump) clears trump-only sayings + betli.
   function chooseColor(c) {
     setColor(c)
@@ -294,6 +305,14 @@ export default function BidPanel({ roomCode }) {
               {NO_TRUMP_CONTRACTS[key].label}
             </button>
           ))}
+          {/* Terített durchmars is its own contract button: it selects durchmars +
+              terített in one. The color row still picks trump / piros / Színtelen. */}
+          <button
+            className={`${styles.chip} ${openNow ? styles.chipOn : ''}`}
+            onClick={toggleTeritett}
+          >
+            Terített durchmars (×2)
+          </button>
         </div>
         {/* Color / trump suit + Színtelen (no-trump). Hidden for a betli contract. */}
         {!isNt && (namedTrump ? (
@@ -316,16 +335,6 @@ export default function BidPanel({ roomCode }) {
             <button className={`${styles.chip} ${color === 'notrump' ? styles.chipOn : ''}`} onClick={() => chooseColor('notrump')}>Színtelen</button>
           </div>
         ))}
-        {canOpen && (
-          <div className={styles.colorRow}>
-            <button
-              className={`${styles.chip} ${openNow ? styles.chipOn : ''}`}
-              onClick={() => setOpen((v) => !v)}
-            >
-              Terített durchmars (×2)
-            </button>
-          </div>
-        )}
         <div className={styles.preview}>
           {candidate.invalid
             ? <span className={styles.invalid}>{candidate.error}</span>
