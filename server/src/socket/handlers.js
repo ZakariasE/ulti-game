@@ -237,8 +237,13 @@ function registerHandlers(io, socket) {
   socket.on('concede:start', ({ roomCode }) => {
     try {
       const state = rooms.getRoom(roomCode)
-      const { stage } = startConcede(state, socket.id)
-      io.to(roomCode).emit('concede:pending', { stage, declarerId: socket.id })
+      const res = startConcede(state, socket.id)
+      if (res.resolved) {
+        // Bedobás before any card was played — immediate loss, no negotiation.
+        io.to(roomCode).emit('round:completed', _roundCompleted(state))
+      } else {
+        io.to(roomCode).emit('concede:pending', { stage: res.stage, declarerId: socket.id })
+      }
     } catch (err) {
       socket.emit('game:error', { message: err.message })
     }

@@ -1060,6 +1060,12 @@ function applyConcede(state, playerId, hundred) {
 function startConcede(state, playerId) {
   if (state.phase !== 'PLAYING') throw new Error('Not in play')
   if (playerId !== state.play.declarerId) throw new Error('Only the declarer can concede')
+  // Before any card is played there is nothing to negotiate — the declarer simply
+  // throws in and loses (no rendben / csak százzal cycle). The negotiation only
+  // matters once play has begun.
+  if (!state.play.openingLeadDone) {
+    return { resolved: true, ...applyConcede(state, state.play.declarerId, false) }
+  }
   state.play.concede = { stage: 'defenders', responses: {} }
   return { stage: 'defenders' }
 }

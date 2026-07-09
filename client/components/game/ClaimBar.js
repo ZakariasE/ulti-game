@@ -110,13 +110,17 @@ export default function ClaimBar({ roomCode }) {
     currentTrick.length === 0 && completedTricks.length >= 1 && completedTricks.length < 10
 
   // Bedobás is available any time the declarer is at play (even before the
-  // opening lead). Parti contracts open the negotiation; others concede at once.
+  // opening lead). Parti contracts open the negotiation — BUT only once play has
+  // begun; before any card is played the declarer just throws in and loses (no
+  // rendben / csak százzal cycle). Others always concede at once.
+  const beforeAnyCard = completedTricks.length === 0 && currentTrick.length === 0
+  const negotiate = declaration.hasParti && !beforeAnyCard
   const startBedobas = () => {
-    if (declaration.hasParti) emit('concede:start', { roomCode })
+    if (negotiate) emit('concede:start', { roomCode })
     else emit('play:concede', { roomCode, hundred: false })
     setConfirming(false)
   }
-  const confirmText = declaration.hasParti
+  const confirmText = negotiate
     ? 'Biztosan bedobod? Az ellenfelek döntenek, hogy százzal számoljon-e.'
     : 'Biztosan bedobod? Elveszíted a leosztást.'
 
