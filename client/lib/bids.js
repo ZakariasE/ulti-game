@@ -185,13 +185,18 @@ export function isHigherDeclaration(next, current) {
   return fewerComponents(next, current)
 }
 
+const SUIT_LABEL = { makk: 'Makk', zold: 'Zöld', tok: 'Tök', piros: 'Piros' }
 export function declarationLabel(decl) {
   if (!decl || decl.invalid) return '—'
   if (decl.isNoTrump) return componentLabel(decl.components[0])
   const base = decl.components
     .map((c) => (decl.open && c === 'durchmars' ? `Terített ${componentLabel(c).toLowerCase()}` : componentLabel(c)))
     .join(' + ')
-  return decl.color === 'red' ? `${base} (piros)` : base
+  if (decl.color === 'red') return `${base} (piros)`
+  // Include the concrete trump suit when public (named upfront in félkez, or
+  // revealed after the opening lead); hidden-trump normal bids have trumpSuit null.
+  if (decl.trumpSuit) return `${base} (${SUIT_LABEL[decl.trumpSuit] || decl.trumpSuit})`
+  return base
 }
 
 export function declarationMode(decl) {

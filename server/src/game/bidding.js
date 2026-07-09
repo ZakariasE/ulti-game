@@ -195,13 +195,19 @@ function isHigherDeclaration(next, current) {
   return fewerComponents(next, current)
 }
 
-// A short human label for a declaration, e.g. "Ulti + 40-100 (red)".
+// A short human label for a declaration, e.g. "Ulti + 40-100 (piros)".
+const SUIT_LABEL = { makk: 'Makk', zold: 'Zöld', tok: 'Tök', piros: 'Piros' }
 function declarationLabel(decl) {
   if (decl.isNoTrump) return componentLabel(decl.components[0])
   // Terített (open) trump durchmars is shown as "Terített durchmars".
   const parts = decl.components.map((c) => (decl.open && c === 'durchmars' ? `Terített ${componentLabel(c).toLowerCase()}` : componentLabel(c)))
   const base = parts.join(' + ')
-  return decl.color === 'red' ? `${base} (piros)` : base
+  if (decl.color === 'red') return `${base} (piros)`
+  // Include the concrete trump suit when it is public: named upfront in félkez, or
+  // revealed after the opening lead in teljes. Hidden-trump normal bids have
+  // trumpSuit null (chosen at the lead) → no suit shown.
+  if (decl.trumpSuit) return `${base} (${SUIT_LABEL[decl.trumpSuit] || decl.trumpSuit})`
+  return base
 }
 
 function getInitialBidderSeat(dealerSeat, numPlayers) {
