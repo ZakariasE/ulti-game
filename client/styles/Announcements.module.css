@@ -25,15 +25,15 @@
   box-shadow: 0 16px 56px rgba(0, 0, 0, 0.65);
   border: 2px solid rgba(255, 255, 255, 0.18);
   text-align: center;
-  animation: flash 2s ease-out forwards;
+  animation: flash 3s ease-out forwards;
 }
 
-/* Pop in fast, hold, then fade at the end — the whole life is ~2s (DISPLAY_MS). */
+/* Pop in fast, hold, then fade at the end — the whole life is ~3s (DISPLAY_MS). */
 @keyframes flash {
   0%   { opacity: 0; transform: translateY(-14px) scale(0.9); }
-  6%   { opacity: 1; transform: translateY(0) scale(1.04); }
-  11%  { transform: translateY(0) scale(1); }
-  85%  { opacity: 1; }
+  4%   { opacity: 1; transform: translateY(0) scale(1.04); }
+  8%   { transform: translateY(0) scale(1); }
+  88%  { opacity: 1; }
   100% { opacity: 0; transform: scale(0.98); }
 }
 
