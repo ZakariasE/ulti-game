@@ -12,8 +12,8 @@
   background: #2d5a3d;
   border-radius: 14px;
   padding: 28px;
-  max-width: 400px;
-  width: 90%;
+  max-width: 520px;
+  width: 92%;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -38,6 +38,8 @@
 }
 
 .scoreTable th { color: #aaa; font-weight: normal; }
+
+.numCol { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .totalRow td {
   font-weight: 700;

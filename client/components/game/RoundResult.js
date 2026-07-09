@@ -54,7 +54,7 @@ export default function RoundResult({ roomCode }) {
 
         <table className={styles.scoreTable}>
           <thead>
-            <tr><th>Bemondás</th><th>Eredmény</th><th>Tét</th></tr>
+            <tr><th>Bemondás</th><th>Eredmény</th><th>Tét</th><th className={styles.numCol}>Érték</th></tr>
           </thead>
           <tbody>
             {roundResult.components.map((c) => (
@@ -75,22 +75,26 @@ export default function RoundResult({ roomCode }) {
                 </td>
                 <td>
                   {c.flat
-                    ? `+${c.delta}`
+                    ? '—'
                     : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
+                </td>
+                <td className={`${styles.numCol} ${c.delta >= 0 ? styles.pos : styles.neg}`}>
+                  {c.delta >= 0 ? '+' : ''}{c.delta}
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             {(() => {
-              // Per-defender total (the sum of the Tét column) — NOT the pairwise
+              // Per-defender total (the sum of the Érték column) — NOT the pairwise
               // amount. The per-player table below shows the actual balance change.
               const net = roundResult.declarerRaw || 0
               return (
                 <tr className={styles.totalRow}>
                   <td>Összesen (felvevő)</td>
                   <td className={net >= 0 ? styles.win : styles.loss}>{net >= 0 ? 'nyert' : 'vesztett'}</td>
-                  <td className={net >= 0 ? styles.pos : styles.neg}>{net >= 0 ? '+' : ''}{net}</td>
+                  <td></td>
+                  <td className={`${styles.numCol} ${net >= 0 ? styles.pos : styles.neg}`}>{net >= 0 ? '+' : ''}{net}</td>
                 </tr>
               )
             })()}
