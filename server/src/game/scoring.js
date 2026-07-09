@@ -57,6 +57,32 @@ function marriagePoints(marriages, ids, eligible) {
   return ids.reduce((sum, id) => sum + (marriages[id] || []).reduce((s, m) => s + m.value, 0), 0)
 }
 
+// Csendes ulti (silent ulti): in a trump contract that did NOT declare ulti, if the
+// trump 7 is played in the LAST trick, that is an "attempt". It succeeds if that 7
+// wins the last trick (worth half a declared ulti) and is defeated if a higher trump
+// beats it (pays double, like a lost declared ulti). Either the declarer or a
+// defender may attempt; scoring is always declarer-vs-defenders.
+//   value = ulti base incl. red doubling (4 / 8) × (félkez ? 1 : 0.5) × redealMult
+// declarer ledger: attempt succeeds → +value if the attacker was the declarer, −value
+// if a defender; a defeated attempt flips and doubles it.
+function _csendesUlti({ declaration, declarerId, completedTricks, felkezesBid, redealMultiplier, conceded }) {
+  if (conceded) return null
+  const trumpSuit = declaration.trumpSuit
+  if (!trumpSuit) return null // no-trump contracts (betli / nt-durchmars) can't have it
+  if (declaration.scoring.includes('ulti')) return null // a declared ulti, not silent
+  if (completedTricks.length !== 10) return null // needs the real last trick
+  const last = completedTricks[9]
+  const seven = last.cards.find((c) => c.card.suit === trumpSuit && c.card.rank === '7')
+  if (!seven) return null // the trump 7 was not played in the last trick → no attempt
+  const attempterIsDeclarer = seven.playerId === declarerId
+  const success = last.winnerId === seven.playerId // the 7 won ⇒ silent ulti made
+  const base = componentBasePoints('ulti', declaration.color) // 4, or 8 in red
+  const baseUnit = base * (felkezesBid ? 1 : 0.5) // félkez halves the hozám-ulti (8/16); teljes halves 4/8
+  const amount = baseUnit * (redealMultiplier || 1) * (success ? 1 : 2) // defeated ⇒ ×2
+  const won = attempterIsDeclarer === success // declarer's ledger direction
+  return { won, amount, baseUnit, success, attempterIsDeclarer }
+}
+
 // Returns { components:[{key,label,won,basePoints,kontraLevel,delta}], deltas, cardTotal }
 function calculateRoundScore({ declaration, declarerId, defenderIds,
                                completedTricks, talon, declarerPoints, kontra = {}, marriages = {},
@@ -194,6 +220,28 @@ function calculateRoundScore({ declaration, declarerId, defenderIds,
     }
     return { key, label: componentLabel(key), won, basePoints, kontraLevel, hundred, lossMult, mult, redealMult, hozam: isHozam, delta: won ? amount : -amount }
   })
+
+  // Csendes ulti (silent ulti) — only when the trump 7 was played in the last
+  // trick. An extra declarer-vs-defenders row: declarer wins/pays the (halved) ulti
+  // value, doubled on a defeated attempt (see _csendesUlti).
+  const csendes = _csendesUlti({ declaration, declarerId, completedTricks, felkezesBid, redealMultiplier, conceded })
+  if (csendes) {
+    const { won, amount, baseUnit, success } = csendes
+    if (won) {
+      deltas[declarerId] += amount * defenderIds.length
+      defenderIds.forEach((id) => { deltas[id] -= amount })
+    } else {
+      deltas[declarerId] -= amount * defenderIds.length
+      defenderIds.forEach((id) => { deltas[id] += amount })
+    }
+    components.push({
+      key: 'csendes_ulti',
+      label: success ? 'Csendes ulti' : 'Elbukott csendes ulti',
+      won, basePoints: baseUnit, kontraLevel: 1, hundred: false, mult: 1, hozam: false,
+      redealMult: redealMultiplier, lossMult: success ? 1 : 2,
+      csendes: true, attemptFailed: !success, delta: won ? amount : -amount,
+    })
+  }
 
   // Kötelező ulti premium (lean-trump <3 in the 5-card hand): a flat declarer
   // bonus (+10, +20 red), shown as its own row. It is NOT a pairwise defender

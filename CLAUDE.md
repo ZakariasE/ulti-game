@@ -95,6 +95,24 @@ A bid is a **declaration**: a set of scoring components plus a **color** (Normal
 
 **Payout:** per component — on win each defender pays `base × kontra`; on loss the declarer pays each defender. **A lost Ulti is doubled** (win +N per defender, lose −2N) — `lossMult` in `scoring.js`.
 
+**Csendes ulti (silent ulti):** in a **trump contract that did NOT declare ulti**
+(parti / 40-100 / négy ász / 20-100 / trump durchmars — anything with a trumpSuit
+and no `ulti` component), the **trump 7 winning the last trick** scores a silent
+ulti — **half** a declared ulti's value — even though it was never announced.
+**Either the declarer or a defender** may attempt it; the row is **always scored
+declarer-vs-defenders** (declarer wins or pays). An **attempt** = the trump 7 is
+played **in the last (10th) trick specifically**; it's **defeated** if a higher
+trump beats it there (even the attacker's own teammate beating them counts), and a
+defeated attempt **pays double** (like a lost ulti). Value = ulti base incl. red
+doubling (**4 / 8**) × **0.5 if the bid was won in teljes kéz** (→ 2 / 4) or **×1 if
+won in félkez** with or without hozám (→ 4 / 8, half the hozám-ulti's 8/16) × redeal.
+Declarer ledger: own 7 wins → **+value**; own 7 beaten → **−2×value**; a defender's
+7 wins → **−value**; a defender's 7 beaten → **+2×value**. Only scored when all 10
+tricks were played (incl. via a claim, which already puts the declarer's 7 last).
+Shown as its own breakdown row (`csendes_ulti`, label **Csendes ulti** on success /
+**Elbukott csendes ulti** on a defeated attempt). `_csendesUlti` in `scoring.js`; no
+kontra applies (it was never declared).
+
 ### Kontra (per component)
 
 Each component can be doubled **independently**. In teljes kéz (10-card play) the

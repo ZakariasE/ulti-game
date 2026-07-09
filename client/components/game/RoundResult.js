@@ -81,7 +81,12 @@ export default function RoundResult({ roomCode }) {
                 <td>
                   {c.flat
                     ? '—'
-                    : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
+                    : c.csendes
+                      // Csendes doubles on a DEFEATED attempt, which can coincide with a
+                      // declarer win (a defender's failed attempt) — so show ×2 (bukó)
+                      // whenever the attempt failed, not only on a declarer loss.
+                      ? <>{c.basePoints}{c.attemptFailed ? ' ×2 (bukó)' : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}</>
+                      : <>{c.basePoints}{c.kontraLevel > 1 ? ` ×${c.kontraLevel}` : ''}{c.hundred ? ' ×2 (100)' : ''}{c.mult > 1 ? ` ×${c.mult}` : ''}{c.redealMult > 1 ? ` ×${c.redealMult} (${redealWord(c.redealMult)})` : ''}{!c.won && c.lossMult > 1 ? ` ×${c.lossMult} (bukó)` : ''}</>}
                 </td>
                 <td className={`${styles.numCol} ${c.delta >= 0 ? styles.pos : styles.neg}`}>
                   {c.delta >= 0 ? '+' : ''}{c.delta}
