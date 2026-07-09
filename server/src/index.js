@@ -18,6 +18,9 @@ const corsOrigin = process.env.CLIENT_URL
       }
     }
 
+// Health check — Render (and other hosts) ping this to confirm the server is up.
+app.get('/', (req, res) => res.status(200).send('Ulti server OK'))
+
 const io = new Server(server, {
   cors: {
     origin: corsOrigin,
