@@ -32,8 +32,6 @@
 .popover {
   position: absolute;
   z-index: 60;
-  bottom: 100%;
-  margin-bottom: 8px;
   background: #1f3d2a;
   border: 1px solid rgba(255,255,255,0.25);
   border-radius: 10px;
@@ -47,6 +45,11 @@
 .center { left: 50%; transform: translateX(-50%); }
 .left { left: 0; }
 .right { right: 0; }
+
+/* Own pile (bottom of screen) opens upward; opponent piles (top) drop down so the
+ * popover can't float off the top of the viewport. */
+.up { bottom: 100%; margin-bottom: 8px; }
+.down { top: 100%; margin-top: 8px; }
 
 .popTitle {
   font-size: 11px;

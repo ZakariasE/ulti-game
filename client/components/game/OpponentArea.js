@@ -19,7 +19,7 @@ export default function OpponentArea({ player, cardCount, score, isDeclarer, isA
         ))}
       </div>
       {wonTrick && <div className={styles.wonLabel}>vitte az ütést</div>}
-      <TrickPile ownerId={player.id} revealable={revealable} align="center" />
+      <TrickPile ownerId={player.id} revealable={revealable} align="center" drop="down" />
     </div>
   )
 }

@@ -5,7 +5,7 @@ import styles from '../../styles/TrickPile.module.css'
 
 // A little stack of won tricks shown in front of a player. Hovering reveals the
 // captured cards grouped by trick — but only for piles on the viewer's side.
-export default function TrickPile({ ownerId, revealable, align = 'center' }) {
+export default function TrickPile({ ownerId, revealable, align = 'center', drop = 'up' }) {
   const { state } = useGame()
   const [open, setOpen] = useState(false)
 
@@ -30,7 +30,7 @@ export default function TrickPile({ ownerId, revealable, align = 'center' }) {
       <div className={styles.count}>{tricks.length} ütés</div>
 
       {open && revealable && (
-        <div className={`${styles.popover} ${styles[align]}`}>
+        <div className={`${styles.popover} ${styles[align]} ${styles[drop]}`}>
           <div className={styles.popTitle}>Megnyert ütések</div>
           <div className={styles.groups}>
             {tricks.map((t) => (
