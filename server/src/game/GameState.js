@@ -1297,6 +1297,10 @@ function biddingSnapshot(state) {
     redealMultiplier: state.redealMultiplier || 1,
     kontra: b.kontra || {}, // per-lane bidding kontra (client derives eligible options)
     mandatoryBetli: !!b.mandatoryBetli, // defenders must kontra/outbid this betli
+    // Latest bidding action + a monotonic length so clients can flash a banner
+    // for each declare/kontra exactly once (dedup on historyLen).
+    historyLen: b.history.length,
+    lastAction: b.history.length ? b.history[b.history.length - 1] : null,
     currentHighBid: b.currentHighBid
       ? { playerId: b.currentHighBid.playerId, round: b.currentHighBid.round, declaration: publicDeclaration(b.currentHighBid.declaration) }
       : null,

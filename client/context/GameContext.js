@@ -80,7 +80,26 @@ const initialState = {
   readyState: null,
   announcements: [], // transient toasts: [{ id, text, kind }]
   announceSeq: 0,
+  lastBidSeq: 0, // bidding.history length already flashed (dedup for per-bid banners)
   error: null,
+}
+
+// Build the toast fields for a single bidding-history action (declare/kontra).
+// Passes/robs get no banner (rob is always followed by a declare). `decl` is the
+// standing declaration, needed to label individual-kontra lanes (defender ids).
+function bidActionToast(state, entry, decl) {
+  if (!entry) return null
+  if (entry.action === 'declare') {
+    return { text: `${nameOf(state, entry.playerId)} bemondta: ${entry.label}`, kind: 'contract' }
+  }
+  if (entry.action === 'kontra' && entry.components?.length) {
+    const individual = decl && isIndividualKontra(decl)
+    const comps = entry.components
+      .map((lane) => (individual ? `${componentLabel(decl.scoring[0])} (${nameOf(state, lane)})` : componentLabel(lane)))
+      .join(', ')
+    return { text: `${nameOf(state, entry.playerId)} — kontra: ${comps}`, kind: 'kontra' }
+  }
+  return null
 }
 
 function resetForNewRound(state) {
@@ -106,6 +125,7 @@ function resetForNewRound(state) {
     pendingKontra: [],
     kontraNego: null,
     kontraNegoStaged: [],
+    lastBidSeq: 0,
     biddingKontra: {},
     pendingBidKontra: [],
     pendingDiscard: [],
@@ -164,9 +184,17 @@ function gameReducer(state, action) {
     case 'TALON_HELD':
       return { ...state, talonCardIds: action.cardIds || [] }
 
-    case 'BID_STATE':
+    case 'BID_STATE': {
+      // Flash a banner for each new bidding action (declare/kontra) exactly once.
+      let bidToast = {}
+      if (action.historyLen > state.lastBidSeq) {
+        const t = bidActionToast(state, action.lastAction, action.currentHighBid?.declaration)
+        if (t) bidToast = announce(state, t.text, t.kind)
+      }
       return {
         ...state,
+        ...bidToast,
+        lastBidSeq: action.historyLen ?? state.lastBidSeq,
         currentTurnId: action.currentBidderId,
         biddingPhase: action.phase,
         biddingMode: action.mode || state.biddingMode,
@@ -180,6 +208,7 @@ function gameReducer(state, action) {
         pendingHozam: action.phase === 'POST_DEAL_DISCARD' ? state.pendingHozam : [],
         handCounts: action.handCounts || state.handCounts,
       }
+    }
 
     case 'FELKEZES_REDEAL':
       return { ...state, felkezesReveal: null, ...announce(state, `Új osztás — a lap értéke most ×${action.multiplier}`, 'contract') }

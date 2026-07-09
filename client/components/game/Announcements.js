@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useGame } from '../../context/GameContext'
 import styles from '../../styles/Announcements.module.css'
 
-const DISPLAY_MS = 4500
+const DISPLAY_MS = 1000
 
 // Auto-dismiss a single toast after DISPLAY_MS.
 function Toast({ id, text, kind }) {
