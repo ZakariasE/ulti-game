@@ -38,7 +38,7 @@ export default function TrickPile({ ownerId, revealable, align = 'center' }) {
                 <div className={styles.groupLabel}>#{t.num}</div>
                 <div className={styles.groupCards}>
                   {t.cards.map((c) => (
-                    <CardComponent key={c.card.id} card={c.card} />
+                    <CardComponent key={c.card.id} card={c.card} size="large" />
                   ))}
                 </div>
               </div>

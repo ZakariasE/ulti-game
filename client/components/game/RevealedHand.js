@@ -22,7 +22,7 @@ export default function RevealedHand() {
       <div className={styles.label}>{declarerName} lapjai (terített)</div>
       <div className={styles.cards}>
         {sorted.map((card) => (
-          <CardComponent key={card.id} card={card} />
+          <CardComponent key={card.id} card={card} size="large" />
         ))}
       </div>
     </div>

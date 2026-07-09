@@ -15,7 +15,7 @@ export default function OpponentArea({ player, cardCount, score, isDeclarer, isA
       {marriages ? <div className={styles.marriage}>{marriages}</div> : null}
       <div className={styles.cards}>
         {Array.from({ length: Math.min(cardCount, 12) }).map((_, i) => (
-          <CardComponent key={i} faceDown size="small" />
+          <CardComponent key={i} faceDown size="tiny" />
         ))}
       </div>
       {wonTrick && <div className={styles.wonLabel}>vitte az ütést</div>}

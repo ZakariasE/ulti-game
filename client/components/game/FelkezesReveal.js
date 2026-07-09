@@ -23,7 +23,7 @@ export default function FelkezesReveal() {
       <div className={styles.label}>Kötelező ulti — {name} eredeti 5 lapja</div>
       <div className={styles.cards}>
         {sorted.map((card) => (
-          <CardComponent key={card.id} card={card} size="small" />
+          <CardComponent key={card.id} card={card} size="large" />
         ))}
       </div>
     </div>

@@ -21,6 +21,4 @@
   flex-wrap: wrap;
   gap: 4px;
   justify-content: center;
-  transform: scale(0.8);
-  transform-origin: center;
 }

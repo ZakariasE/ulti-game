@@ -23,6 +23,7 @@
 /* Size variants */
 .large { width: 92px; height: 148px; border-radius: 8px; }
 .small { width: 46px; height: 74px; border-radius: 5px; }
+.tiny { width: 34px; height: 55px; border-radius: 4px; }
 
 .clickable {
   cursor: pointer;

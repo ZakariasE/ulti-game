@@ -364,11 +364,9 @@ export default function BidPanel({ roomCode }) {
         {mustKontra && (
           <p className={styles.hint}><strong>Kötelező kontrázni vagy überelni ezt a betlit</strong> (a bemondó betlije befejezi a kötelező mondását).</p>
         )}
-        {!isNt && !noTrumpMode && (
+        {!isNt && !noTrumpMode && !namedTrump && (
           <p className={styles.hint}>
-            {namedTrump
-              ? 'Félkezesben azonnal meg kell mondani a színt (adut). Színtelen = adu nélkül.'
-              : 'Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu. Színtelen = adu nélkül.'}
+            Az adu színt (Makk/Zöld/Tök) az első hívásnál választod ki. A Piros = piros adu. Színtelen = adu nélkül.
           </p>
         )}
       </div>
